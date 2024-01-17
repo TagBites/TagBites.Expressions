@@ -1,0 +1,21 @@
+name: publish preview
+
+on:
+  push:
+    tags:
+    - "v?[0-9]+.[0-9]+.[0-9]+-preview.[0-9]+"
+
+jobs:
+  publish-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: TagBites/actions/dotnet-build@master
+      with:
+        solution: TagBites.Expressions.sln
+    - uses: TagBites/actions/nuget-publish@master
+      with:
+        nuget-source: "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+        nuget-key: "${{ secrets.GITHUB_TOKEN }}"

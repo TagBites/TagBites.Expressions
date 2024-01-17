@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <Description>Converts C# text expressions into LINQ expressions using **Roslyn**, supporting complete language syntax.</Description>
+    <PackageTags>LINQ;expressions;Roslyn;csharp</PackageTags>
+
+    <PackageProjectUrl>https://github.com/TagBites/TagBites.Expressions</PackageProjectUrl>
+    <PackageIconUrl></PackageIconUrl>
+
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/TagBites/TagBites.Expressions.git</RepositoryUrl>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,23 @@
+<Project>
+    <PropertyGroup>
+      <MinVerDefaultPreReleaseIdentifiers>preview</MinVerDefaultPreReleaseIdentifiers>
+    </PropertyGroup>
+
+    <Target Name="VersionFromGit" AfterTargets="MinVer">
+        <PropertyGroup>
+            <VersionPrefix>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch)</VersionPrefix>
+            <VersionSuffix>$(MinVerPreRelease)</VersionSuffix>
+            <VersionFull Condition=" '$(VersionSuffix)' == '' ">$(VersionPrefix)</VersionFull>
+            <VersionFull Condition=" '$(VersionSuffix)' != '' ">$(VersionPrefix)-$(VersionSuffix)</VersionFull>
+
+            <Version>$(VersionFull)</Version>
+            <PackageVersion>$(VersionFull)</PackageVersion>
+            <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+            <AssemblyFileVersion>$(VersionPrefix).0</AssemblyFileVersion>
+            <InformationalVersion>$(VersionFull)</InformationalVersion>
+        </PropertyGroup>
+        
+        <Message Importance="High" Text="InformationalVersion: $(InformationalVersion)"/>
+    </Target>
+
+</Project>

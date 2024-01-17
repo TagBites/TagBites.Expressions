@@ -1,0 +1,21 @@
+<Project>
+
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="4.3.0">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Copy package to local packages repository -->
+  <Target Name="CopyPackage" AfterTargets="Pack" Condition="exists('$(MSBuildThisFileDirectory)..\LocalPackages\')">
+    <Message Text="Copy '$(PackageOutputPath)$(PackageId).$(PackageVersion).nupkg' to '$(MSBuildThisFileDirectory)..\LocalPackages\'" Importance="high"/>
+    <Copy
+      SourceFiles="$(PackageOutputPath)$(PackageId).$(PackageVersion).nupkg"
+      DestinationFolder="$(MSBuildThisFileDirectory)..\LocalPackages\"
+      ContinueOnError="false" />
+
+    <Message Text="Delete local package folder 'C:\Users\$([System.Environment]::UserName)\.nuget\packages\$(PackageId)\$(PackageVersion)'" Importance="high"/>
+    <RemoveDir Directories="C:\Users\$([System.Environment]::UserName)\.nuget\packages\$(PackageId)\$(PackageVersion)" />
+  </Target>
+
+</Project>

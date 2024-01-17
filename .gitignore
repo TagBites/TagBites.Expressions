@@ -1,0 +1,14 @@
+# User-specific files
+*.DotSettings
+*.user
+
+# Folders
+/Build/keys
+/Build/*.exe
+/Build/*.dll
+/Build/*.nupkg
+/TestResults
+.vs/
+packages/
+[Bb]in/
+[Oo]bj/

@@ -1,0 +1,21 @@
+name: publish
+
+on:
+  push:
+    tags:
+    - "v?[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: TagBites/actions/dotnet-build@master
+      with:
+        solution: TagBites.Expressions.sln
+    - uses: TagBites/actions/nuget-publish@master
+      with:
+        nuget-source: "https://api.nuget.org/v3/index.json"
+        nuget-key: "${{ secrets.NUGET_KEY }}"

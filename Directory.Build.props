@@ -1,0 +1,63 @@
+<Project>
+
+  <!-- Company/Copyright -->
+  <PropertyGroup>
+    <Company>Tag Bites sp. z o.o.</Company>
+    <Authors>Tag Bites sp. z o.o.</Authors>
+    <CopyrightSinceYear>2012</CopyrightSinceYear>
+
+    <Copyright>© $(CopyrightSinceYear)-$([System.DateTime]::Today.ToString(`yyyy`)) $(Company)</Copyright>
+  </PropertyGroup>
+
+  <!-- Bin/Obj directories -->
+  <PropertyGroup>
+    <BaseOutputPath>$(SolutionDir)bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <PackageOutputPath>$(SolutionDir)bin\</PackageOutputPath>
+    <BaseIntermediateOutputPath>$(SolutionDir)bin\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+  <!-- Compilation settings -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Documentation -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Warnings -->
+  <PropertyGroup>
+    <NoWarn>1701;1702;1591;NU5048;NU5125;IDE0290</NoWarn>
+  </PropertyGroup>
+
+  <!-- Globalization -->
+  <PropertyGroup>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+
+  <!-- Ignored files/folders -->
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);*.csproj.DotSettings</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- Usings -->
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.Collections" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+    <Using Include="JetBrains.Annotations" />
+  </ItemGroup>
+
+  <!-- Includes -->
+  <Import Condition="exists('Version.props')" Project="Version.props" />
+  <Import Condition="exists('Package.props')" Project="Package.props" /> 
+
+</Project>

@@ -1,0 +1,48 @@
+# top-most EditorConfig file
+root = true
+
+# charset
+[*]
+charset = utf-8
+
+# lines
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = off
+
+# tabs
+[*]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.{csproj,props,resx,targets}]
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+# rules
+# CA2225: Operator overloads have named alternates
+dotnet_diagnostic.CA2225.severity = none
+# CA1716: Identifiers should not match keywords
+dotnet_diagnostic.CA1716.severity = none
+# CA1054: URI-like parameters should not be strings
+dotnet_diagnostic.CA1054.severity = none
+# CA1056: URI-like properties should not be strings
+dotnet_diagnostic.CA1056.severity = none
+# CA1062: Validate arguments of public methods
+dotnet_diagnostic.CA1062.severity = none
+# CA1033: Interface methods should be callable by child types
+dotnet_diagnostic.CA1033.severity = none
+# CA1034: Nested types should not be visible
+dotnet_diagnostic.CA1034.severity = none
+# CA1308: Normalize strings to uppercase
+dotnet_diagnostic.CA1308.severity = none
+# CA1805: Do not initialize unnecessarily
+dotnet_diagnostic.CA1805.severity = none
+# CA1031: Do not catch general exception types
+dotnet_diagnostic.CA1031.severity = none
+# CA1714: Flags enums should have plural names
+dotnet_diagnostic.CA1714.severity = none
