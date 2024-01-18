@@ -502,11 +502,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 var oldExtensionInstance = _extensionInstance;
                 _extensionInstance = instanceExpression;
+                try
                 {
                     if (TryResolveMethodCall(node, null, parameters, methods, out var expression))
                         return expression;
                 }
-                _extensionInstance = oldExtensionInstance;
+                finally
+                {
+                    _extensionInstance = oldExtensionInstance;
+                }
             }
         }
 
