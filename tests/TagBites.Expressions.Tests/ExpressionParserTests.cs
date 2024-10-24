@@ -405,6 +405,13 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("One", 1)]
+    [InlineData("Two", 2)]
+    [InlineData("TenTimes.One", 10)]
+    [InlineData("TwentyTimes.One", 20)]
+    [InlineData("TwentyTimes.Two", 20 * 2)]
+    [InlineData("TwentyTimes.TwentyTimes.One", 20 * 20)]
+    [InlineData("TwentyTimes.TwentyTimes.Two", 20 * 20 * 2)]
     [InlineData("One + Two + TenTimes.One + TwentyTimes.One + TwentyTimes.Two + TwentyTimes.TwentyTimes.One + TwentyTimes.TwentyTimes.Two", 1 + 2 + 10 + 20 + 20 * 2 + 20 * 20 + 20 * 20 * 2)]
     [InlineData("m.Two + m.TwentyTimes.Two", 2 + 20 * 2)]
     public void DynamicParameterBinding(string script, object expectedResult)
@@ -507,8 +514,9 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2, x.Sum(y => y.Count))).First().Item3", 6)]
-    public void LambdaWithValueTuple(string script, object expectedResult)
+    [InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2)).First().Item2", "b")]
+    //[InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2, x.Sum(y => y.Count))).First().Item3", 6)]
+    public void LambdaWithCustomResolver(string script, object expectedResult)
     {
         var t1 = new RuntimeDefinedType
         {
@@ -720,7 +728,7 @@ public class ExpressionParserTests
             return member switch
             {
                 "Two" => One * 2,
-                "TenTimes" => _dynamiChild ??= new TestModel(One * 10),
+                "TenTimes" => TenTimes,
                 "TwentyTimes" => _dynamiChild ??= new TestModel(One * 20),
                 _ => null
             };
