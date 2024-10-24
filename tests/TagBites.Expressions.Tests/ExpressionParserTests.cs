@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace TagBites.Expressions.Tests;
 
@@ -431,6 +432,41 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("TenTimes.One", "this.TenTimes.One")]
+    [InlineData("m.TenTimes.One", "m.TenTimes.One")]
+    [InlineData("TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One", "this.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One")]
+    [InlineData("m.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One", "m.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One")]
+    public void FullMemberPathTest(string script, string expectedPath)
+    {
+        var maxPath = string.Empty;
+
+        var options = new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(TestModel), "this"),
+                (typeof(TestModel), "m")
+            },
+            UseFirstParameterAsThis = true,
+            CustomPropertyResolver = context =>
+            {
+                if (context.MemberFullPath?.Length > maxPath.Length)
+                    maxPath = context.MemberFullPath;
+
+                if (context.Instance.Type == typeof(TestModel) && TestModel.GetMemberType(context.MemberName) is { } type)
+                    return Expression.Convert(
+                        Expression.Call(context.Instance, typeof(TestModel).GetMethod("GetValue")!, Expression.Constant(context.MemberName)),
+                        type);
+
+                return null;
+            },
+        };
+        ExpressionParser.Parse(script, options);
+
+        Assert.Equal(expectedPath, maxPath);
+    }
+
+    [Theory]
     [InlineData("list.First()", 1)]
     [InlineData("list.FirstOrDefault()", 1)]
     [InlineData("list.Count()", 3)]
@@ -468,6 +504,55 @@ public class ExpressionParserTests
         };
         //var w= new List<IList<int>> { new List<int> { 1, 2, 3 }, new List<int> { 4, 5, 6 } }.Select(x=>x.Select(y=>y.))
         ExecuteAndTest(script, options, expectedResult, args);
+    }
+
+    [Theory]
+    [InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2, x.Sum(y => y.Count))).First().Item3", 6)]
+    public void LambdaWithValueTuple(string script, object expectedResult)
+    {
+        var t1 = new RuntimeDefinedType
+        {
+            Properties = { { "K1", typeof(string) }, { "K2", typeof(string) }, { "Count", typeof(int) } }
+        };
+        var models = new RuntimeDefinedTypeInstanceCollection(t1)
+            {
+                new (t1) { ["K1"] = "a", ["K2"] = "b", ["Count"] = 1  },
+                new (t1) { ["K1"] = "a", ["K2"] = "b", ["Count"] = 2  },
+                new (t1) { ["K1"] = "c", ["K2"] = "d", ["Count"] = 3  },
+                new (t1) { ["K1"] = "c", ["K2"] = "d", ["Count"] = 4  }
+            };
+
+        var options = new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(object), "this")
+            },
+            UseFirstParameterAsThis = true,
+            CustomPropertyResolver = CustomPropertyResolver
+        };
+
+        ExecuteAndTest(script, options, expectedResult, (object?)null);
+
+        Expression? CustomPropertyResolver(IExpressionMemberResolverContext arg)
+        {
+            if (arg.MemberFullPath == "this.models")
+                return arg.IncludeTypeInfo(Expression.Constant(models), t1);
+
+            if (arg.Instance.Type == typeof(RuntimeDefinedTypeInstance)
+                && arg.InstanceTypeInfo is RuntimeDefinedType { } type
+                && type.Properties.TryGetValue(arg.MemberName, out var p))
+            {
+                var method = typeof(RuntimeDefinedTypeInstance)
+                    .GetMethod(nameof(RuntimeDefinedTypeInstance.GetTypedValue), BindingFlags.Instance | BindingFlags.Public)!
+                    .MakeGenericMethod(p);
+                var getValue = Expression.Call(arg.Instance, method, Expression.Constant(arg.MemberName));
+
+                return getValue;
+            }
+
+            return null;
+        }
     }
 
     [Theory]
@@ -635,6 +720,7 @@ public class ExpressionParserTests
             return member switch
             {
                 "Two" => One * 2,
+                "TenTimes" => _dynamiChild ??= new TestModel(One * 10),
                 "TwentyTimes" => _dynamiChild ??= new TestModel(One * 20),
                 _ => null
             };
@@ -644,6 +730,7 @@ public class ExpressionParserTests
             return member switch
             {
                 "Two" => typeof(int),
+                "TenTimes" => typeof(TestModel),
                 "TwentyTimes" => typeof(TestModel),
                 _ => null
             };

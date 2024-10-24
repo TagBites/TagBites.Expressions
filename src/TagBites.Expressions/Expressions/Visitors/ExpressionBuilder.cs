@@ -25,6 +25,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private MemberResolverContext? _resolverContext;
     private ParameterExpression? _variableContextParameter;
     private List<(Type Type, string Name, int Index)>? _variables;
+    private Dictionary<Expression, string>? _fullMemberPath;
     private int _nextVariableIndex;
 
     public string? FirstError { get; private set; }
@@ -1197,7 +1198,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         _resolverContext ??= new MemberResolverContext(this);
         _resolverContext.Switch(_extensionInstance, expression, name);
 
-        return resolver(_resolverContext);
+        if (_fullMemberPath?.TryGetValue(expression, out var fullMemberPath) == true)
+            _resolverContext.MemberFullPath = fullMemberPath + "." + name;
+
+        var next = resolver(_resolverContext);
+        if (next != null)
+        {
+            _fullMemberPath ??= new Dictionary<Expression, string>();
+            _fullMemberPath[next] = _resolverContext.MemberFullPath?.Length > 0 ? _resolverContext.MemberFullPath : name;
+        }
+
+        return next;
     }
 
     private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, Type? resultType)
@@ -2018,6 +2029,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     ? _memberFullPath
                     : null;
             }
+            set => _memberFullPath = value;
         }
 
         public MemberResolverContext(ExpressionBuilder visitor) => _visitor = visitor;
