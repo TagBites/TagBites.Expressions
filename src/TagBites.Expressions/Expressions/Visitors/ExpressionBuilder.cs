@@ -387,7 +387,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Find instance, type, name syntax
         Expression? instanceExpression;
         Type? instanceType;
-        SimpleNameSyntax methodNameSyntax;
+        SimpleNameSyntax? methodNameSyntax;
+        string methodName;
 
         switch (node.Expression)
         {
@@ -395,6 +396,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 {
                     instanceExpression = null;
                     methodNameSyntax = ins;
+
+                    // Parameter as method
+                    var name = methodNameSyntax.Identifier.Text;
+                    var parameter = _parameters.FirstOrDefault(x => x.Name == name && x != _thisParameter);
+                    if (parameter != null && typeof(Delegate).IsAssignableFrom(parameter.Type))
+                    {
+                        instanceExpression = parameter;
+                        methodNameSyntax = null;
+                        methodName = "Invoke";
+                    }
+                    else
+                        methodName = methodNameSyntax.Identifier.Text;
                 }
                 break;
 
@@ -405,6 +418,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         return null;
 
                     methodNameSyntax = ma.Name;
+                    methodName = methodNameSyntax.Identifier.Text;
                     break;
                 }
 
@@ -415,6 +429,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         return null;
 
                     methodNameSyntax = mbs.Name;
+                    methodName = methodNameSyntax.Identifier.Text;
                     break;
                 }
 
@@ -435,7 +450,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         // Method name with generics
-        var methodName = methodNameSyntax.Identifier.Text;
         Type[]? genericTypes = null;
 
         if (methodNameSyntax is GenericNameSyntax gns)

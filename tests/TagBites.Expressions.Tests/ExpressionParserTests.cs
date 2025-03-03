@@ -622,6 +622,21 @@ public class ExpressionParserTests
         ExecuteAndTest(script, options, expectedResult, new TestModel());
     }
 
+    [Fact]
+    public void DelegateAsParameter()
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = {
+                (typeof(Func<object?, object?>), "a"),
+            }
+        };
+
+        Assert.Null(Execute("a?.Invoke(42)", options, [null]));
+        Assert.Equal(Execute("a?.Invoke(42)", options, (Func<object, object>)(x => x)), 42);
+        Assert.Equal(Execute("a(42)", options, (Func<object, object>)(x => x)), 42);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
