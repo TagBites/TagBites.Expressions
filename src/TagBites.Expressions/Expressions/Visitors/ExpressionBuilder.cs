@@ -1318,7 +1318,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // ReSharper disable StringLiteralTypo
         if (methodName is not ("typeis" or "typeas" or "typecast")
             || parameters.Count != 2
-            || parameters[0] is not ConstantExpression { Value: string typeName })
+            || parameters[1] is not ConstantExpression { Value: string typeName })
         {
             return null;
         }
@@ -1327,7 +1327,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (runtimeType == null)
             return ToError(node, $"Runtime type '{typeName}' not found.");
 
-        var expression = parameters[1];
+        var expression = parameters[0];
 
         return methodName switch
         {

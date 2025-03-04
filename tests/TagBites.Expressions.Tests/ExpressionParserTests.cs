@@ -137,7 +137,7 @@ public class ExpressionParserTests
     [InlineData("v + v", 20)]
     [InlineData(@"v.ToString() + ""-"" + t", "10-ten")]
     [InlineData("int.Parse(v.ToString().Substring(0,1))", 1)]
-    [InlineData("m.TenTimes.One + m.One", 11)]
+    [InlineData("m.TimesTen.Value + m.Value", 11)]
     public void Arguments(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -157,11 +157,11 @@ public class ExpressionParserTests
     [InlineData("((TimeSpan?)TimeSpan.FromMinutes(2))?.TotalMinutes", 2d)]
     [InlineData("((TimeSpan?)TimeSpan.FromMinutes(2)).Value.TotalMinutes", 2d)]
     [InlineData("nv.Value", 5)]
-    [InlineData("m?.TenTimes != null", true)]
-    [InlineData("m?.TenTimes?.One", 10)]
-    [InlineData("nv + m.TenTimes?.TenTimes.One + m.TenTimes?.One", 115)]
+    [InlineData("m?.TimesTen != null", true)]
+    [InlineData("m?.TimesTen?.Value", 10)]
+    [InlineData("nv + m.TimesTen?.TimesTen.Value + m.TimesTen?.Value", 115)]
     [InlineData("(1 < 2 ? (int?)1 : 2).Value", 1)]
-    [InlineData("(m?.TenTimes.One ?? nv).Value", 10)]
+    [InlineData("(m?.TimesTen.Value ?? nv).Value", 10)]
     public void ConditionalOperators(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -350,9 +350,9 @@ public class ExpressionParserTests
     [InlineData(@"m is { NullChild: not null }", false)]
     [InlineData(@"m is { NullChild: not { } }", true)]
     [InlineData(@"m is { NullChild: { } }", false)]
-    [InlineData(@"m is { NullChild: null, TenTimes: { } }", true)]
-    [InlineData(@"m is { NullChild: null, TenTimes: not { } }", false)]
-    [InlineData(@"m is TestModel { NullChild: null, TenTimes: { } } a && a.TenTimes.Value == 10", true)]
+    [InlineData(@"m is { NullChild: null, TimesTen: { } }", true)]
+    [InlineData(@"m is { NullChild: null, TimesTen: not { } }", false)]
+    [InlineData(@"m is TestModel { NullChild: null, TimesTen: { } } a && a.TimesTen.Value == 10", true)]
     public void PatternProperty(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -388,7 +388,7 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("TenTimes.One + One + v", 16)]
+    [InlineData("TimesTen.Value + Value + v", 16)]
     public void ThisParameter(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -405,15 +405,15 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("One", 1)]
-    [InlineData("Two", 2)]
-    [InlineData("TenTimes.One", 10)]
-    [InlineData("TwentyTimes.One", 20)]
-    [InlineData("TwentyTimes.Two", 20 * 2)]
-    [InlineData("TwentyTimes.TwentyTimes.One", 20 * 20)]
-    [InlineData("TwentyTimes.TwentyTimes.Two", 20 * 20 * 2)]
-    [InlineData("One + Two + TenTimes.One + TwentyTimes.One + TwentyTimes.Two + TwentyTimes.TwentyTimes.One + TwentyTimes.TwentyTimes.Two", 1 + 2 + 10 + 20 + 20 * 2 + 20 * 20 + 20 * 20 * 2)]
-    [InlineData("m.Two + m.TwentyTimes.Two", 2 + 20 * 2)]
+    [InlineData("Value", 1)]
+    [InlineData("TimesTwo", 2)]
+    [InlineData("TimesTen.Value", 10)]
+    [InlineData("TimesTwenty.Value", 20)]
+    [InlineData("TimesTwenty.TimesTwo", 20 * 2)]
+    [InlineData("TimesTwenty.TimesTwenty.Value", 20 * 20)]
+    [InlineData("TimesTwenty.TimesTwenty.TimesTwo", 20 * 20 * 2)]
+    [InlineData("Value + TimesTwo + TimesTen.Value + TimesTwenty.Value + TimesTwenty.TimesTwo + TimesTwenty.TimesTwenty.Value + TimesTwenty.TimesTwenty.TimesTwo", 1 + 2 + 10 + 20 + 20 * 2 + 20 * 20 + 20 * 20 * 2)]
+    [InlineData("m.TimesTwo + m.TimesTwenty.TimesTwo", 2 + 20 * 2)]
     public void DynamicParameterBinding(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -439,10 +439,10 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("TenTimes.One", "this.TenTimes.One")]
-    [InlineData("m.TenTimes.One", "m.TenTimes.One")]
-    [InlineData("TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One", "this.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One")]
-    [InlineData("m.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One", "m.TenTimes.TwentyTimes.TenTimes.TwentyTimes.TenTimes.TwentyTimes.One")]
+    [InlineData("TimesTen.Value", "this.TimesTen.Value")]
+    [InlineData("m.TimesTen.Value", "m.TimesTen.Value")]
+    [InlineData("TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value", "this.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value")]
+    [InlineData("m.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value", "m.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value")]
     public void FullMemberPathTest(string script, string expectedPath)
     {
         var maxPath = string.Empty;
@@ -600,13 +600,13 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData(@"typeis(""System.String,System.Private.CoreLib"", ""a"")", true)]
-    [InlineData(@"typeis(""System.String,System.Private.CoreLib"", m)", false)]
-    [InlineData(@"typeis(""System.String,System.Private.CoreLib"", null)", false)]
-    [InlineData(@"typeas(""System.String,System.Private.CoreLib"", ""a"")", "a")]
-    [InlineData(@"typeas(""System.String,System.Private.CoreLib"", null)", null)]
-    [InlineData(@"typecast(""System.String,System.Private.CoreLib"", null)", null)]
-    [InlineData(@"typecast(""System.String,System.Private.CoreLib"", ""a"")", "a")]
+    [InlineData(@"typeis(""a"", ""System.String,System.Private.CoreLib"")", true)]
+    [InlineData(@"typeis(m, ""System.String,System.Private.CoreLib"")", false)]
+    [InlineData(@"typeis(null, ""System.String,System.Private.CoreLib"")", false)]
+    [InlineData(@"typeas(""a"", ""System.String,System.Private.CoreLib"")", "a")]
+    [InlineData(@"typeas(null, ""System.String,System.Private.CoreLib"")", null)]
+    [InlineData(@"typecast(null, ""System.String,System.Private.CoreLib"")", null)]
+    [InlineData(@"typecast(""a"", ""System.String,System.Private.CoreLib"")", "a")]
     public void RuntimeCast(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -623,7 +623,7 @@ public class ExpressionParserTests
     }
 
     [Fact]
-    public void DelegateAsParameter()
+    public void FuncAsParameter()
     {
         var options = new ExpressionParserOptions
         {
@@ -635,9 +635,12 @@ public class ExpressionParserTests
         Assert.Null(Execute("a?.Invoke(42)", options, [null]));
         Assert.Equal(Execute("a?.Invoke(42)", options, (Func<object, object>)(x => x)), 42);
         Assert.Equal(Execute("a(42)", options, (Func<object, object>)(x => x)), 42);
+    }
 
-        // Void method
-        options = new ExpressionParserOptions
+    [Fact]
+    public void ActionAsParameter()
+    {
+        var options = new ExpressionParserOptions
         {
             Parameters = {
                 (typeof(Action<object>), "a")
@@ -647,13 +650,18 @@ public class ExpressionParserTests
                 typeof(TestModel)
             }
         };
+        var voidCallCount = 0;
 
         Assert.Null(Execute("a(42)", options, (Action<object>)VoidMethod));
         Assert.Null(Execute("a.Invoke(42)", options, (Action<object>)VoidMethod));
         Assert.Null(Execute("a?.Invoke(42)", options, (Action<object>)VoidMethod));
+        Assert.Null(Execute("a?.Invoke(42)", options, [null]));
+        Assert.Equal(3, voidCallCount);
+
         Assert.Null(Execute("TestModel.StaticVoidMethod(42)", options, (Action<object>)VoidMethod));
 
-        void VoidMethod(object x) { }
+        void VoidMethod(object x) => ++voidCallCount;
+    }
     }
 
     [Theory]
@@ -745,25 +753,24 @@ public class ExpressionParserTests
         private TestModel? _child;
         private TestModel? _dynamiChild;
 
-        public int Value => One;
-        public int One { get; }
-        public TestModel TenTimes => _child ??= new TestModel(One * 10);
+        public int Value { get; }
+        public TestModel TimesTen => _child ??= new TestModel(Value * 10);
 
         public int Field1 { get; set; }
         public int Field2 { get; set; }
 
         public TestModel? NullChild => null;
 
-        public TestModel(int value = 1) => One = value;
+        public TestModel(int value = 1) => Value = value;
 
 
         public object? GetValue(string member)
         {
             return member switch
             {
-                "Two" => One * 2,
-                "TenTimes" => TenTimes,
-                "TwentyTimes" => _dynamiChild ??= new TestModel(One * 20),
+                "TimesTwo" => Value * 2,
+                "TimesTen" => TimesTen,
+                "TimesTwenty" => _dynamiChild ??= new TestModel(Value * 20),
                 _ => null
             };
         }
@@ -771,9 +778,9 @@ public class ExpressionParserTests
         {
             return member switch
             {
-                "Two" => typeof(int),
-                "TenTimes" => typeof(TestModel),
-                "TwentyTimes" => typeof(TestModel),
+                "TimesTwo" => typeof(int),
+                "TimesTen" => typeof(TestModel),
+                "TimesTwenty" => typeof(TestModel),
                 _ => null
             };
         }
