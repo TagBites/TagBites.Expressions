@@ -635,6 +635,23 @@ public class ExpressionParserTests
         Assert.Null(Execute("a?.Invoke(42)", options, [null]));
         Assert.Equal(Execute("a?.Invoke(42)", options, (Func<object, object>)(x => x)), 42);
         Assert.Equal(Execute("a(42)", options, (Func<object, object>)(x => x)), 42);
+
+        // Void method
+        options = new ExpressionParserOptions
+        {
+            Parameters = {
+                (typeof(Action<object>), "a")
+            },
+            IncludedTypes =
+            {
+                typeof(Console)
+            }
+        };
+
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a(42)", options));
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a.Invoke(42)", options));
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a?.Invoke(42)", options));
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("Console.WriteLine(42)", options));
     }
 
     [Theory]
