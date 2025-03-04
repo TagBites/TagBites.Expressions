@@ -662,6 +662,39 @@ public class ExpressionParserTests
 
         void VoidMethod(object x) => ++voidCallCount;
     }
+
+    [Theory]
+    [InlineData("GetValue(\"TimesTwo\")", 2)]
+    [InlineData("v == 5", true)]
+    [InlineData("nv.HasValue && nv == 5", true)]
+    [InlineData("Add.Invoke(2, 3)", 5)]
+    [InlineData("Add?.Invoke(2, 3)", 5)]
+    [InlineData("Add(2, 3)", 5)]
+    [InlineData("m.TimesTen.Value", 10)]
+    [InlineData("m?.TimesTen.Value", 10)]
+    [InlineData("m.GetValue(\"TimesTwo\")", 2)]
+    [InlineData("this.GetValue(\"TimesTwo\")", 2)]
+    [InlineData("this.TimesTen.Value", 10)]
+    [InlineData("TimesTen.Value", 10)]
+    [InlineData("ReturnIt<int>(2)", 2)]
+    [InlineData("this.ReturnIt<int>(2)", 2)]
+    [InlineData("m.ReturnIt<int>(2)", 2)]
+    public void GlobalMembers(string script, object? expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            GlobalMembers =
+            {
+                {"this", (null, new TestModel())},
+                {"m", (null, new TestModel())},
+                {"v", (null, 5)},
+                {"nv", (typeof(int?), 5)},
+                {"Add", (null, (Func<int, int, int>)Add)},
+            }
+        };
+        ExecuteAndTest(script, options, expectedResult);
+
+        int Add(int a, int b) => a + b;
     }
 
     [Theory]

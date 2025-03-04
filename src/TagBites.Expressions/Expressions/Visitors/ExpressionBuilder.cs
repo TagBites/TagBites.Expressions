@@ -17,7 +17,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static MethodInfo? s_typeInfoWrapper;
 
     private readonly ExpressionParserOptions _options;
-    private readonly ParameterExpression? _thisParameter;
+    private readonly Expression? _thisParameter;
     private readonly List<ParameterExpression> _parameters;
     private Expression? _tmp;
     private Expression? _extensionInstance;
@@ -35,8 +35,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         _options = options;
         _parameters = options.Parameters.Select(x => Expression.Parameter(x.Type, x.Name)).ToList();
 
-        if (options.UseFirstParameterAsThis && _parameters.Count > 0)
-            _thisParameter = _parameters[0];
+        if (options.UseFirstParameterAsThis)
+        {
+            if (_parameters.Count > 0)
+                _thisParameter = _parameters[0];
+        }
+        else if (options.GlobalMembers.TryGetValue("this", out var item) && item.Value != null)
+            _thisParameter = Expression.Constant(item.Value, GetGlobalMemberType("this", item));
     }
 
 
@@ -394,7 +399,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         {
             case IdentifierNameSyntax ins:
                 {
-                    instanceExpression = null;
                     methodNameSyntax = ins;
 
                     // Parameter as method
@@ -406,8 +410,29 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         methodNameSyntax = null;
                         methodName = "Invoke";
                     }
+                    // Member as method
+                    else if (_options.GlobalMembers.TryGetValue(name, out var item)
+                             && GetGlobalMemberType(name, item) is var memberType
+                             && typeof(Delegate).IsAssignableFrom(memberType))
+                    {
+                        instanceExpression = Expression.Constant(item.Value, memberType);
+                        methodNameSyntax = null;
+                        methodName = "Invoke";
+                    }
+                    // Custom operator or 'this' method
                     else
+                    {
                         methodName = methodNameSyntax.Identifier.Text;
+
+                        if (_options.AllowRuntimeCast
+                            && methodName is "typeis" or "typeas" or "typecast"
+                            && ResolveCustomKeywords(node, methodName, parameters) is { } expression)
+                        {
+                            return expression;
+                        }
+
+                        instanceExpression = _thisParameter;
+                    }
                 }
                 break;
 
@@ -429,6 +454,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         return null;
 
                     methodNameSyntax = mbs.Name;
+                    methodName = methodNameSyntax.Identifier.Text;
+                    break;
+                }
+
+            case GenericNameSyntax g:
+                {
+                    instanceExpression = _thisParameter;
+                    methodNameSyntax = g;
                     methodName = methodNameSyntax.Identifier.Text;
                     break;
                 }
@@ -468,13 +501,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Custom keywords
         if (instanceType == null)
         {
-            if (_options.AllowRuntimeCast
-                && genericTypes == null
-                && ResolveCustomKeywords(node, methodName, parameters) is { } expression)
-            {
-                return expression;
-            }
-
             if (FirstError != null)
                 return null;
 
@@ -1017,6 +1043,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return expression;
         }
 
+        // Members
+        if (_options.GlobalMembers.TryGetValue(name, out var item))
+            return Expression.Constant(item.Value, GetGlobalMemberType(name, item));
+
         // Static type
         var type = ResolveType(node, name);
         if (type != null)
@@ -1205,8 +1235,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private Expression? ResolveCustomMember(Expression expression, string name)
     {
-        var resolver = _options.CustomPropertyResolver;
-        if (resolver == null)
+        if (_options.CustomPropertyResolver is not { } resolver)
             return null;
 
         _resolverContext ??= new MemberResolverContext(this);
@@ -1316,12 +1345,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private Expression? ResolveCustomKeywords(SyntaxNode node, string methodName, IList<Expression> parameters)
     {
         // ReSharper disable StringLiteralTypo
-        if (methodName is not ("typeis" or "typeas" or "typecast")
-            || parameters.Count != 2
-            || parameters[1] is not ConstantExpression { Value: string typeName })
-        {
+        if (parameters.Count != 2 || parameters[1] is not ConstantExpression { Value: string typeName })
             return null;
-        }
 
         var runtimeType = Type.GetType(typeName);
         if (runtimeType == null)
@@ -1954,6 +1979,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return code is >= TypeCode.Byte and <= TypeCode.UInt64
             ? code is TypeCode.Byte or TypeCode.UInt16 or TypeCode.UInt32 or TypeCode.UInt64
             : null;
+    }
+    private static Type GetGlobalMemberType(string name, (Type? Type, object? Value) member)
+    {
+        if (member is { Type: not null, Value: not null } && !member.Type.IsAssignableFrom(member.Value.GetType()))
+            throw new ArgumentException($"Member value is not type of member type. Member '{name}'.");
+
+        return member.Type ?? member.Value?.GetType() ?? typeof(object);
     }
 
     private static Expression WrapWithTypeInfo(Expression expression, object typeInfo)
