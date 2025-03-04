@@ -84,3 +84,74 @@ private class TestModel
     public TestModel Nested => _nested ??= new TestModel { X = Y, Y = X + Y };
 }
 ```
+
+## Benchmark
+
+Benchmark for parsing the string `"Math.Pow(x, y) + 5"` into a LINQ expression.  
+Comparison of TagBites (v. 1.0.5) and DynamicExpresso (v. 2.17.2).
+
+| Method                            | Mean      | Error     | StdDev    | Allocated |
+|---------------------------------- |----------:|----------:|----------:|----------:|
+| TagBites                          |  8.355 us | 0.1583 us | 0.1555 us |    8.3 KB |
+| TagBites_SharedOptions            |  7.780 us | 0.1424 us | 0.1262 us |   8.04 KB |
+| DynamicExpresso                   | 26.860 us | 0.3166 us | 0.2962 us |  35.12 KB |
+| DynamicExpresso_SharedInterpreter | 17.087 us | 0.0903 us | 0.0800 us |  16.64 KB |
+
+
+```
+[MemoryDiagnoser]
+public class ParseToExpression
+{
+    private const string Script = "Math.Pow(x, y) + 5";
+
+    private readonly ExpressionParserOptions _options = new()
+    {
+        Parameters =
+        {
+            (typeof(double), "x"),
+            (typeof(double), "y")
+        }
+    };
+    private readonly Interpreter _interpreter = new();
+
+
+    [Benchmark]
+    public void TagBites()
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(double), "x"),
+                (typeof(double), "y")
+            }
+        };
+
+        ExpressionParser.Parse(Script, options);
+    }
+
+    [Benchmark]
+    public void TagBitesSharedOptions()
+    {
+        ExpressionParser.Parse(Script, _options);
+    }
+
+    [Benchmark]
+    public void DynamicExpresso()
+    {
+        var interpreter = new Interpreter();
+
+        interpreter.Parse(Script,
+            new Parameter("x", typeof(double)),
+            new Parameter("y", typeof(double)));
+    }
+
+    [Benchmark]
+    public void DynamicExpressoSharedInterpreter()
+    {
+        _interpreter.Parse(Script,
+            new Parameter("x", typeof(double)),
+            new Parameter("y", typeof(double)));
+    }
+}
+```
