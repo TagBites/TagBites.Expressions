@@ -1701,12 +1701,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return false;
 
         expression = Expression.Call(instanceExpression, bestMethod.Method, bestMethod.Arguments);
-        if (expression.Type == typeof(void))
-        {
-            expression = ToError(relatedNode, "Can not call method with void type as part of expression.");
-            return true;
-        }
-
         return true;
 
         MethodCallInfo? ToMatchingMethod(MethodInfo x)
@@ -2105,10 +2099,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (_type != member.Type)
                 member = Convert(Member, _type);
 
+            var constantExpression = _type == typeof(void)
+                ? (Expression)Invoke(Constant(() => { }))
+                : Constant(null, _type);
+
             return Condition(
                 ToIsNotNull(Instance),
                 member,
-                Constant(null, _type));
+                constantExpression);
         }
         public override string ToString()
         {

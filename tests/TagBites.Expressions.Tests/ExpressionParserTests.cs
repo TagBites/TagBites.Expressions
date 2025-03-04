@@ -644,14 +644,16 @@ public class ExpressionParserTests
             },
             IncludedTypes =
             {
-                typeof(Console)
+                typeof(TestModel)
             }
         };
 
-        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a(42)", options));
-        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a.Invoke(42)", options));
-        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("a?.Invoke(42)", options));
-        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("Console.WriteLine(42)", options));
+        Assert.Null(Execute("a(42)", options, (Action<object>)VoidMethod));
+        Assert.Null(Execute("a.Invoke(42)", options, (Action<object>)VoidMethod));
+        Assert.Null(Execute("a?.Invoke(42)", options, (Action<object>)VoidMethod));
+        Assert.Null(Execute("TestModel.StaticVoidMethod(42)", options, (Action<object>)VoidMethod));
+
+        void VoidMethod(object x) { }
     }
 
     [Theory]
@@ -780,6 +782,8 @@ public class ExpressionParserTests
         public T ReturnIt<T>(T value) => value;
 
         public T? GetExactOrDefault<T>(object v, T? defaultValue = default) => v is T v1 ? v1 : defaultValue;
+
+        public static void StaticVoidMethod(object _) { }
     }
     private struct TestStruct
     {
