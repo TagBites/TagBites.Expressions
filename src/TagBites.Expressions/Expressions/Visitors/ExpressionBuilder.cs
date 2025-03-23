@@ -1593,14 +1593,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return members;
     }
-    private static IList<MethodInfo> GetExtensionMethods(Type instanceType, string name)
+    private IList<MethodInfo> GetExtensionMethods(Type instanceType, string name)
     {
-        var members = new List<MethodInfo>();
+        IList<MethodInfo>? members = null;
 
-        // Extensions
+        // From known extensions
         if (TypeUtils.ContainsGenericDefinition(instanceType, typeof(IEnumerable<>)))
+            FindMembers(typeof(Enumerable));
+
+        // From included types
+        if (_options.IncludedTypes.Count > 0)
+            foreach (var type in _options.IncludedTypes)
+                if (type.IsAbstract && type.IsSealed)
+                    FindMembers(type);
+
+        return members ?? Array.Empty<MethodInfo>();
+
+        void FindMembers(Type type)
         {
-            var nextMembers = typeof(Enumerable).GetMethods(BindingFlags.Public | BindingFlags.Static);
+            var nextMembers = type.GetMethods(BindingFlags.Public | BindingFlags.Static);
 
             // ReSharper disable once ForCanBeConvertedToForeach
             // ReSharper disable once LoopCanBeConvertedToQuery
@@ -1616,12 +1627,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (!IsMatchingParameterType(thisParameter.ParameterType, instanceType))
                         continue;
 
+                    members ??= new List<MethodInfo>();
                     members.Add(item);
                 }
             }
         }
-
-        return members;
     }
     private static MemberInfo? GetAssignMember(Type type, string name)
     {

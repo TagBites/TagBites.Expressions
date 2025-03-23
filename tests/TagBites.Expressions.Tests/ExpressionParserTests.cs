@@ -1,6 +1,6 @@
-using System.Collections.ObjectModel;
 using System.Linq.Expressions;
 using System.Reflection;
+using TagBites.Expressions.Tests.Models;
 
 namespace TagBites.Expressions.Tests;
 
@@ -210,6 +210,20 @@ public class ExpressionParserTests
         var options = new ExpressionParserOptions
         {
             Parameters = { (typeof(TestModel), "m") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new TestModel());
+    }
+
+    [Theory]
+    [InlineData("m.GetValueExtension(2)", 2)]
+    [InlineData("m.GetValueUsingInterfaceExtension(2)", 2)]
+    public void ExtensionMethods(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(TestModel), "m") },
+            IncludedTypes = { typeof(TestModelExtensions) }
         };
 
         ExecuteAndTest(script, options, expectedResult, new TestModel());
@@ -773,115 +787,4 @@ public class ExpressionParserTests
         var expressionDelegate = expression.Compile();
         return expressionDelegate.DynamicInvoke(args);
     }
-
-    // ReSharper disable NotAccessedField.Local
-    // ReSharper disable UnusedMember.Local
-    // ReSharper disable MemberCanBePrivate.Local
-    private class ITestModel
-    {
-
-    }
-    private class TestModel : ITestModel
-    {
-        private TestModel? _child;
-        private TestModel? _dynamiChild;
-
-        public int Value { get; }
-        public TestModel TimesTen => _child ??= new TestModel(Value * 10);
-
-        public int Field1 { get; set; }
-        public int Field2 { get; set; }
-
-        public TestModel? NullChild => null;
-
-        public TestModel(int value = 1) => Value = value;
-
-
-        public object? GetValue(string member)
-        {
-            return member switch
-            {
-                "TimesTwo" => Value * 2,
-                "TimesTen" => TimesTen,
-                "TimesTwenty" => _dynamiChild ??= new TestModel(Value * 20),
-                _ => null
-            };
-        }
-        public static Type? GetMemberType(string member)
-        {
-            return member switch
-            {
-                "TimesTwo" => typeof(int),
-                "TimesTen" => typeof(TestModel),
-                "TimesTwenty" => typeof(TestModel),
-                _ => null
-            };
-        }
-
-        public T? ReturnForExactType<T>(object v) => v is T v1 ? v1 : default;
-        public T ReturnIt<T>(T value) => value;
-
-        public T? GetExactOrDefault<T>(object v, T? defaultValue = default) => v is T v1 ? v1 : defaultValue;
-
-        public static void StaticVoidMethod(object _) { }
-    }
-    private struct TestStruct
-    {
-        public int X;
-        public int Y;
-    }
-
-    private class RuntimeDefinedType
-    {
-        public Dictionary<string, Type> Properties { get; } = new();
-    }
-    private class RuntimeDefinedTypeInstance
-    {
-        public RuntimeDefinedType Type { get; }
-        private readonly Dictionary<string, object?> _values = new();
-
-        public object? this[string propertyName]
-        {
-            get => _values.GetValueOrDefault(propertyName);
-            set
-            {
-                var type = Type.Properties.GetValueOrDefault(propertyName);
-                if (type == null || value?.GetType() is { } t && !type.IsAssignableFrom(t))
-                    throw new ArgumentException();
-
-                _values[propertyName] = value;
-            }
-        }
-
-        public RuntimeDefinedTypeInstance(RuntimeDefinedType type) => Type = type;
-
-
-        public T? GetTypedValue<T>(string propertyName) => this[propertyName] is T t ? t : default;
-    }
-    private class RuntimeDefinedTypeInstanceCollection : Collection<RuntimeDefinedTypeInstance>
-    {
-        public RuntimeDefinedType Type { get; }
-
-        public RuntimeDefinedTypeInstanceCollection(RuntimeDefinedType type) => Type = type;
-
-
-        protected override void InsertItem(int index, RuntimeDefinedTypeInstance item)
-        {
-            if (item.Type != Type)
-                throw new ArgumentException();
-
-            base.InsertItem(index, item);
-        }
-        protected override void SetItem(int index, RuntimeDefinedTypeInstance item)
-        {
-            if (item.Type != Type)
-                throw new ArgumentException();
-
-            base.SetItem(index, item);
-        }
-    }
-
-    // ReSharper restore NotAccessedField.Local
-    // ReSharper restore UnusedMember.Local
-    // ReSharper restore MemberCanBePrivate.Local
 }
