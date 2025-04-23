@@ -1604,7 +1604,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // From included types
         if (_options.IncludedTypes.Count > 0)
             foreach (var type in _options.IncludedTypes)
-                if (type.IsAbstract && type.IsSealed)
+                if (type.IsAbstract && type.IsSealed && type != typeof(Enumerable))
                     FindMembers(type);
 
         return members ?? Array.Empty<MethodInfo>();
