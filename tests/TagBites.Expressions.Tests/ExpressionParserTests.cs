@@ -597,6 +597,16 @@ public class ExpressionParserTests
     public void TupleEquality(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("sizeof(bool)", 1)]
+    [InlineData("sizeof(byte)", 1)]
+    [InlineData("sizeof(char)", 2)]
+    [InlineData("sizeof(int)", 4)]
+    [InlineData("sizeof(long)", 8)]
+    [InlineData("sizeof(double)", 8)]
+    [InlineData("sizeof(decimal)", 16)]
+    public void SizeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(1, 2).Item1", 1)]
     [InlineData("(1, 2).Item2", 2)]
     [InlineData("(n, n + 1, a + a).Item1", 1)]

@@ -454,6 +454,26 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _checkedContext = previous;
         }
     }
+    public override Expression? VisitSizeOfExpression(SizeOfExpressionSyntax node)
+    {
+        var type = ResolveType(node.Type);
+        if (type == null)
+            return null;
+
+        var size = Type.GetTypeCode(type) switch
+        {
+            TypeCode.Boolean or TypeCode.SByte or TypeCode.Byte => 1,
+            TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Char => 2,
+            TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Single => 4,
+            TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Double => 8,
+            TypeCode.Decimal => 16,
+            _ => 0
+        };
+
+        return size > 0
+            ? Expression.Constant(size)
+            : ToError(node, $"Operator sizeof is not supported for type '{type.GetFriendlyTypeName()}'.");
+    }
     public override Expression? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
     {
         var instance = Visit(node.Expression);
