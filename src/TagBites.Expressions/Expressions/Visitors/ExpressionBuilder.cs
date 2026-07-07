@@ -740,25 +740,140 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitArrayCreationExpression(ArrayCreationExpressionSyntax node)
     {
-        var type = ResolveType(node.Type.ElementType);
-        if (type == null)
+        var elementType = ResolveType(node.Type.ElementType);
+        if (elementType == null)
             return null;
 
-        if (node.Type.RankSpecifiers.Count > 1 || node.Type.RankSpecifiers[0].Sizes[0] is not OmittedArraySizeExpressionSyntax)
-            return ToError(node.Type, "Array with explicit range specifiers is not supported.");
+        // Jagged array creation (int[][]) - not supported
+        if (node.Type.RankSpecifiers.Count != 1)
+            return ToError(node.Type, "Jagged array creation is not supported.");
 
-        var expressions = new List<Expression>();
+        var rankSpecifier = node.Type.RankSpecifiers[0];
+        var rank = rankSpecifier.Rank;
 
+        // With initializer, optional sizes inferred from the initializer
         if (node.Initializer != null)
-            foreach (var expression in node.Initializer.Expressions)
+        {
+            // Simple array
+            if (rank == 1)
             {
-                var exp = Visit(expression);
-                if (exp == null)
-                    return null;
-                expressions.Add(exp);
+                var expressions = new List<Expression>(node.Initializer.Expressions.Count);
+
+                foreach (var expression in node.Initializer.Expressions)
+                {
+                    var exp = Visit(expression);
+                    if (exp == null)
+                        return null;
+
+                    if (!EnsureArgumentType(expression, elementType, ref exp))
+                        return ToError(expression, $"Cannot convert array element to '{elementType.GetFriendlyTypeName()}'.");
+
+                    expressions.Add(exp);
+                }
+
+                return Expression.NewArrayInit(elementType, expressions);
             }
 
-        return Expression.NewArrayInit(type, expressions);
+            // Multidimensional array (e.g. new int[,] { { 1, 2 }, { 3, 4 } }) 
+            var dimensions = new List<int>();
+            var elements = new List<Expression>();
+
+            if (!CollectMultiDimElements(node.Initializer, 0, dimensions, elements))
+                return null;
+
+            var arrayType = elementType.MakeArrayType(rank);
+            var arrayVariable = Expression.Variable(arrayType, "array");
+
+            var statements = new List<Expression>(elements.Count + 2)
+            {
+                Expression.Assign(arrayVariable, Expression.NewArrayBounds(elementType, dimensions.Select(x => (Expression)Expression.Constant(x)).ToArray()))
+            };
+
+            // Convert the flat indexes i into a per-dimension indexes (row-major order)
+            for (var i = 0; i < elements.Count; i++)
+            {
+                var indices = new Expression[rank];
+                var remainder = i;
+                for (var d = rank - 1; d >= 0; d--)
+                {
+                    indices[d] = Expression.Constant(remainder % dimensions[d]);
+                    remainder /= dimensions[d];
+                }
+
+                statements.Add(Expression.Assign(Expression.ArrayAccess(arrayVariable, indices), elements[i]));
+            }
+
+            statements.Add(arrayVariable);
+
+            return Expression.Block([arrayVariable], statements);
+        }
+
+        // Without initializer: every dimension needs an explicit size
+        if (rankSpecifier.Sizes[0] is OmittedArraySizeExpressionSyntax)
+            return ToError(node.Type, "Array creation requires either explicit sizes or an initializer.");
+
+        var bounds = new Expression[rank];
+        for (var i = 0; i < rank; i++)
+        {
+            var sizeExpression = Visit(rankSpecifier.Sizes[i]);
+            if (sizeExpression == null)
+                return null;
+
+            if (TryConvertExpression(sizeExpression, typeof(int)) is not { } bound)
+                return ToError(rankSpecifier.Sizes[i], "Array size must be convertible to int.");
+
+            bounds[i] = bound;
+        }
+
+        return Expression.NewArrayBounds(elementType, bounds);
+
+        bool CollectMultiDimElements(InitializerExpressionSyntax initializer, int depth, List<int> dimensions, List<Expression> elements)
+        {
+            var count = initializer.Expressions.Count;
+
+            // All sub-initializers at the same depth must have the same length (rectangular).
+            if (dimensions.Count <= depth)
+                dimensions.Add(count);
+            else if (dimensions[depth] != count)
+            {
+                ToError(initializer, "Array initializer has inconsistent dimensions.");
+                return false;
+            }
+
+            if (depth == rank - 1)
+            {
+                foreach (var expression in initializer.Expressions)
+                {
+                    var exp = Visit(expression);
+                    if (exp == null)
+                        return false;
+
+                    if (!EnsureArgumentType(expression, elementType, ref exp))
+                    {
+                        ToError(expression, $"Cannot convert array element to '{elementType.GetFriendlyTypeName()}'.");
+                        return false;
+                    }
+
+                    elements.Add(exp);
+                }
+            }
+            else
+            {
+                foreach (var expression in initializer.Expressions)
+                {
+                    if (expression is not InitializerExpressionSyntax nested)
+                    {
+                        ToError(expression, "Array initializer has inconsistent dimensions.");
+                        return false;
+                    }
+
+                    if (!CollectMultiDimElements(nested, depth + 1, dimensions, elements))
+                        return false;
+                }
+            }
+
+            return true;
+        }
     }
     public override Expression? VisitImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node)
     {

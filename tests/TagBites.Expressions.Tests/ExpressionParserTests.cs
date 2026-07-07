@@ -115,7 +115,35 @@ public class ExpressionParserTests
     [Theory]
     [InlineData("new int[] { 1, 2, 3 }[0]", 1)]
     [InlineData("new [] { 1, 2, 3 }[0]", 1)]
+    [InlineData("new long[] { 1, 2, 3 }[1]", 2L)]
     public void Array(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("new int[2].Length", 2)]
+    [InlineData("(new int[3])[1]", 0)]
+    [InlineData("new int[n].Length", 5)]
+    public void ArrayWithSize(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+        ExecuteAndTest(script, options, expectedResult, 5);
+    }
+
+    [Theory]
+    [InlineData("(new int[2, 3]).Length", 6)]
+    [InlineData("(new int[2, 3]).GetLength(1)", 3)]
+    [InlineData("(new int[2, 3])[1, 2]", 0)]
+    [InlineData("new int[,] { { 1, 2, 3 }, { 4, 5, 6 } }[1, 2]", 6)]
+    [InlineData("new int[,] { { 1, 2 }, { 3, 4 } }[0, 1]", 2)]
+    [InlineData("new int[2, 2] { { 1, 2 }, { 3, 4 } }[1, 0]", 3)]
+    [InlineData("(new int[3, 3, 3])[1, 1, 1]", 0)]
+    [InlineData("new int[,,] { { { 1 } }, { { 2 } } }[1, 0, 0]", 2)]
+    [InlineData("new long[,] { { 1, 2 }, { 3, 4 } }[1, 1]", 4L)]
+    public void MultiDimensionalArray(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
+    [InlineData("new int[3][1]")]
+    public void InvalidArrayCreation(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
     [InlineData("1 + 2.1", 3.1)]
