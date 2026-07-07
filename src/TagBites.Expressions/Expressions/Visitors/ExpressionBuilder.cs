@@ -363,6 +363,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             ? Expression.ConvertChecked(expression, type)
             : Expression.Convert(expression, type);
     }
+    public override Expression? VisitTypeOfExpression(TypeOfExpressionSyntax node)
+    {
+        var type = ResolveType(node.Type);
+        if (type == null)
+            return null;
+
+        return Expression.Constant(type, typeof(Type));
+    }
     public override Expression? VisitCheckedExpression(CheckedExpressionSyntax node)
     {
         var previous = _checkedContext;

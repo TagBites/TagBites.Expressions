@@ -161,6 +161,13 @@ public class ExpressionParserTests
     public void InvalidCastOperator(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
+    [InlineData("typeof(int) == typeof(int)", true)]
+    [InlineData("typeof(int) == typeof(long)", false)]
+    [InlineData("typeof(string) != typeof(int)", true)]
+    [InlineData("typeof(int?) == typeof(int?)", true)]
+    public void TypeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("nameof(System)", "System")]
     [InlineData("nameof(v)", "v")]
     [InlineData("nameof(m.TimesTen)", "TimesTen")]
