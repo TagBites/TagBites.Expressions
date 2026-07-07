@@ -27,6 +27,9 @@ public class ExpressionParserTests
     [InlineData("~5", -6)]
     [InlineData("~0L", -1L)]
     [InlineData("~5 & 7", 2)]
+    [InlineData("1L << 40", 1099511627776L)]   // shift on long: result type follows left operand
+    [InlineData("(long)1 << 40", 1099511627776L)]
+    [InlineData("1 << (byte)2", 4)]            // shift count promoted from byte
     public void BitwiseOperators(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
@@ -174,6 +177,16 @@ public class ExpressionParserTests
     [InlineData("typeof(string) != typeof(int)", true)]
     [InlineData("typeof(int?) == typeof(int?)", true)]
     public void TypeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("~(byte)5", -6)]           // unary ~ promotes byte -> int
+    [InlineData("-(byte)5", -5)]           // unary - promotes byte -> int
+    [InlineData("+(short)5", 5)]
+    [InlineData("(byte)200 + (byte)100", 300)]   // binary promotion byte -> int
+    [InlineData("(short)5 * (short)3", 15)]
+    [InlineData("(byte)1 + (short)2", 3)]
+    [InlineData("(char)65 + 1", 66)]
+    public void SmallIntegerPromotion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
     [InlineData("nameof(System)", "System")]

@@ -311,6 +311,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (left.Type.IsEnum || right.Type.IsEnum)
             return TryBuildEnumBinaryOperation(node, expressionType, left, right);
 
+        // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int before applying the operator
+        left = PromoteSmallInteger(left);
+        right = PromoteSmallInteger(right);
+
+        // For shift operators the shift count is always int
+        if (expressionType is ExpressionType.LeftShift or ExpressionType.RightShift)
+        {
+            if (right.Type != typeof(int))
+            {
+                var countType = IsNullableType(right.Type) ? typeof(int?) : typeof(int);
+                if (TryConvertExpression(right, countType) is not { } count)
+                    return ToError(node.Right, "Shift count must be convertible to int.");
+
+                right = count;
+            }
+
+            return Expression.MakeBinary(expressionType, left, right);
+        }
+
         // Ensure types
         if (!EnsureTheSameTypes(node, ref left, ref right))
             return null;
@@ -343,6 +362,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         };
         if (expressionType == ExpressionType.Throw)
             return ToError(node, $"Unsupported unary operator '{node.OperatorToken.ValueText}'.");
+
+        // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int
+        if (expressionType is ExpressionType.OnesComplement or ExpressionType.Negate or ExpressionType.UnaryPlus)
+            operand = PromoteSmallInteger(operand);
 
         if (_checkedContext && expressionType == ExpressionType.Negate)
             expressionType = ExpressionType.NegateChecked;
@@ -1655,6 +1678,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return Expression.NotEqual(expression, Expression.Constant(null, expression.Type));
     }
     private static Expression ToCast(Expression expression, Type type) => expression.Type != type ? Expression.Convert(expression, type) : expression;
+    private static Expression PromoteSmallInteger(Expression expression)
+    {
+        var underlying = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
+        if (underlying.IsEnum)
+            return expression;
+
+        switch (Type.GetTypeCode(underlying))
+        {
+            case TypeCode.SByte:
+            case TypeCode.Byte:
+            case TypeCode.Int16:
+            case TypeCode.UInt16:
+            case TypeCode.Char:
+                return ToCast(expression, IsNullableType(expression.Type) ? typeof(int?) : typeof(int));
+
+            default:
+                return expression;
+        }
+    }
     private static Expression CallWhenNotNull(Expression instance, MethodInfo method)
     {
         if (Nullable.GetUnderlyingType(instance.Type) is { })
