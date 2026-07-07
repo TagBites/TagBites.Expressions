@@ -147,12 +147,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         for (var i = 0; i < node.Arms.Count; i++)
         {
             var arm = node.Arms[i];
-
-            var expression = Visit(arm.Expression);
-            if (expression == null)
-                return null;
-
-            // Condition
             Expression? condition = null;
 
             switch (arm.Pattern)
@@ -162,7 +156,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 case DiscardPatternSyntax:
                     break;
 
-                case ConstantPatternSyntax cps:
+                case ConstantPatternSyntax { Expression: not LiteralExpressionSyntax { Token.Text: "null" } } cps:
                     {
                         var value = Visit(cps.Expression);
                         if (value == null)
@@ -176,8 +170,30 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     }
 
                 default:
-                    return ToError(arm.Pattern);
+                    {
+                        condition = ResolvePattern(governing, arm.Pattern);
+                        if (condition == null)
+                            return null;
+                        break;
+                    }
             }
+
+            // Case guard
+            if (arm.WhenClause != null)
+            {
+                var guard = Visit(arm.WhenClause.Condition);
+                if (guard == null)
+                    return null;
+
+                if ((Nullable.GetUnderlyingType(guard.Type) ?? guard.Type) != typeof(bool))
+                    return ToError(arm.WhenClause, "Expected boolean expression.");
+
+                condition = condition != null ? Expression.AndAlso(condition, guard) : guard;
+            }
+
+            var expression = Visit(arm.Expression);
+            if (expression == null)
+                return null;
 
             if (condition == null)
                 switchExpression = expression;
@@ -185,16 +201,29 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 paths.Add((condition, expression));
         }
 
+        // No discard arm, a fallback arm throwing when nothing matches
         if (switchExpression == null)
-            return ToError(node);
+        {
+            if (paths.Count == 0)
+                return ToError(node);
+
+            var exceptionConstructor = typeof(InvalidOperationException).GetConstructor([typeof(string)])!;
+            switchExpression = Expression.Throw(
+                Expression.New(exceptionConstructor, Expression.Constant("The input was not matched by any switch expression arm.")),
+                paths[paths.Count - 1].Then.Type);
+        }
 
         // Convert to if-else
         for (var i = paths.Count - 1; i >= 0; i--)
         {
-            if (switchExpression.Type != paths[i].Then.Type)
+            var then = paths[i].Then;
+            if (switchExpression.Type != then.Type && !EnsureTheSameTypes(node.Arms[i].Expression, ref then, ref switchExpression))
+                return null;
+
+            if (switchExpression.Type != then.Type)
                 return ToError(node.Arms[i].Expression, "Switch expressions types mismatch.");
 
-            switchExpression = Expression.Condition(paths[i].When, paths[i].Then, switchExpression);
+            switchExpression = Expression.Condition(paths[i].When, then, switchExpression);
         }
 
         return switchExpression;

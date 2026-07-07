@@ -71,6 +71,13 @@ public class ExpressionParserTests
     [InlineData("2 switch { 1 => 10, 2 => 20, _ => 0 }", 20)]
     [InlineData("3 switch { 1 => 10, 2 => 20, _ => 0 }", 0)]
     [InlineData("n switch { 1 => 10, 2 => 20, _ => 0 }", 10)]
+    [InlineData("5 switch { > 3 => 1, _ => 0 }", 1)]
+    [InlineData("5 switch { > 3 and < 10 => 1, _ => 0 }", 1)]
+    [InlineData("5 switch { 1 or 5 => 1, _ => 0 }", 1)]
+    [InlineData("5 switch { not 5 => 0, _ => 1 }", 1)]
+    [InlineData("5 switch { 5 when 1 > 2 => 1, 5 => 2, _ => 0 }", 2)]
+    [InlineData("n switch { int a => a + 1 }", 2)]
+    [InlineData("1 switch { 1 => 1, _ => 2L }", 1L)]
     public void Switch(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -82,6 +89,20 @@ public class ExpressionParserTests
         };
 
         ExecuteAndTest(script, options, expectedResult, 1);
+    }
+
+    [Theory]
+    [InlineData("nv switch { null => -1, _ => 1 }", -1, null)]
+    [InlineData("nv switch { null => -1, int a => a * 2 }", 14, 7)]
+    [InlineData("nv switch { > 5 => 1, _ => 0 }", 1, 7)]
+    public void SwitchOnNullable(string script, object expectedResult, int? value)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(int?), "nv") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, value);
     }
 
     [Theory]
