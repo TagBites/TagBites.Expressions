@@ -454,6 +454,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _checkedContext = previous;
         }
     }
+    public override Expression? VisitPostfixUnaryExpression(PostfixUnaryExpressionSyntax node)
+    {
+        if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.ExclamationToken)
+            return Visit(node.Operand);
+
+        return ToError(node, $"Unsupported unary operator '{node.OperatorToken.ValueText}'.");
+    }
     public override Expression? VisitSizeOfExpression(SizeOfExpressionSyntax node)
     {
         var type = ResolveType(node.Type);

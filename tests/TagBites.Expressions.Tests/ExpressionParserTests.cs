@@ -606,6 +606,18 @@ public class ExpressionParserTests
     [InlineData("sizeof(decimal)", 16)]
     public void SizeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
+    [Fact]
+    public void NullForgivingOperator()
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(string), "s") }
+        };
+
+        ExecuteAndTest("s!.Length", options, 2, "ab");
+        ExecuteAndTest("s!.Length + 1", options, 3, "ab");
+    }
+
     [Theory]
     [InlineData("new Dictionary<string, int>().Count", 0)]
     [InlineData("new HashSet<int>().Count", 0)]
