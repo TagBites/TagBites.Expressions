@@ -335,6 +335,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var expressionType = (SyntaxKind)node.OperatorToken.RawKind switch
         {
             SyntaxKind.ExclamationToken => ExpressionType.Not,
+            SyntaxKind.TildeToken => ExpressionType.OnesComplement,
             SyntaxKind.PlusToken => ExpressionType.UnaryPlus,
             SyntaxKind.MinusToken => ExpressionType.Negate,
 

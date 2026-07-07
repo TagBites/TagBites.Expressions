@@ -24,6 +24,9 @@ public class ExpressionParserTests
     [InlineData("1 | 2 | 4", 7)]
     [InlineData("7 & 2", 2)]
     [InlineData("7 ^ 2", 5)]
+    [InlineData("~5", -6)]
+    [InlineData("~0L", -1L)]
+    [InlineData("~5 & 7", 2)]
     public void BitwiseOperators(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
