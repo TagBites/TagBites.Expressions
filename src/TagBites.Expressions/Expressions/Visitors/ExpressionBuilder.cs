@@ -1707,7 +1707,44 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return ToError(node, $"Cannot convert value type '{left.Type}' to '{right.Type}' using build-in conversion.");
     }
 
-    private static IList<MethodInfo> GetIndexers(Type instanceType) => GetMethods(instanceType, "get_Item", BindingFlags.Instance);
+    private static IList<MethodInfo> GetIndexers(Type instanceType)
+    {
+        var members = new List<MethodInfo>();
+
+        Collect(instanceType);
+
+        if (instanceType.IsInterface)
+            foreach (var type in instanceType.GetInterfaces())
+                Collect(type);
+
+        return members;
+
+        void Collect(Type type)
+        {
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var getter = property.GetMethod;
+                if (property.GetIndexParameters().Length == 0 || getter is not { IsPublic: true })
+                    continue;
+
+                if (!members.Any(x => HasSameParameterTypes(x, getter)))
+                    members.Add(getter);
+            }
+        }
+    }
+    private static bool HasSameParameterTypes(MethodInfo a, MethodInfo b)
+    {
+        var pa = a.GetParameters();
+        var pb = b.GetParameters();
+        if (pa.Length != pb.Length)
+            return false;
+
+        for (var i = 0; i < pa.Length; i++)
+            if (pa[i].ParameterType != pb[i].ParameterType)
+                return false;
+
+        return true;
+    }
     private static IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
     {
         var members = new List<MethodInfo>();

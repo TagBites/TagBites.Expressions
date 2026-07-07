@@ -209,6 +209,20 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData(@"""abc""[1]", 'b')]
+    [InlineData(@"""abcd"".Substring(1)[0]", 'b')]
+    [InlineData("list[1]", 2)]
+    public void IndexerAccess(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(IList<int>), "list") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new List<int> { 1, 2, 3 });
+    }
+
+    [Theory]
     [InlineData("new DateTime(2021, 8, 14).Day", 14)]
     [InlineData("new DateTime(2021, 8, 14).Date.Day", 14)]
     [InlineData("DateTime.MinValue < new DateTime(2021, 8, 14)", true)]
