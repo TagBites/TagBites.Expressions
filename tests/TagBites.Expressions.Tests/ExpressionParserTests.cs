@@ -223,6 +223,47 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData(@"string.Format(""{0} {1}"", 1, 2)", "1 2")]
+    [InlineData(@"string.Format(""{0}"", 1)", "1")]
+    [InlineData(@"string.Format(""{0} {1} {2}"", 1, 2, ""a"")", "1 2 a")]
+    [InlineData(@"string.Concat(""a"", ""b"", 1 + 2, ""d"")", "ab3d")]
+    public void ParamsBclMethods(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("p.Sum(1, 2, 3)", 6)]           // expanded form
+    [InlineData("p.Sum(1)", 1)]                 // single trailing argument
+    [InlineData("p.Sum()", 0)]                  // no trailing arguments -> empty array
+    [InlineData("p.SumLong(1, 2, 3)", 6L)]      // params long[] fed with ints (element conversion)
+    [InlineData("p.SumLong(1, 2L)", 3L)]
+    [InlineData("p.Sum(new [] { 1, 2, 3 })", 6)] // params normal form: array passed directly
+    [InlineData("p.First(new [] { 5, 6 })", 5)]  // plain (non-params) array parameter
+    [InlineData("ParamsModel.Join(\"-\", \"a\", \"b\")", "a-b")] // static params
+    public void ParamsMethods(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            IncludedTypes = { typeof(ParamsModel) },
+            Parameters = { (typeof(ParamsModel), "p") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new ParamsModel());
+    }
+
+    [Theory]
+    [InlineData(@"p.Describe(""x"")", "x:none")]   // picks the non-params overload
+    [InlineData(@"p.Describe(""x"", 1)", "x:1")]   // picks the params overload
+    [InlineData(@"p.Describe(""x"", 1, 2)", "x:2")]
+    public void ParamsOverloadResolution(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(ParamsModel), "p") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new ParamsModel());
+    }
+
+    [Theory]
     [InlineData("new DateTime(2021, 8, 14).Day", 14)]
     [InlineData("new DateTime(2021, 8, 14).Date.Day", 14)]
     [InlineData("DateTime.MinValue < new DateTime(2021, 8, 14)", true)]

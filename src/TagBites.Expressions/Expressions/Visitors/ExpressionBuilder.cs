@@ -1935,7 +1935,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var methodParameters = info.Parameters;
             var methodArguments = info.Arguments;
 
-            if (methodParameters.Length < methodArguments.Count)
+            // A params method accepts more arguments than declared parameters.
+            if (methodParameters.Length < methodArguments.Count && !info.HasParams)
                 return null;
 
             // Try extract arguments
@@ -1951,7 +1952,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 for (var i = 0; i < methodArguments.Count; i++)
                     if (methodArguments[i] is not DelayLambdaExpression)
-                        TryExtractGenericArguments(methodParameters[i].ParameterType, methodArguments[i].Type, argumentTypes);
+                        TryExtractGenericArguments(methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType, methodArguments[i].Type, argumentTypes);
 
                 for (var i = 0; i < genericParameters.Length; i++)
                 {
@@ -1972,7 +1973,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 if (methodArguments[i] is DelayLambdaExpression dl)
                 {
                     // Resolve parameters
-                    var lambdaType = methodParameters[i].ParameterType;
+                    var lambdaType = methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType;
                     if (!lambdaType.IsGenericType)
                         return null;
 
@@ -2035,6 +2036,37 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 method = method.MakeGenericMethod(genericArguments!);
                 methodParameters = method.GetParameters();
+            }
+
+            // Params array: pass a matching array directly (normal form) or collect the trailing arguments into a new array,
+            // converting each to the element type (expanded form).
+            if (info.HasParams)
+            {
+                var paramsIndex = methodParameters.Length - 1;
+                var paramsArrayType = methodParameters[paramsIndex].ParameterType;
+                var normalForm = methodArguments.Count == methodParameters.Length
+                                 && IsMatchingParameterType(paramsArrayType, methodArguments[paramsIndex].Type);
+
+                if (!normalForm)
+                {
+                    if (methodArguments.Count < paramsIndex || !paramsArrayType.IsArray)
+                        return null;
+
+                    var elementType = paramsArrayType.GetElementType()!;
+                    var elements = new List<Expression>(methodArguments.Count - paramsIndex);
+
+                    for (var i = paramsIndex; i < methodArguments.Count; i++)
+                    {
+                        var element = methodArguments[i];
+                        if (!EnsureArgumentType(relatedNode, elementType, ref element))
+                            return null;
+
+                        elements.Add(element);
+                    }
+
+                    methodArguments.RemoveRange(paramsIndex, methodArguments.Count - paramsIndex);
+                    methodArguments.Add(Expression.NewArrayInit(elementType, elements));
+                }
             }
 
             // Cast method arguments
