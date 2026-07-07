@@ -1397,64 +1397,84 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         else if (Nullable.GetUnderlyingType(t2) != null && t1.IsValueType)
             e1 = Expression.Convert(e1, typeof(Nullable<>).MakeGenericType(t1));
 
-        // Numeric mismatch
-        if (TypeUtils.IsNumericType(t1) && TypeUtils.IsNumericType(t2))
+        t1 = e1.Type;
+        t2 = e2.Type;
+
+        if (t1 == t2)
+            return true;
+
+        // Implicit conversion
+        if (TryConvertExpression(e2, t1) is { } converted2)
         {
-            var c1 = Type.GetTypeCode(t1);
-            var c2 = Type.GetTypeCode(t2);
-
-            if (c1 is TypeCode.Decimal or TypeCode.Double && c2 is TypeCode.Decimal or TypeCode.Double)
-            {
-                ToError(node, "Can not apply operator to decimal and double types.");
-                return false;
-            }
-
-            if (c1 > c2)
-                e2 = ToCast(e2, t1);
-            else
-                e1 = ToCast(e1, t2);
+            e2 = converted2;
+            return true;
         }
 
-        // Cast
-        if (t1.IsAssignableFrom(t2))
-            e2 = ToCast(e2, t1);
-        else if (t2.IsAssignableFrom(t1))
-            e1 = ToCast(e1, t2);
+        if (TryConvertExpression(e1, t2) is { } converted1)
+        {
+            e1 = converted1;
+            return true;
+        }
 
+        // Two distinct numeric types with no implicit conversion between them (e.g. decimal vs double) can never be resolved.
+        if (TypeUtils.IsNumericType(t1) && TypeUtils.IsNumericType(t2))
+        {
+            ToError(node, $"Can not apply operator to '{t1.GetFriendlyTypeName()}' and '{t2.GetFriendlyTypeName()}' types.");
+            return false;
+        }
+
+        // Any other mismatch is left to Expression.MakeBinary/Expression.Condition.
+        // They may still succeed via a mixed-type operator overload (e.g. DateTime - TimeSpan) or throw error otherwise.
         return true;
     }
     private bool EnsureArgumentType(SyntaxNode node, Type parameterType, ref Expression argument)
     {
-        var argumentType = argument.Type;
-        if (parameterType == argumentType)
-            return true;
+        if (TryConvertExpression(argument, parameterType) is not { } converted)
+            return false;
 
-        // Numeric mismatch
-        if (TypeUtils.IsNumericType(argumentType) && TypeUtils.IsNumericType(parameterType))
+        argument = converted;
+        return true;
+    }
+    private static Expression? TryConvertExpression(Expression expression, Type targetType)
+    {
+        var sourceType = expression.Type;
+        if (sourceType == targetType)
+            return expression;
+
+        if (targetType.IsAssignableFrom(sourceType))
+            return ToCast(expression, targetType);
+
+        if (TypeUtils.HasImplicitNumericConversion(sourceType, targetType))
+            return ToCast(expression, targetType);
+
+        var method = FindConversionOperator(sourceType, targetType, "op_Implicit");
+        return method != null
+            ? Expression.Convert(expression, targetType, method)
+            : null;
+    }
+    private static MethodInfo? FindConversionOperator(Type sourceType, Type targetType, string operatorName)
+    {
+        return FindIn(sourceType) ?? FindIn(targetType);
+
+        MethodInfo? FindIn(Type declaringType)
         {
-            var argumentCode = Type.GetTypeCode(argumentType);
-            var parameterCode = Type.GetTypeCode(parameterType);
-
-            if (argumentCode is TypeCode.Decimal or TypeCode.Double && parameterCode is TypeCode.Decimal or TypeCode.Double)
-                return false;
-
-            if (argumentCode < parameterCode)
+            foreach (var method in declaringType.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                argument = ToCast(argument, parameterType);
-                return true;
+                if (method.Name != operatorName)
+                    continue;
+
+                var parameters = method.GetParameters();
+                if (parameters.Length != 1 || !parameters[0].ParameterType.IsAssignableFrom(sourceType))
+                    continue;
+
+                if (!targetType.IsAssignableFrom(method.ReturnType))
+                    continue;
+
+                return method;
             }
 
-            return false;
+            return null;
         }
-
-        // Missing type cast
-        if (parameterType.IsAssignableFrom(argumentType))
-        {
-            argument = ToCast(argument, parameterType);
-            return true;
-        }
-
-        return false;
     }
 
     private void Push(Expression expression) => _tmp = expression;
@@ -1963,25 +1983,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private static bool IsMatchingParameterType(Type parameterType, Type argumentType)
     {
-        if (!parameterType.IsAssignableFrom(argumentType))
-        {
-            // Numeric mismatch
-            if (TypeUtils.IsNumericType(argumentType) && TypeUtils.IsNumericType(parameterType))
-            {
-                var argumentCode = Type.GetTypeCode(argumentType);
-                var parameterCode = Type.GetTypeCode(parameterType);
+        if (parameterType.IsAssignableFrom(argumentType))
+            return true;
 
-                if (argumentCode is TypeCode.Decimal or TypeCode.Double && parameterCode is TypeCode.Decimal or TypeCode.Double)
-                    return false;
+        // Numeric mismatch
+        if (TypeUtils.IsNumericType(argumentType) && TypeUtils.IsNumericType(parameterType))
+            return TypeUtils.HasImplicitNumericConversion(argumentType, parameterType);
 
-                return argumentCode < parameterCode;
-            }
+        // User-defined implicit conversion
+        if (FindConversionOperator(argumentType, parameterType, "op_Implicit") != null)
+            return true;
 
-            // Generic
-            return TryExtractGenericArguments(parameterType, argumentType, null);
-        }
-
-        return true;
+        // Generic
+        return TryExtractGenericArguments(parameterType, argumentType, null);
     }
     private static bool? IsUnsignedType(Type type)
     {

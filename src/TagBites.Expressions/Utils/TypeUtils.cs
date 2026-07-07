@@ -7,20 +7,67 @@ internal static class TypeUtils
 {
     #region Types
 
+    private static readonly HashSet<(TypeCode From, TypeCode To)> s_implicitNumericConversions = new()
+    {
+        (TypeCode.Char, TypeCode.UInt16), (TypeCode.Char, TypeCode.Int32), (TypeCode.Char, TypeCode.UInt32),
+        (TypeCode.Char, TypeCode.Int64), (TypeCode.Char, TypeCode.UInt64), (TypeCode.Char, TypeCode.Single),
+        (TypeCode.Char, TypeCode.Double), (TypeCode.Char, TypeCode.Decimal),
+
+        (TypeCode.SByte, TypeCode.Int16), (TypeCode.SByte, TypeCode.Int32), (TypeCode.SByte, TypeCode.Int64),
+        (TypeCode.SByte, TypeCode.Single), (TypeCode.SByte, TypeCode.Double), (TypeCode.SByte, TypeCode.Decimal),
+
+        (TypeCode.Byte, TypeCode.Int16), (TypeCode.Byte, TypeCode.UInt16), (TypeCode.Byte, TypeCode.Int32),
+        (TypeCode.Byte, TypeCode.UInt32), (TypeCode.Byte, TypeCode.Int64), (TypeCode.Byte, TypeCode.UInt64),
+        (TypeCode.Byte, TypeCode.Single), (TypeCode.Byte, TypeCode.Double), (TypeCode.Byte, TypeCode.Decimal),
+
+        (TypeCode.Int16, TypeCode.Int32), (TypeCode.Int16, TypeCode.Int64), (TypeCode.Int16, TypeCode.Single),
+        (TypeCode.Int16, TypeCode.Double), (TypeCode.Int16, TypeCode.Decimal),
+
+        (TypeCode.UInt16, TypeCode.Int32), (TypeCode.UInt16, TypeCode.UInt32), (TypeCode.UInt16, TypeCode.Int64),
+        (TypeCode.UInt16, TypeCode.UInt64), (TypeCode.UInt16, TypeCode.Single), (TypeCode.UInt16, TypeCode.Double),
+        (TypeCode.UInt16, TypeCode.Decimal),
+
+        (TypeCode.Int32, TypeCode.Int64), (TypeCode.Int32, TypeCode.Single), (TypeCode.Int32, TypeCode.Double),
+        (TypeCode.Int32, TypeCode.Decimal),
+
+        (TypeCode.UInt32, TypeCode.Int64), (TypeCode.UInt32, TypeCode.UInt64), (TypeCode.UInt32, TypeCode.Single),
+        (TypeCode.UInt32, TypeCode.Double), (TypeCode.UInt32, TypeCode.Decimal),
+
+        (TypeCode.Int64, TypeCode.Single), (TypeCode.Int64, TypeCode.Double), (TypeCode.Int64, TypeCode.Decimal),
+
+        (TypeCode.UInt64, TypeCode.Single), (TypeCode.UInt64, TypeCode.Double), (TypeCode.UInt64, TypeCode.Decimal),
+
+        (TypeCode.Single, TypeCode.Double),
+    };
+
+
     public static bool IsNumericType(Type type)
     {
+        type = Nullable.GetUnderlyingType(type) ?? type;
         if (type.IsEnum)
             return false;
 
-        var code = GetTypeCodeWithNullable(type);
-        return code >= TypeCode.SByte && code <= TypeCode.Decimal;
+        var code = Type.GetTypeCode(type);
+        return code is >= TypeCode.Char and <= TypeCode.Decimal;
     }
     private static TypeCode GetTypeCodeWithNullable(Type type)
     {
+        type = Nullable.GetUnderlyingType(type) ?? type;
         if (type.IsEnum)
             type = Enum.GetUnderlyingType(type);
 
         return Type.GetTypeCode(type);
+    }
+
+    public static bool HasImplicitNumericConversion(Type from, Type to)
+    {
+        if (!IsNumericType(from) || !IsNumericType(to))
+            return false;
+
+        var fromCode = GetTypeCodeWithNullable(from);
+        var toCode = GetTypeCodeWithNullable(to);
+
+        return fromCode == toCode || s_implicitNumericConversions.Contains((fromCode, toCode));
     }
 
     public static string? GetTypeAlias(Type type)
