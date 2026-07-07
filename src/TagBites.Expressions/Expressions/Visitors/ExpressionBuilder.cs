@@ -1196,10 +1196,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (elementType == null)
                         return null;
 
-                    if (arrayType.RankSpecifiers.Count == 0)
-                        return elementType.MakeArrayType();
+                    for (var i = arrayType.RankSpecifiers.Count - 1; i >= 0; i--)
+                    {
+                        var rank = arrayType.RankSpecifiers[i].Rank;
+                        elementType = rank == 1 ? elementType.MakeArrayType() : elementType.MakeArrayType(rank);
+                    }
 
-                    return ToTypeError(type, null);
+                    return elementType;
                 }
 
             case GenericNameSyntax genericName:

@@ -169,6 +169,7 @@ public class ExpressionParserTests
     [InlineData("default(string) == null", true)]
     [InlineData("default(bool)", false)]
     [InlineData("default(DateTime).Year", 1)]
+    [InlineData("default(int[]) == null", true)]
     public void DefaultExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
@@ -176,6 +177,9 @@ public class ExpressionParserTests
     [InlineData("typeof(int) == typeof(long)", false)]
     [InlineData("typeof(string) != typeof(int)", true)]
     [InlineData("typeof(int?) == typeof(int?)", true)]
+    [InlineData("typeof(int[]) == typeof(int[])", true)]
+    [InlineData("typeof(int[]) != typeof(int[,])", true)]
+    [InlineData("(int[])null == null", true)]
     public void TypeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
