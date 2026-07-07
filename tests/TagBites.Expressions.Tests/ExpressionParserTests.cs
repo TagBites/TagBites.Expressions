@@ -158,6 +158,25 @@ public class ExpressionParserTests
     public void InvalidCastOperator(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
+    [InlineData("nameof(System)", "System")]
+    [InlineData("nameof(v)", "v")]
+    [InlineData("nameof(m.TimesTen)", "TimesTen")]
+    [InlineData("nameof(m.TimesTen.Value)", "Value")]
+    public void NameOfExpression(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(int), "v"),
+                (typeof(TestModel), "m")
+            }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, 1, new TestModel());
+    }
+
+    [Theory]
     [InlineData("new DateTime(2021, 8, 14).Day", 14)]
     [InlineData("new DateTime(2021, 8, 14).Date.Day", 14)]
     [InlineData("DateTime.MinValue < new DateTime(2021, 8, 14)", true)]

@@ -388,6 +388,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitInvocationExpression(InvocationExpressionSyntax node)
     {
+        // nameof(...) operator
+        if (node is { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" }, ArgumentList.Arguments.Count: 1 }
+            && !IsKnownIdentifier("nameof")
+            && TryGetNameOfValue(node.ArgumentList.Arguments[0].Expression) is { } nameOfValue)
+        {
+            return Expression.Constant(nameOfValue);
+        }
+
         // Parameters
         var parameters = ResolveParameters(node.ArgumentList.Arguments);
         if (parameters == null)
@@ -1536,6 +1544,24 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.Convert(Expression.Subtract(Expression.Convert(enumSide, underlyingType2), subtractOperand), enumType2);
 
         return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+    }
+
+    private bool IsKnownIdentifier(string name)
+    {
+        return _variables?.Any(x => x.Name == name) == true
+               || _nestedParameters?.Any(x => x.Name == name) == true
+               || _parameters.Any(x => x.Name == name)
+               || _options.GlobalMembers.ContainsKey(name);
+    }
+    private static string? TryGetNameOfValue(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            IdentifierNameSyntax id => id.Identifier.Text,
+            GenericNameSyntax g => g.Identifier.Text,
+            MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+            _ => null
+        };
     }
 
     private void Push(Expression expression) => _tmp = expression;
