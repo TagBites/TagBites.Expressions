@@ -607,6 +607,12 @@ public class ExpressionParserTests
     public void SizeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new Dictionary<string, int>().Count", 0)]
+    [InlineData("new HashSet<int>().Count", 0)]
+    [InlineData("new List<List<int>>().Count", 0)]
+    public void BuiltInCollectionTypes(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(1, 2).Item1", 1)]
     [InlineData("(1, 2).Item2", 2)]
     [InlineData("(n, n + 1, a + a).Item1", 1)]

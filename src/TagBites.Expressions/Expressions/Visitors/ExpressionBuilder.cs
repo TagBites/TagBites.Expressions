@@ -1433,19 +1433,32 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         {
             "TimeSpan" => typeof(TimeSpan),
             "DateTime" => typeof(DateTime),
+            "DateTimeOffset" => typeof(DateTimeOffset),
             "DateTimeKind" => typeof(DateTimeKind),
             "DayOfWeek" => typeof(DayOfWeek),
             "StringComparison" => typeof(StringComparison),
             "StringSplitOptions" => typeof(StringSplitOptions),
+            "MidpointRounding" => typeof(MidpointRounding),
+            "Guid" => typeof(Guid),
 
             "List'1" => typeof(List<>),
             "IList'1" => typeof(IList<>),
             "IEnumerable'1" => typeof(IEnumerable<>),
+            "ICollection'1" => typeof(ICollection<>),
+            "IReadOnlyList'1" => typeof(IReadOnlyList<>),
+            "IReadOnlyCollection'1" => typeof(IReadOnlyCollection<>),
+            "Dictionary'2" => typeof(Dictionary<,>),
+            "IDictionary'2" => typeof(IDictionary<,>),
+            "IReadOnlyDictionary'2" => typeof(IReadOnlyDictionary<,>),
+            "HashSet'1" => typeof(HashSet<>),
+            "ISet'1" => typeof(ISet<>),
+            "KeyValuePair'2" => typeof(KeyValuePair<,>),
 
             "CultureInfo" => typeof(CultureInfo),
             //"Type" => typeof(Type),
 
             "Math" => typeof(Math),
+            "Convert" => typeof(Convert),
             "Enumerable" => typeof(Enumerable),
 
             _ => ToTypeError(relatedNode, typeName)
