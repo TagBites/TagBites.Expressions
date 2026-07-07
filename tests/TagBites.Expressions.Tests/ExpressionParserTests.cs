@@ -589,6 +589,14 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("(1, 2) == (1, 2)", true)]
+    [InlineData("(1, 2) == (1, 3)", false)]
+    [InlineData("(1, 2) != (1, 3)", true)]
+    [InlineData(@"(""a"", 1) == (""a"", 1)", true)]
+    [InlineData("(1, 2, 3) == (1, 2, 3)", true)]
+    public void TupleEquality(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(1, 2).Item1", 1)]
     [InlineData("(1, 2).Item2", 2)]
     [InlineData("(n, n + 1, a + a).Item1", 1)]

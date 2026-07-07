@@ -340,6 +340,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (left.Type.IsEnum || right.Type.IsEnum)
             return TryBuildEnumBinaryOperation(node, expressionType, left, right);
 
+        // Tuple has no == operator
+        if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual
+            && left.Type == right.Type
+            && left.Type is { IsValueType: true, Namespace: "System" } && left.Type.Name.StartsWith("ValueTuple`"))
+        {
+            var equalsCall = Expression.Call(left, left.Type.GetMethod(nameof(Equals), [left.Type])!, right);
+            return expressionType == ExpressionType.Equal ? equalsCall : Expression.Not(equalsCall);
+        }
+
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int before applying the operator
         left = PromoteSmallInteger(left);
         right = PromoteSmallInteger(right);
