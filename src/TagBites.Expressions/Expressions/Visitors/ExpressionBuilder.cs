@@ -306,6 +306,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return ToError(node.Right, "Expected boolean expression.");
         }
 
+        // Enum arithmetic
+        if (left.Type.IsEnum || right.Type.IsEnum)
+            return TryBuildEnumBinaryOperation(node, expressionType, left, right);
+
         // Ensure types
         if (!EnsureTheSameTypes(node, ref left, ref right))
             return null;
@@ -1475,6 +1479,63 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             return null;
         }
+    }
+
+    private Expression? TryBuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
+    {
+        var leftIsEnum = left.Type.IsEnum;
+        var rightIsEnum = right.Type.IsEnum;
+
+        if (leftIsEnum && rightIsEnum)
+        {
+            if (left.Type != right.Type)
+                return ToError(node, $"Operator cannot be applied to operands of enum types '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+
+            // Linq.Expressions doesn't implement any operator for the enum type itself.
+            var enumType = left.Type;
+            var underlyingType = Enum.GetUnderlyingType(enumType);
+
+            switch (expressionType)
+            {
+                case ExpressionType.Equal:
+                case ExpressionType.NotEqual:
+                    return Expression.MakeBinary(expressionType, left, right);
+
+                case ExpressionType.LessThan:
+                case ExpressionType.LessThanOrEqual:
+                case ExpressionType.GreaterThan:
+                case ExpressionType.GreaterThanOrEqual:
+                    return Expression.MakeBinary(expressionType, Expression.Convert(left, underlyingType), Expression.Convert(right, underlyingType));
+
+                case ExpressionType.Subtract:
+                    return Expression.Subtract(Expression.Convert(left, underlyingType), Expression.Convert(right, underlyingType));
+
+                case ExpressionType.And:
+                case ExpressionType.Or:
+                case ExpressionType.ExclusiveOr:
+                    return Expression.Convert(Expression.MakeBinary(expressionType, Expression.Convert(left, underlyingType), Expression.Convert(right, underlyingType)), enumType);
+
+                default:
+                    return ToError(node, $"Operator is not defined for the enum type '{enumType.GetFriendlyTypeName()}'.");
+            }
+        }
+
+        // Exactly one side is an enum; the other side must be its underlying numeric type (or - only for ==/!= - the literal 0)
+        var enumSide = leftIsEnum ? left : right;
+        var otherSide = leftIsEnum ? right : left;
+        var enumType2 = enumSide.Type;
+        var underlyingType2 = Enum.GetUnderlyingType(enumType2);
+
+        if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual && otherSide is ConstantExpression { Value: 0 })
+            return Expression.MakeBinary(expressionType, enumSide, Expression.Convert(otherSide, enumType2));
+
+        if (expressionType == ExpressionType.Add && TryConvertExpression(otherSide, underlyingType2) is { } addOperand)
+            return Expression.Convert(Expression.Add(Expression.Convert(enumSide, underlyingType2), addOperand), enumType2);
+
+        if (expressionType == ExpressionType.Subtract && leftIsEnum && TryConvertExpression(otherSide, underlyingType2) is { } subtractOperand)
+            return Expression.Convert(Expression.Subtract(Expression.Convert(enumSide, underlyingType2), subtractOperand), enumType2);
+
+        return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
     }
 
     private void Push(Expression expression) => _tmp = expression;
