@@ -177,6 +177,20 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("checked(1 + 2)", 3)]
+    [InlineData("unchecked(1 + 2)", 3)]
+    [InlineData("unchecked(2147483647 + 1)", int.MinValue)]
+    [InlineData("unchecked((int)(2147483647L + 1))", int.MinValue)]
+    public void CheckedContext(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Fact]
+    public void CheckedOverflowThrows()
+    {
+        var ex = Assert.ThrowsAny<Exception>(() => Execute("checked(2147483647 + 1)", null));
+        Assert.IsType<OverflowException>(ex.InnerException ?? ex);
+    }
+
+    [Theory]
     [InlineData("new DateTime(2021, 8, 14).Day", 14)]
     [InlineData("new DateTime(2021, 8, 14).Date.Day", 14)]
     [InlineData("DateTime.MinValue < new DateTime(2021, 8, 14)", true)]

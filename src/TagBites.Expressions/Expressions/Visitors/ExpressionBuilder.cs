@@ -27,6 +27,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private List<(Type Type, string Name, int Index)>? _variables;
     private Dictionary<Expression, string>? _fullMemberPath;
     private int _nextVariableIndex;
+    private bool _checkedContext;
 
     public string? FirstError { get; private set; }
 
@@ -314,6 +315,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (!EnsureTheSameTypes(node, ref left, ref right))
             return null;
 
+        if (_checkedContext)
+            expressionType = expressionType switch
+            {
+                ExpressionType.Add => ExpressionType.AddChecked,
+                ExpressionType.Subtract => ExpressionType.SubtractChecked,
+                ExpressionType.Multiply => ExpressionType.MultiplyChecked,
+                _ => expressionType
+            };
+
         return Expression.MakeBinary(expressionType, left, right);
     }
     public override Expression? VisitPrefixUnaryExpression(PrefixUnaryExpressionSyntax node)
@@ -333,6 +343,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expressionType == ExpressionType.Throw)
             return ToError(node, $"Unsupported unary operator '{node.OperatorToken.ValueText}'.");
 
+        if (_checkedContext && expressionType == ExpressionType.Negate)
+            expressionType = ExpressionType.NegateChecked;
+
         return Expression.MakeUnary(expressionType, operand, null);
     }
     public override Expression? VisitCastExpression(CastExpressionSyntax node)
@@ -345,7 +358,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (type == null)
             return null;
 
-        return Expression.Convert(expression, type);
+        return _checkedContext
+            ? Expression.ConvertChecked(expression, type)
+            : Expression.Convert(expression, type);
+    }
+    public override Expression? VisitCheckedExpression(CheckedExpressionSyntax node)
+    {
+        var previous = _checkedContext;
+        _checkedContext = (SyntaxKind)node.Keyword.RawKind == SyntaxKind.CheckedKeyword;
+
+        try
+        {
+            return Visit(node.Expression);
+        }
+        finally
+        {
+            _checkedContext = previous;
+        }
     }
     public override Expression? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
     {
