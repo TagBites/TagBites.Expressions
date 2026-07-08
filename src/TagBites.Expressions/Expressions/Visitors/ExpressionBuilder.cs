@@ -52,22 +52,20 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expression == null)
             return null;
 
-        var isNullableExpression = IsNullableType(expression.Type);
-        if (_options.ResultType != null)
+        if (_options.ResultType != null && expression.Type != _options.ResultType)
         {
-            var isNullableResultType = IsNullableType(_options.ResultType);
-            var isNullableResult = !_options.ResultType.IsValueType || isNullableResultType;
-            var isAssignable = isNullableResultType && !isNullableExpression && Nullable.GetUnderlyingType(_options.ResultType) == expression.Type
-                               || _options.ResultType.IsAssignableFrom(expression.Type);
+            var isNullableResult = !_options.ResultType.IsValueType || IsNullableType(_options.ResultType);
+            var converted = IsNullableType(expression.Type) && !isNullableResult
+                ? null
+                : TryConvertExpression(expression, _options.ResultType);
 
-            if (isNullableExpression && !isNullableResult || !isAssignable)
+            if (converted == null)
             {
                 ToError(node, $"Result type is expected to be '{_options.ResultType.GetFriendlyTypeName()}', but type '{expression.Type.GetFriendlyTypeName()}' is returned.");
                 return null;
             }
 
-            //if (_options.ResultType != expression.Type && !isNullableResult)
-            //    expression = Expression.Convert(expression, _options.ResultType);
+            expression = converted;
         }
 
         if (_options.ResultCastType != null && _options.ResultCastType != expression.Type)
