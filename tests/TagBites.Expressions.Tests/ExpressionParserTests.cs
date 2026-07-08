@@ -129,6 +129,22 @@ public class ExpressionParserTests
     public void StringOperators(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("$\"{1 + 2}\"", "3")]                                   // expression hole
+    [InlineData("$\"sum = {1 + 2}!\"", "sum = 3!")]                     // text around the hole
+    [InlineData("$\"{1}-{2}-{3}\"", "1-2-3")]                           // multiple holes
+    [InlineData("$\"{true} {false}\"", "True False")]
+    [InlineData("$\"{(1 < 2 ? \"y\" : \"n\")}\"", "y")]                 // nested ternary + string
+    [InlineData("$\"{5,4}\"", "   5")]                                  // alignment, right
+    [InlineData("$\"{5,-4}!\"", "5   !")]                               // alignment, left
+    [InlineData("$\"{5,6:000}\"", "   005")]                            // alignment + format
+    [InlineData("$\"{255:X}\"", "FF")]                                  // hex format
+    [InlineData("$\"{255:x4}\"", "00ff")]
+    [InlineData("$\"{{literal {1 + 1}}}\"", "{literal 2}")]             // escaped braces + hole
+    [InlineData("$\"{new DateTime(2021, 8, 14):yyyy-MM-dd}\"", "2021-08-14")]
+    [InlineData("$\"{new DateTime(2021, 8, 14),12:yyyy-MM-dd}\"", "  2021-08-14")]
+    public void StringInterpolation(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new DateTime(1992, 8, 7) < new DateTime(2021, 8, 14)", true)]
     [InlineData("new List<int>() != null", true)]
     public void NewOperator(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);

@@ -65,6 +65,17 @@ var func = ExpressionParser.Compile<Func<int, int>>("a switch { 1 => b, 2 => b *
 func(3); // 5
 ```
 
+String interpolation, including alignment and format specifiers (formatting follows the current culture):
+
+```csharp
+ExpressionParser.Invoke(@"$""sum = {1 + 2}""");                          // sum = 3
+ExpressionParser.Invoke(@"$""{5,-4}|""");                                // "5   |"   (left aligned)
+ExpressionParser.Invoke(@"$""{5,6:000}""");                              // "   005"  (alignment + format)
+ExpressionParser.Invoke(@"$""{255:X}""");                                // FF
+ExpressionParser.Invoke(@"$""{new DateTime(2021, 8, 14):yyyy-MM-dd}"""); // 2021-08-14
+ExpressionParser.Invoke(@"$""{(1 < 2 ? ""yes"" : ""no"")}""");           // yes
+```
+
 Get the expression tree, or parse without throwing:
 
 ```csharp

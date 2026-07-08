@@ -1245,7 +1245,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (expression == null)
                         return null;
 
-                    format.Append($"{{{args.Count}{item.FormatClause?.ToString()}}}");
+                    format.Append($"{{{args.Count}{item.AlignmentClause?.ToString()}{item.FormatClause?.ToString()}}}");
                     args.Add(ToCast(expression, typeof(object)));
                     break;
 
