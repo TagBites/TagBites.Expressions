@@ -15,7 +15,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
-    <PackageReference Include="DynamicExpresso.Core" Version="2.*" />
+    <PackageReference Include="DynamicExpresso.Core" Version="2.19.3" />
   </ItemGroup>
 
 </Project>

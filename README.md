@@ -132,7 +132,27 @@ The two combine: to run many rules through a single `Func<object>` while still r
 | Startup / memory | Low | Low | Low | High |
 | Dependency | Roslyn | None | None | Roslyn |
 
-## Benchmark
+### C# syntax vs DynamicExpresso
+
+Because TagBites parses with Roslyn, it accepts modern C# syntax that DynamicExpresso's own parser does not.  
+Verified against DynamicExpresso 2.19.3 (see [LibraryFeatureComparer.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/LibraryFeatureComparer.cs)):
+
+| C# syntax | TagBites | DynamicExpresso |
+|---|:---:|:---:|
+| String interpolation `$"{x,6:0.00}"` (alignment + format) | ✓ | ✗ |
+| Switch expressions | ✓ | ✗ |
+| Pattern matching: relational, `and`/`or`/`not`, property | ✓ | ✗ |
+| Tuples and tuple equality | ✓ | ✗ |
+| Array creation: sized and multidimensional | ✓ | ✗ |
+| `checked` / `unchecked` | ✓ | ✗ |
+| `nameof`, `sizeof` | ✓ | ✗ |
+| Null-forgiving `x!` | ✓ | ✗ |
+| Verbatim strings `@"..."` | ✓ | ✗ |
+| Digit separators `1_000` | ✓ | ✗ |
+
+Both handle arithmetic and logical operators, member access, method calls, generics, lambdas and LINQ, `is`/`as`, `typeof`, `default(T)`, object initializers, ternary and null-coalescing/-conditional.
+
+#### Benchmark
 
 Parsing `"Math.Pow(x, y) + 5"` into a LINQ expression. TagBites (v. 1.1.0) vs DynamicExpresso (v. 2.19.3).
 
