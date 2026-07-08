@@ -132,9 +132,6 @@ public static class ExpressionParser
         if (string.IsNullOrWhiteSpace(expressionText))
             throw new ArgumentException("Value cannot be null or whitespace.", nameof(expressionText));
 
-        var tree = CSharpSyntaxTree.ParseText(expressionText, CSharpParseOptions.Default.WithKind(SourceCodeKind.Script));
-        var root = tree.GetRoot();
-
-        return root;
+        return SyntaxFactory.ParseExpression(expressionText);
     }
 }
