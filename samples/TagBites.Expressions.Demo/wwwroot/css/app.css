@@ -1,0 +1,166 @@
+:root {
+    color-scheme: dark;
+    --bg: #0f1117;
+    --panel: #171a22;
+    --border: #2a2f3a;
+    --text: #e6e6e6;
+    --muted: #9aa4b2;
+    --accent: #4f9cff;
+    --error: #ff6b6b;
+    --ok: #7ee787;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height: 1.5;
+}
+
+.page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 4rem;
+}
+
+header {
+    position: relative;
+}
+
+h1 {
+    margin: 0 0 .5rem;
+    font-size: 1.9rem;
+}
+
+header p {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+}
+
+.repo {
+    position: absolute;
+    top: .25rem;
+    right: 0;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: .9rem;
+}
+
+.repo:hover {
+    text-decoration: underline;
+}
+
+.examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1rem;
+}
+
+.chip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: .3rem .75rem;
+    font-size: .82rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    cursor: pointer;
+}
+
+.chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+textarea {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: .9rem 1rem;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 1rem;
+    resize: vertical;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.run {
+    margin-top: .75rem;
+    background: var(--accent);
+    border: none;
+    color: #06122a;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: .6rem 1.25rem;
+    cursor: pointer;
+}
+
+.run:hover {
+    filter: brightness(1.08);
+}
+
+.result {
+    margin-top: 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--ok);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.result .value {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 1.15rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.result .type {
+    margin-top: .35rem;
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.error {
+    margin-top: 1.25rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--error);
+    border-radius: 8px;
+    padding: 1rem;
+    color: var(--error);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+    color: #000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }

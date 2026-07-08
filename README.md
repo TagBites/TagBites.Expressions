@@ -6,6 +6,8 @@
 **TagBites.Expressions is a Roslyn-based C# expression parser and evaluator for .NET.**
 It compiles runtime string expressions into strongly typed `Func<>` delegates or `LambdaExpression` expression trees, without creating a new assembly.
 
+**[▶ Try it online](https://tagbites.github.io/TagBites.Expressions/)** — type an expression and evaluate it in the browser.
+
 ```csharp
 var options = new ExpressionParserOptions { Parameters = { (typeof(int), "a"), (typeof(int), "b") } };
 var func = ExpressionParser.Compile<Func<int, int, int>>("(a + b) / 2", options);

@@ -1,0 +1,112 @@
+@page "/"
+
+<PageTitle>TagBites.Expressions playground</PageTitle>
+
+<div class="page">
+    <header>
+        <h1>TagBites.Expressions</h1>
+        <p>
+            Type a C# expression and evaluate it in your browser. It is parsed by Roslyn, compiled to a delegate
+            and run - all client-side. Reflection is disabled and only common built-in types are available.
+        </p>
+        <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
+    </header>
+
+    <div class="examples">
+        @foreach (var example in Examples)
+        {
+            <button type="button" class="chip" @onclick="() => Run(example)">@example</button>
+        }
+    </div>
+
+    <textarea @bind="_expression" @bind:event="oninput" rows="3" spellcheck="false" autocomplete="off"></textarea>
+
+    <button type="button" class="run" @onclick="Evaluate">Evaluate</button>
+
+    @if (_error is not null)
+    {
+        <pre class="error">@_error</pre>
+    }
+    else if (_hasResult)
+    {
+        <div class="result">
+            <div class="value">@_result</div>
+            <div class="type">@_resultType</div>
+        </div>
+    }
+</div>
+
+@code {
+    private string _expression = "Math.Pow(2, 10) + 5";
+    private string? _error;
+    private string? _result;
+    private string? _resultType;
+    private bool _hasResult;
+
+    private static readonly string[] Examples =
+    {
+        "1 + 2 * 3",
+        "Math.Pow(2, 10)",
+        "new [] { 3, 1, 2 }.OrderBy(x => x)",
+        "\"hello world\"[^1]",
+        "(1, 2).Item2",
+        "5 switch { > 3 => \"big\", _ => \"small\" }",
+        "$\"{1.0 / 3.0:0.000}\"",
+        "Enumerable.Range(1, 5).Sum()",
+    };
+
+
+    protected override void OnInitialized() => Evaluate();
+
+    private void Run(string example)
+    {
+        _expression = example;
+        Evaluate();
+    }
+
+    private void Evaluate()
+    {
+        _error = null;
+        _result = null;
+        _resultType = null;
+        _hasResult = false;
+
+        if (string.IsNullOrWhiteSpace(_expression))
+            return;
+
+        // ResultCastType = object gives a uniform Func<object> regardless of the expression's real type.
+        var options = new ExpressionParserOptions { ResultCastType = typeof(object) };
+
+        if (!ExpressionParser.TryParse(_expression, options, out var lambda, out var error))
+        {
+            _error = error;
+            return;
+        }
+
+        try
+        {
+            var value = lambda!.Compile().DynamicInvoke();
+            _result = Format(value);
+            _resultType = value?.GetType().Name ?? "null";
+            _hasResult = true;
+        }
+        catch (Exception e)
+        {
+            _error = (e.InnerException ?? e).Message;
+        }
+    }
+
+    private static string Format(object? value)
+    {
+        if (value is null)
+            return "null";
+
+        if (value is string s)
+            return $"\"{s}\"";
+
+        if (value is IEnumerable enumerable and not string)
+            return "[" + string.Join(", ", enumerable.Cast<object?>().Select(x => x?.ToString() ?? "null")) + "]";
+
+        return value.ToString() ?? "null";
+    }
+}
