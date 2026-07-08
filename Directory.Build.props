@@ -10,10 +10,13 @@
   </PropertyGroup>
 
   <!-- Bin/Obj directories -->
+  <!-- Use this file's directory (the repo root) instead of $(SolutionDir), which is only defined when
+       building through a .sln - this keeps the output layout correct for single-project builds too. -->
   <PropertyGroup>
-    <BaseOutputPath>$(SolutionDir)bin\$(MSBuildProjectName)\</BaseOutputPath>
-    <PackageOutputPath>$(SolutionDir)bin\</PackageOutputPath>
-    <BaseIntermediateOutputPath>$(SolutionDir)bin\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <BaseOutputPath>$(RepoRoot)bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <PackageOutputPath>$(RepoRoot)bin\</PackageOutputPath>
+    <BaseIntermediateOutputPath>$(RepoRoot)bin\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
   </PropertyGroup>
 
   <!-- Compilation settings -->
