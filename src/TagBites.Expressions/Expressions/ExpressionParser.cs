@@ -93,16 +93,10 @@ public static class ExpressionParser
                 expression = sv.CreateLambdaExpression(root);
                 errorMessage = sv.FirstError;
 
-                if (!options.AllowReflection && expression != null)
+                if (!options.AllowReflection && expression != null && sv.HasReflectionCall)
                 {
-                    var reflectionVisitor = new ReflectionDetector();
-                    reflectionVisitor.Visit(expression);
-
-                    if (reflectionVisitor.HasReflectionCall)
-                    {
-                        expression = null;
-                        errorMessage = "Reflection is not allowed.";
-                    }
+                    expression = null;
+                    errorMessage = "Reflection is not allowed.";
                 }
             }
             catch (Exception e)

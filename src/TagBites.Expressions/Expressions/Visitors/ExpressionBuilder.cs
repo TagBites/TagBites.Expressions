@@ -30,6 +30,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private bool _checkedContext;
 
     public string? FirstError { get; private set; }
+    public bool HasReflectionCall { get; private set; }
 
     public ExpressionBuilder(ExpressionParserOptions options)
     {
@@ -88,9 +89,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         try
         {
             var expression = base.Visit(node);
-            return expression != null && _options.UseReducedExpressions && expression is not DelayLambdaExpression && expression.NodeType == ExpressionType.Extension
-                ? expression.Reduce()
-                : expression;
+            if (expression != null)
+            {
+                if (!_options.AllowReflection)
+                    DetectReflection(expression);
+
+                if (_options.UseReducedExpressions && expression is not DelayLambdaExpression && expression.NodeType == ExpressionType.Extension)
+                    return expression.Reduce();
+            }
+
+            return expression;
         }
         catch (Exception e)
         {
@@ -1809,6 +1817,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
     }
 
+    private void DetectReflection(Expression expression)
+    {
+        if (HasReflectionCall)
+            return;
+
+        switch (expression)
+        {
+            case MethodCallExpression { Object: { } instance } m:
+                HasReflectionCall = (typeof(Type).IsAssignableFrom(instance.Type) || typeof(MemberInfo).IsAssignableFrom(instance.Type))
+                                    && m.Method.Name != nameof(Type.IsAssignableFrom);
+                break;
+
+            case MemberExpression me:
+                HasReflectionCall = (typeof(Type).IsAssignableFrom(me.Member.DeclaringType) || typeof(MemberInfo).IsAssignableFrom(me.Member.DeclaringType))
+                                    && me.Member.Name != "Name"
+                                    && me.Member.Name != "IsValueType";
+                break;
+        }
+    }
     private bool IsKnownIdentifier(string name)
     {
         return _variables?.Any(x => x.Name == name) == true
