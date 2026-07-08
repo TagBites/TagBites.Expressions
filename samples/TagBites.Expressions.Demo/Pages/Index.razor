@@ -2,30 +2,30 @@
 
 <PageTitle>TagBites.Expressions playground</PageTitle>
 
-<div class="page">
+<main class="container">
     <header>
-        <h1>TagBites.Expressions</h1>
+        <div class="titlebar">
+            <h1>TagBites.Expressions</h1>
+            <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
+        </div>
         <p>
-            Type a C# expression and evaluate it in your browser. It is parsed by Roslyn, compiled to a delegate
-            and run - all client-side. Reflection is disabled and only common built-in types are available.
+            Type a C# expression and it is evaluated as you type - parsed by Roslyn, compiled to a delegate and run,
+            all client-side. Reflection is disabled and only common built-in types are available.
         </p>
-        <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
     </header>
 
     <div class="examples">
         @foreach (var example in Examples)
         {
-            <button type="button" class="chip" @onclick="() => Run(example)">@example</button>
+            <button type="button" class="chip outline secondary" @onclick="() => Run(example)">@example</button>
         }
     </div>
 
-    <textarea @bind="_expression" @bind:event="oninput" rows="3" spellcheck="false" autocomplete="off"></textarea>
-
-    <button type="button" class="run" @onclick="Evaluate">Evaluate</button>
+    <textarea id="expr" value="@_expression" @oninput="OnInput" rows="3" spellcheck="false" autocomplete="off" autofocus></textarea>
 
     @if (_error is not null)
     {
-        <pre class="error">@_error</pre>
+        <div class="error">@_error</div>
     }
     else if (_hasResult)
     {
@@ -34,7 +34,7 @@
             <div class="type">@_resultType</div>
         </div>
     }
-</div>
+</main>
 
 @code {
     private string _expression = "Math.Pow(2, 10) + 5";
@@ -53,10 +53,17 @@
         "5 switch { > 3 => \"big\", _ => \"small\" }",
         "$\"{1.0 / 3.0:0.000}\"",
         "Enumerable.Range(1, 5).Sum()",
+        "5 is var a and > 0 ? a * 2 : 0"
     };
 
 
     protected override void OnInitialized() => Evaluate();
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        _expression = e.Value?.ToString() ?? string.Empty;
+        Evaluate();
+    }
 
     private void Run(string example)
     {

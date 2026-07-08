@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TagBites.Expressions playground</title>
     <meta name="description" content="Evaluate C# expressions in the browser - parsed by Roslyn, compiled to a delegate." />
     <base href="/" />
+    <link rel="icon" type="image/svg+xml" href="favicon.ico" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <link href="css/app.css" rel="stylesheet" />
 </head>
-
 <body>
-    <div id="app">Loading...</div>
+<div id="app">
+    <div class="app-loading">
+        <span>Loading...</span>
+    </div>
+</div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.
@@ -19,5 +24,4 @@
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
-
 </html>
