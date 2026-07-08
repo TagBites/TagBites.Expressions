@@ -166,6 +166,25 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("\"abcd\"[^1]", 'd')]
+    [InlineData("\"abcd\"[^2]", 'c')]
+    [InlineData("new [] { 10, 20, 30 }[^1]", 30)]
+    [InlineData("new [] { 10, 20, 30 }[^3]", 10)]
+    [InlineData("(new [] { 1, 2, 3, 4 })[^2] + 100", 103)]
+    [InlineData("arr[^1]", 7)]
+    [InlineData("list[^2]", 2)]
+    [InlineData("arr[^n]", 6)]
+    public void IndexFromEnd(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(int[]), "arr"), (typeof(IList<int>), "list"), (typeof(int), "n") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new[] { 5, 6, 7 }, new List<int> { 1, 2, 3 }, 2);
+    }
+
+    [Theory]
     [InlineData("(new int[2, 3]).Length", 6)]
     [InlineData("(new int[2, 3]).GetLength(1)", 3)]
     [InlineData("(new int[2, 3])[1, 2]", 0)]

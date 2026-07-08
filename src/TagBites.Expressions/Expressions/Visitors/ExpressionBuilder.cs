@@ -711,6 +711,56 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitElementAccessExpression(ElementAccessExpressionSyntax node)
     {
+        var arguments = node.ArgumentList.Arguments;
+
+        // Index-from-end (x[^n]), uses collection length to avoid relying on System.Index.
+        if (arguments.Count == 1
+            && arguments[0].Expression is PrefixUnaryExpressionSyntax { OperatorToken.RawKind: (int)SyntaxKind.CaretToken } fromEnd)
+        {
+            if (Visit(node.Expression) is not { } instance)
+                return null;
+
+            if (Visit(fromEnd.Operand) is not { } offset)
+                return null;
+
+            if (offset.Type != typeof(int))
+            {
+                if (TryConvertExpression(offset, typeof(int)) is not { } converted)
+                    return ToError(fromEnd.Operand, "Index must be convertible to int.");
+
+                offset = converted;
+            }
+
+            // Capture the receiver so it is evaluated once (both the length and the access use it).
+            var receiver = Expression.Variable(instance.Type, "receiver");
+
+            // Length
+            Expression length;
+            if (instance.Type.IsArray)
+            {
+                if (instance.Type.GetArrayRank() != 1)
+                    return ToError(node, "Index from end is not supported for multidimensional arrays.");
+
+                length = Expression.ArrayLength(receiver);
+            }
+            else
+            {
+                var property = GetCountProperty(instance.Type, "Length")
+                               ?? GetCountProperty(instance.Type, "Count");
+                if (property == null)
+                    return ToError(node, $"Index from end requires a 'Length' or 'Count' property on type '{instance.Type.GetFriendlyTypeName()}'.");
+
+                length = Expression.MakeMemberAccess(receiver, property);
+            }
+
+            // Access
+            var access = ResolveItemCall(node, receiver, new List<Expression> { Expression.Subtract(length, offset) });
+            if (access == null)
+                return null;
+
+            return Expression.Block([receiver], Expression.Assign(receiver, instance), access);
+        }
+
         // Parameters
         var parameters = ResolveParameters(node.ArgumentList.Arguments);
         if (parameters == null)
@@ -2096,6 +2146,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return null;
+    }
+    private static PropertyInfo? GetCountProperty(Type type, string name)
+    {
+        var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+        if (property == null && type.IsInterface)
+            foreach (var i in type.GetInterfaces())
+                if ((property = i.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)) != null)
+                    break;
+
+        return property?.PropertyType == typeof(int) && property.GetMethod is { IsPublic: true } ? property : null;
     }
     private static bool TryExtractGenericArguments(Type parameterWithGeneric, Type argumentType, IList<(string, Type)>? argumentTypes)
     {
