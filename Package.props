@@ -1,10 +1,10 @@
 <Project>
   <PropertyGroup>
-    <Description>Converts C# text expressions into LINQ expressions using **Roslyn**, supporting complete language syntax.</Description>
-    <PackageTags>LINQ;expressions;Roslyn;csharp</PackageTags>
+    <Description>Compile C# text expressions into native .NET delegates using Roslyn, without creating a new assembly. Supports the full C# expression grammar: operators, LINQ, lambdas, pattern matching, tuples and generics.</Description>
+    <PackageTags>expression;expression-evaluator;parser;Roslyn;eval;csharp;lambda;LINQ;dynamic;compile;formula;rules</PackageTags>
 
     <PackageProjectUrl>https://github.com/TagBites/TagBites.Expressions</PackageProjectUrl>
-    <PackageIconUrl></PackageIconUrl>
+    <PackageIcon>logo.png</PackageIcon>
 
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
