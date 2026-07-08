@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using BenchmarkDotNet.Attributes;
 using DynamicExpresso;
 // ReSharper disable IdentifierTypo
@@ -5,6 +6,7 @@ using DynamicExpresso;
 namespace TagBites.Expressions.Benchmarks;
 
 [MemoryDiagnoser]
+[SimpleJob(iterationCount: 60)]
 public class ParseToExpression
 {
     private const string Script = "Math.Pow(x, y) + 5";
@@ -21,7 +23,7 @@ public class ParseToExpression
 
 
     [Benchmark]
-    public void TagBites()
+    public LambdaExpression TagBites_Parse()
     {
         var options = new ExpressionParserOptions
         {
@@ -32,29 +34,29 @@ public class ParseToExpression
             }
         };
 
-        ExpressionParser.Parse(Script, options);
+        return ExpressionParser.Parse(Script, options);
     }
 
     [Benchmark]
-    public void TagBites_SharedOptions()
+    public LambdaExpression TagBites_Parse_SharedOptions()
     {
-        ExpressionParser.Parse(Script, _options);
+        return ExpressionParser.Parse(Script, _options);
     }
 
     [Benchmark]
-    public void DynamicExpresso()
+    public Lambda DynamicExpresso_Parse()
     {
         var interpreter = new Interpreter();
 
-        interpreter.Parse(Script,
+        return interpreter.Parse(Script,
             new Parameter("x", typeof(double), 10),
             new Parameter("y", typeof(double), 2));
     }
 
     [Benchmark]
-    public void DynamicExpresso_SharedInterpreter()
+    public Lambda DynamicExpresso_Parse_SharedInterpreter()
     {
-        _interpreter.Parse(Script,
+        return _interpreter.Parse(Script,
             new Parameter("x", typeof(double), 10),
             new Parameter("y", typeof(double), 2));
     }
