@@ -3,7 +3,8 @@
 [![Nuget](https://img.shields.io/nuget/v/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 [![License](https://img.shields.io/github/license/TagBites/TagBites.Expressions)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
 
-Compile C# text expressions into native .NET delegates using **Roslyn**, without creating a new assembly.
+**TagBites.Expressions is a Roslyn-based C# expression parser and evaluator for .NET.**
+It compiles runtime string expressions into strongly typed `Func<>` delegates or `LambdaExpression` expression trees, without creating a new assembly.
 
 ```csharp
 var options = new ExpressionParserOptions { Parameters = { (typeof(int), "a"), (typeof(int), "b") } };
@@ -11,7 +12,7 @@ var func = ExpressionParser.Compile<Func<int, int, int>>("(a + b) / 2", options)
 int r = func(2, 4); // 3
 ```
 
-Because Roslyn does the parsing, the grammar is real C#: operators, precedence, numeric promotion, implicit conversions, `checked`/`unchecked`, pattern matching, tuples, lambdas and generics behave as the compiler does. If it compiles in C#, it runs here; if C# rejects it, so does the parser.
+Because Roslyn does the parsing, expressions use real C# syntax: operators, precedence, numeric promotion, implicit conversions, pattern matching, tuples, lambdas, LINQ and generics behave like they do in the C# compiler. If C# accepts the expression, TagBites.Expressions accepts it; if C# rejects it, so does the parser.
 
 ## Install
 
@@ -84,10 +85,26 @@ LambdaExpression lambda = ExpressionParser.Parse("x * 2 + 1", options);
 if (!ExpressionParser.TryParse("a + ", options, out var expr, out var error))
     Console.WriteLine(error);
 ```
+## Use cases
 
-## Supported syntax
+Use TagBites.Expressions when you need to parse, validate, evaluate or compile C# expressions from strings at runtime:
+- dynamic business rules and predicates
+- user-defined formulas and calculations
+- configurable filters and scoring logic
+- compile-once/run-many `Func<>` delegates
+- `LambdaExpression` trees for expression-based APIs
+- LINQ-style runtime logic with real C# expression syntax
 
-The whole C# expression grammar.
+## Why TagBites.Expressions?
+
+- **Real C# expression syntax** — parsed by Roslyn, not by a custom C#-like grammar.
+- **Runtime expression evaluation** — evaluate once or compile once and invoke many times.
+- **Delegates or expression trees** — compile to `Func<>` delegates or parse to `LambdaExpression`.
+- **Modern C# expressions** — supports LINQ, lambdas, pattern matching, switch expressions, tuples, generics, interpolated strings, etc.
+- **No generated assembly** — expressions are compiled without creating a new assembly.
+
+## Supported C# expression syntax
+
 
 - Operators: arithmetic, bitwise, shifts, comparison, `&& || !`, `?:`, `??`, `?.`/`?[]`, `is`/`as`, `x!`.
 - Literals: all numeric types, `char`, `string`, verbatim and interpolated strings, hex, digit separators.
@@ -124,6 +141,8 @@ Statements, `async`/`await` and type declarations are out of scope.
 The two combine: to run many rules through a single `Func<object>` while still requiring each to be boolean, set `ResultType = typeof(bool)` (reject anything non-boolean) together with `ResultCastType = typeof(object)`.
 
 ## Alternatives
+
+TagBites.Expressions fits between lightweight expression evaluators and full C# scripting engines: it supports real C# expression syntax through Roslyn, returns delegates or expression trees, and avoids generating a new assembly.
 
 | | TagBites.Expressions | DynamicExpresso | System.Linq.Dynamic.Core | Roslyn scripting (`CSharpScript`) |
 |---|---|---|---|---|

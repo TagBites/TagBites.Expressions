@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <Description>Compile C# text expressions into native .NET delegates using Roslyn, without creating a new assembly. Supports the full C# expression grammar: operators, LINQ, lambdas, pattern matching, tuples and generics.</Description>
-    <PackageTags>expression;expression-evaluator;parser;Roslyn;eval;csharp;lambda;LINQ;dynamic;compile;formula;rules</PackageTags>
+    <Description>Roslyn-based C# expression parser and evaluator for .NET. Compiles runtime string expressions to strongly typed Func delegates or LINQ expression trees without creating a new assembly. Supports modern C# expression syntax: LINQ, lambdas, pattern matching, tuples, generics, interpolated strings and more.</Description>
+    <PackageTags>csharp;c-sharp;dotnet;netstandard;roslyn;parser;expression;expression-parser;expression-evaluator;expression-trees;lambda-expressions;linq;dynamic-linq;eval;runtime-compilation;formula-parser;rules-engine;delegate</PackageTags>
 
     <PackageProjectUrl>https://github.com/TagBites/TagBites.Expressions</PackageProjectUrl>
     <PackageIcon>logo.png</PackageIcon>
