@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -75,7 +76,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (_variableContextParameter != null)
         {
             var innerLambda = Expression.Lambda(expression, _parameters.Concat(new[] { _variableContextParameter }));
-            expression = Expression.Invoke(innerLambda, _parameters.Cast<Expression>().Concat(new[] { Expression.New(_variableContextParameter.Type.GetConstructor(new[] { typeof(int) })!, Expression.Constant(_nextVariableIndex)) }));
+            var lvcConstructor = typeof(LambdaVariableContext).GetConstructor(new[] { typeof(int) })!;
+            expression = Expression.Invoke(innerLambda, _parameters.Cast<Expression>().Concat(new[] { Expression.New(lvcConstructor, Expression.Constant(_nextVariableIndex)) }));
         }
 
         return Expression.Lambda(expression, _parameters);
@@ -2096,6 +2098,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return members;
     }
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(Enumerable))]
     private IList<MethodInfo> GetExtensionMethods(Type instanceType, string name)
     {
         IList<MethodInfo>? members = null;
