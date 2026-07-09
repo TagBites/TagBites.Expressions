@@ -185,3 +185,9 @@ Parsing `"Math.Pow(x, y) + 5"` into a LINQ expression. TagBites (v. 1.1.0) vs Dy
 | DynamicExpresso_Parse_SharedInterpreter | 13.428 us | 0.3094 us | 0.6390 us |  12.32 KB |
 
 Benchmark source: [ParseToExpression.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/ParseToExpression.cs).
+
+## Links
+
+- [Changelog](https://github.com/TagBites/TagBites.Expressions/blob/master/CHANGELOG.md)
+- [Security policy](https://github.com/TagBites/TagBites.Expressions/blob/master/SECURITY.md)
+- [License (MIT)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
