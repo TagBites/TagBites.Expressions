@@ -82,6 +82,14 @@ ExpressionParser.Invoke(@"$""{new DateTime(2021, 8, 14):yyyy-MM-dd}"""); // 2021
 ExpressionParser.Invoke(@"$""{(1 < 2 ? ""yes"" : ""no"")}""");           // yes
 ```
 
+Anonymous objects (`new { ... }`) **work like a real anonymous type without generating a new one, by internally mapping it to `DynamicObject`**:
+
+```csharp
+var script = "new[] { 1, 2, 3 }.Select(v => new { Value = v, Doubled = v * 2 }).Sum(v => v.Value + v.Doubled)";
+dynamic result = ExpressionParser.Invoke(script);
+Console.WriteLine(result); // 18
+```
+
 Get the expression tree, or parse without throwing:
 
 ```csharp
@@ -143,13 +151,17 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Literals: all numeric types, `char`, `string`, verbatim and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
 - `new`: constructors, object initializers, arrays (jagged, multidimensional and sized), generic collections.
+- Anonymous objects (`new { X = 1, Y = 2 }` — see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including element-wise equality.
 - `typeof`, `default(T)`, `nameof`, `sizeof`, `checked`, `unchecked`.
 - Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property, positional and
   `var` patterns, `when` guards.
 
-Statements, `async`/`await` and type declarations are out of scope.
+Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.
+
+Not currently supported:
+- The range operator (`1..2`, `arr[1..^1]`).
 
 ## Configuration
 

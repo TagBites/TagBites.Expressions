@@ -16,6 +16,7 @@ namespace TagBites.Expressions;
 internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 {
     private static MethodInfo? s_typeInfoWrapper;
+    private static readonly PropertyInfo s_anonymousObjectIndexer = typeof(IDictionary<string, object>).GetProperty("Item")!;
 
     private readonly ExpressionParserOptions _options;
     private readonly Expression? _thisParameter;
@@ -29,6 +30,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private Dictionary<Expression, string>? _fullMemberPath;
     private int _nextVariableIndex;
     private bool _checkedContext;
+    private List<(Type SlotType, List<(string Name, Type Type)> Shape)>? _anonymousObjects;
 
     public string? FirstError { get; private set; }
     public bool HasReflectionCall { get; private set; }
@@ -861,6 +863,70 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return instance;
     }
+    public override Expression? VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node)
+    {
+        var members = new List<(string Name, Expression Value)>();
+        var shape = new List<(string Name, Type Type)>();
+
+        foreach (var member in node.Initializers)
+        {
+            // Name
+            string? name;
+            if (member.NameEquals != null)
+                name = member.NameEquals.Name.Identifier.Text;
+            else
+            {
+                name = member.Expression switch
+                {
+                    IdentifierNameSyntax id => id.Identifier.Text,
+                    MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+                    _ => null
+                };
+            }
+
+            if (name == null)
+                return ToError(member, "Anonymous object member requires an explicit name (e.g. `Name = value`).");
+
+            if (members.Any(x => x.Name == name))
+                return ToError(member, $"Member '{name}' is already declared.");
+
+            // Value
+            var valueExpression = Visit(member.Expression);
+            if (valueExpression == null)
+                return null;
+
+            members.Add((name, valueExpression));
+            shape.Add((name, valueExpression.Type));
+        }
+
+        var backingType = GetOrAssignAnonymousObjectSlot();
+
+        var instanceVariable = Expression.Variable(backingType);
+        var asDictionary = Expression.Convert(instanceVariable, typeof(IDictionary<string, object>));
+        var constructor = backingType.GetConstructor(Type.EmptyTypes)!;
+
+        var statements = new List<Expression> { Expression.Assign(instanceVariable, Expression.New(constructor)) };
+        foreach (var (name, value) in members)
+            statements.Add(Expression.Call(asDictionary, s_anonymousObjectIndexer.SetMethod!, Expression.Constant(name), Expression.Convert(value, typeof(object))));
+
+        statements.Add(instanceVariable);
+
+        return Expression.Block([instanceVariable], statements);
+
+        Type GetOrAssignAnonymousObjectSlot()
+        {
+            if (_anonymousObjects != null)
+                foreach (var (slotType, existingShape) in _anonymousObjects)
+                    if (existingShape.SequenceEqual(shape))
+                        return slotType;
+
+            var newSlotType = AnonymousObject.GetAnonymousObjectType(_anonymousObjects?.Count ?? 0);
+            _anonymousObjects ??= [];
+            _anonymousObjects.Add((newSlotType, shape));
+
+            return newSlotType;
+        }
+    }
     public override Expression? VisitArrayCreationExpression(ArrayCreationExpressionSyntax node)
     {
         var elementType = ResolveType(node.Type.ElementType);
@@ -1563,6 +1629,22 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     case > 1:
                         return setErrorWhenNotFound ? ToError(node, $"More then one member with name {name}.") : null;
                 }
+            }
+        }
+
+        // Anonymous object
+        if (staticType == null && _anonymousObjects != null && typeof(AnonymousObject).IsAssignableFrom(expressionType))
+        {
+            var slot = _anonymousObjects.FirstOrDefault(x => x.SlotType == expressionType);
+            if (slot.Shape != null)
+            {
+                var memberType = slot.Shape.FirstOrDefault(x => x.Name == name).Type;
+                if (memberType == null)
+                    return setErrorWhenNotFound ? ToError(node, $"'{name}' is not a member of this anonymous object.") : null;
+
+                var asSlotDictionary = Expression.Convert(expression, typeof(IDictionary<string, object>));
+                var slotValue = Expression.MakeIndex(asSlotDictionary, s_anonymousObjectIndexer, [Expression.Constant(name)]);
+                return Expression.Convert(slotValue, memberType);
             }
         }
 
