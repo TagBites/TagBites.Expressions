@@ -222,6 +222,18 @@ public class ExpressionParserTests
         ExecuteAndTest("(int?)1 + 2m", 3m);
     }
 
+    [Theory]
+    [InlineData("a + b", null, null, 5)]
+    [InlineData("a + b", 8, 5, 3)]
+    [InlineData("a > b", false, null, 5)]
+    [InlineData("a > b", false, 5, 5)]
+    [InlineData("a > b", true, 5, 3)]
+    public void NullableArithmetic_PropagatesRuntimeNull(string script, object? expectedResult, int? a, int? b)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int?), "a"), (typeof(int?), "b") } };
+        ExecuteAndTest(script, options, expectedResult, a, b);
+    }
+
     [Fact]
     public void ImplicitCastFromCustomOperator()
     {
@@ -307,6 +319,23 @@ public class ExpressionParserTests
     {
         var ex = Assert.ThrowsAny<Exception>(() => Execute("checked(2147483647 + 1)", null));
         Assert.IsType<OverflowException>(ex.InnerException ?? ex);
+    }
+
+    [Fact]
+    public void UncheckedNegation_WrapsAtRuntime()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "m") } };
+        ExecuteAndTest("unchecked(-m)", options, int.MinValue, int.MinValue);
+    }
+
+    [Fact]
+    public void NegativeArraySize_ThrowsOverflowException()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+        var lambda = ExpressionParser.Parse("new int[n]", options);
+        var func = (Func<int, int[]>)lambda.Compile();
+
+        Assert.Throws<OverflowException>(() => func(-1));
     }
 
     [Theory]
@@ -1149,6 +1178,17 @@ public class ExpressionParserTests
         };
 
         Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script!, options));
+    }
+
+    [Theory]
+    [InlineData("1..2")]
+    [InlineData("arr[1..^1]")]
+    public void UnsupportedButValidCSharpSyntax(string script)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int[]), "arr") } };
+
+        var ex = Assert.Throws<ExpressionParserException>(() => ExpressionParser.Parse(script, options));
+        Assert.Contains("Unsupported expression", ex.Message);
     }
 
     [Theory]
