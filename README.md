@@ -197,7 +197,7 @@ These opt-in options (all default to `false`) make the parser accept syntax or s
 
 TagBites.Expressions fits between lightweight expression evaluators and full C# scripting engines: it supports real C# expression syntax through Roslyn, returns delegates or expression trees, and avoids generating a new assembly.
 
-| | TagBites.Expressions | DynamicExpresso | System.Linq.Dynamic.Core | Roslyn scripting (`CSharpScript`) |
+| | [TagBites.Expressions](https://github.com/TagBites/TagBites.Expressions) | [DynamicExpresso](https://github.com/dynamicexpresso/DynamicExpresso) | [System.Linq.Dynamic.Core](https://github.com/zzzprojects/System.Linq.Dynamic.Core) | [Roslyn scripting](https://www.nuget.org/packages/Microsoft.CodeAnalysis.CSharp.Scripting/) (`CSharpScript`) |
 |---|---|---|---|---|
 | Language | C# expressions (Roslyn) | C#-like (own parser) | Dynamic LINQ dialect | Full C# (official) |
 | Output | Delegate / Expression | Delegate / Expression | Expression tree | Compiled assembly |
@@ -209,7 +209,7 @@ TagBites.Expressions fits between lightweight expression evaluators and full C# 
 Because TagBites parses with Roslyn, it accepts modern C# syntax that neither DynamicExpresso's nor System.Linq.Dynamic.Core's own parsers do.  
 Verified against DynamicExpresso 2.19.3 and System.Linq.Dynamic.Core 1.7.3 (see [LibraryFeatureComparer.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/LibraryFeatureComparer.cs)):
 
-| C# syntax | TagBites | DynamicExpresso | System.Linq.Dynamic.Core |
+| C# syntax | [TagBites](https://github.com/TagBites/TagBites.Expressions) | [DynamicExpresso](https://github.com/dynamicexpresso/DynamicExpresso) | [System.Linq.Dynamic.Core](https://github.com/zzzprojects/System.Linq.Dynamic.Core) |
 |---|:---:|:---:|:---:|
 | String interpolation `$"{x,6:0.00}"` (alignment + format) | ✓ | ✗ | ✗ |
 | Switch expressions | ✓ | ✗ | ✗ |
