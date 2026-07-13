@@ -708,6 +708,21 @@ public class ExpressionParserTests
     public void TupleEquality(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("(1, 2) is (int a, int b) && a < b", true)]
+    [InlineData("(1, 2) is (1, 2)", true)]
+    [InlineData("(1, 2) is (1, var b) && b == 2", true)]
+    [InlineData("(1, 2) is (2, _)", false)]
+    [InlineData("(1, 2) is (1, _)", true)]
+    [InlineData("(1, 2, 3) is (1, 2, 3)", true)]
+    [InlineData("(1, 2, 3) is (1, _, 3)", true)]
+    [InlineData("t is (int a, string b) && a == 5 && b == \"x\"", true)]
+    public void PatternTuple(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof((int, string)), "t") } };
+        ExecuteAndTest(script, options, expectedResult, (5, "x"));
+    }
+
+    [Theory]
     [InlineData("sizeof(bool)", 1)]
     [InlineData("sizeof(byte)", 1)]
     [InlineData("sizeof(char)", 2)]

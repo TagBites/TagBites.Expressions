@@ -1234,8 +1234,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         Expression.Block(declareExpression, Expression.Constant(true)));
                 }
 
-            // is { } x
-            case RecursivePatternSyntax { PositionalPatternClause: null } p:
+            // is { } x, is (a, b) x
+            case RecursivePatternSyntax p:
                 {
                     Expression checkExpression;
 
@@ -1243,8 +1243,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         checkExpression = ToIsNotNull(expression);
                     else
                     {
-                        checkExpression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<int>.HasValue))!);
-                        expression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<int>.Value))!);
+                        checkExpression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<>.HasValue))!);
+                        expression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<>.Value))!);
                     }
 
                     // Type
@@ -1256,6 +1256,34 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                         checkExpression = ToIsOperator(expression, Expression.Constant(customType));
                         expression = ToCast(expression, customType);
+                    }
+
+                    // Positional
+                    var deconstructVariables = Array.Empty<ParameterExpression>();
+                    if (p.PositionalPatternClause != null)
+                    {
+                        var subpatterns = p.PositionalPatternClause.Subpatterns;
+                        var elements = GetTupleItemAccessors(expression, subpatterns.Count);
+
+                        if (elements == null)
+                        {
+                            var deconstruct = GetDeconstructMethod(expression.Type, subpatterns.Count);
+                            if (deconstruct == null)
+                                return ToError(p.PositionalPatternClause, $"No Deconstruct method for '{expression.Type.GetFriendlyTypeName()}' with {subpatterns.Count} parameters.");
+
+                            deconstructVariables = deconstruct.GetParameters().Select(x => Expression.Variable(x.ParameterType.GetElementType()!)).ToArray();
+                            elements = deconstructVariables.Cast<Expression>().ToArray();
+                            checkExpression = Expression.Block(Expression.Call(expression, deconstruct, elements), checkExpression);
+                        }
+
+                        for (var i = 0; i < subpatterns.Count; i++)
+                        {
+                            var condition = ResolvePattern(elements[i], subpatterns[i].Pattern);
+                            if (condition == null)
+                                return null;
+
+                            checkExpression = Expression.AndAlso(checkExpression, condition);
+                        }
                     }
 
                     // Properties
@@ -1291,12 +1319,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         checkExpression = Expression.AndAlso(checkExpression, Expression.Block(declareExpression, Expression.Constant(true)));
                     }
 
-                    return checkExpression;
+                    return deconstructVariables.Length > 0 ? Expression.Block(deconstructVariables, checkExpression) : checkExpression;
                 }
 
             // is ... _
             case DiscardPatternSyntax:
-                return expression;
+                return Expression.Constant(true);
 
             // Not supported yet
             case ListPatternSyntax:
@@ -2220,6 +2248,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 }
             }
         }
+    }
+    private static Expression[]? GetTupleItemAccessors(Expression expression, int count)
+    {
+        var type = expression.Type;
+        if (!type.IsGenericType || type.Namespace != "System" || !type.Name.StartsWith("ValueTuple`", StringComparison.Ordinal) || type.GetGenericArguments().Length != count)
+            return null;
+
+        var result = new Expression[count];
+        for (var i = 0; i < count; i++)
+            result[i] = Expression.MakeMemberAccess(expression, (MemberInfo?)type.GetField($"Item{i + 1}") ?? type.GetProperty($"Item{i + 1}")!);
+
+        return result;
+    }
+    private static MethodInfo? GetDeconstructMethod(Type type, int count)
+    {
+        return type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(m => m.Name == "Deconstruct" && m.ReturnType == typeof(void) && m.GetParameters().Length == count && m.GetParameters().All(x => x.IsOut));
     }
     private static MemberInfo? GetAssignMember(Type type, string name)
     {
