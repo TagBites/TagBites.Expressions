@@ -19,9 +19,14 @@ public static class LibraryFeatureComparer
             ("Pattern: property", "\"ab\" is { Length: 2 }"),
             ("Tuples", "(1, 2).Item2"),
             ("Tuple equality", "(1, 2) == (1, 2)"),
+            ("Tuple pattern", "(1, 2) is (int a, int b)"),
+            ("List pattern", "xs is [1, 2, 3]"),
             ("Multidim array create", "new int[,] { { 1, 2 }, { 3, 4 } }[1, 1]"),
             ("Sized array create", "new int[3].Length"),
             ("Object initializer", "new StringBuilder { Capacity = 16 }.Capacity"),
+            ("Collection initializer", "new List<int> { 1, 2, 3 }.Count"),
+            ("Target-typed new()", "new List<List<int>> { new() { 1, 2 } }[0][0]"),
+            ("Anonymous object", "new { X = 1 }.X"),
             ("checked/unchecked", "unchecked(2147483647 + 1)"),
             ("nameof", "nameof(xs)"),
             ("sizeof", "sizeof(int)"),
@@ -65,10 +70,11 @@ public static class LibraryFeatureComparer
     {
         try
         {
-            var interpreter = new Interpreter();
+            var interpreter = new Interpreter(InterpreterOptions.Default | InterpreterOptions.LambdaExpressions);
             interpreter.Reference(typeof(StringBuilder));
             interpreter.Reference(typeof(DateTime));
             interpreter.Reference(typeof(Enumerable));
+            interpreter.Reference(typeof(List<>));
             interpreter.Parse(expr, new Parameter("xs", typeof(int[])));
             return true;
         }

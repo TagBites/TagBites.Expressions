@@ -214,15 +214,25 @@ Verified against DynamicExpresso 2.19.3 (see [LibraryFeatureComparer.cs](https:/
 | String interpolation `$"{x,6:0.00}"` (alignment + format) | ✓ | ✗ |
 | Switch expressions | ✓ | ✗ |
 | Pattern matching: relational, `and`/`or`/`not`, property | ✓ | ✗ |
+| Tuple/recursive deconstruction patterns (`x is (int a, int b)`) | ✓ | ✗ |
+| List patterns (`arr is [1, 2, 3]`) | ✓ | ✗ |
 | Tuples and tuple equality | ✓ | ✗ |
 | Array creation: sized and multidimensional | ✓ | ✗ |
+| Target-typed `new()` | ✓ | ✗ |
+| Anonymous objects (`new { X = 1 }`) | ✓ | ✗ |
 | `checked` / `unchecked` | ✓ | ✗ |
 | `nameof`, `sizeof` | ✓ | ✗ |
 | Null-forgiving `x!` | ✓ | ✗ |
 | Verbatim strings `@"..."` | ✓ | ✗ |
 | Digit separators `1_000` | ✓ | ✗ |
-
-Both handle arithmetic and logical operators, member access, method calls, generics, lambdas and LINQ, `is`/`as`, `typeof`, `default(T)`, object initializers, ternary and null-coalescing/-conditional.
+| Arithmetic and logical operators | ✓ | ✓ |
+| Member access and method calls | ✓ | ✓ |
+| Generics | ✓ | ✓ |
+| Lambdas and LINQ | ✓ | ✓ |
+| `is` / `as` | ✓ | ✓ |
+| `typeof`, `default(T)` | ✓ | ✓ |
+| Object and collection initializers | ✓ | ✓ |
+| Ternary and null-coalescing/-conditional | ✓ | ✓ |
 
 #### Benchmark
 
