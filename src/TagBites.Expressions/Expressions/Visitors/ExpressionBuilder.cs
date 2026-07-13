@@ -329,8 +329,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.Call(null, contactMethod!, left, right);
         }
 
-        // Operator < <= > >= is not defined for string - use Compare instead
-        if (left.Type == typeof(string) && right.Type == typeof(string) && expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+        // Operator < <= > >= is not defined for string - use Compare instead (opt-in, not valid in real C#)
+        if (_options.AllowStringRelationalOperators
+            && left.Type == typeof(string) && right.Type == typeof(string)
+            && expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
         {
             var compareMethod = typeof(string).GetMethod(nameof(string.Compare), BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(string) }, null);
             var compareExpression = Expression.Call(null, compareMethod!, left, right);

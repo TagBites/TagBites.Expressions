@@ -107,14 +107,6 @@ public class ExpressionParserTests
 
     [Theory]
     [InlineData(@"""a"" + ""b""", "ab")]
-    [InlineData(@"""a"" < ""b""", true)]
-    [InlineData(@"""b"" < ""a""", false)]
-    [InlineData(@"""a"" <= ""b""", true)]
-    [InlineData(@"""b"" <= ""a""", false)]
-    [InlineData(@"""a"" > ""b""", false)]
-    [InlineData(@"""b"" > ""a""", true)]
-    [InlineData(@"""a"" >= ""b""", false)]
-    [InlineData(@"""b"" >= ""a""", true)]
     [InlineData(@"""a"" == ""a""", true)]
     [InlineData(@"""a"" == ""b""", false)]
     [InlineData(@"""a"" != ""a""", false)]
@@ -127,6 +119,21 @@ public class ExpressionParserTests
     [InlineData("$\"{\"a\"}.{\"b\"}\"", "a.b")]
     [InlineData("$\"{1.23:0}x{2.34:00}\"", "1x02")]
     public void StringOperators(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData(@"""a"" < ""b""", true)]
+    [InlineData(@"""b"" < ""a""", false)]
+    [InlineData(@"""a"" <= ""b""", true)]
+    [InlineData(@"""b"" <= ""a""", false)]
+    [InlineData(@"""a"" > ""b""", false)]
+    [InlineData(@"""b"" > ""a""", true)]
+    [InlineData(@"""a"" >= ""b""", false)]
+    [InlineData(@"""b"" >= ""a""", true)]
+    public void StringRelationalOperators_WhenAllowed(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { AllowStringRelationalOperators = true };
+        ExecuteAndTest(script, options, expectedResult);
+    }
 
     [Theory]
     [InlineData("$\"{1 + 2}\"", "3")]                                   // expression hole
@@ -1233,6 +1240,10 @@ public class ExpressionParserTests
     [InlineData("2d == 2m")]
     [InlineData("2d + 2m")]
     [InlineData("new()")]
+    [InlineData(@"""a"" < ""b""")]
+    [InlineData(@"""a"" <= ""b""")]
+    [InlineData(@"""a"" > ""b""")]
+    [InlineData(@"""a"" >= ""b""")]
     public void InvalidSyntax(string? script)
     {
         var options = new ExpressionParserOptions

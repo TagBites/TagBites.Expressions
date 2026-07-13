@@ -69,6 +69,12 @@ public class ExpressionParserOptions
     /// <code>typecast(someExpression, "MyNamespace.MyType,MyAssembly")</code>
     /// </remarks>
     public bool AllowRuntimeCast { get; set; }
+    /// <summary>
+    /// True to allow <c>&lt;</c> / <c>&lt;=</c> / <c>&gt;</c> / <c>&gt;=</c> on strings, compared ordinally via <see cref="string.Compare(string, string)"/>.
+    /// Not valid in real C#.
+    /// Default: <c>false</c>.
+    /// </summary>
+    public bool AllowStringRelationalOperators { get; set; }
 
     /// <summary>
     /// Collection of types that can be used in expressions.

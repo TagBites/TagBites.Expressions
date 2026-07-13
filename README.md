@@ -177,13 +177,20 @@ Not currently supported:
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
 | `ResultCastType` | Force the result to this type with an explicit cast, e.g. to compile every expression as `Func<object>`. |
 | `AllowReflection` | Allow reflection APIs. (default: `false`) |
-| `AllowRuntimeCast` | Allow custom keywords `typeis` / `typeas` / `typecast` against runtime type names. (default: `false`) |
 
 **Result type:**  
 `ResultType` is a contract: the expression must produce this type. A C# implicit conversion (like `int` -> `long`) is applied automatically; anything else is a parse error. Use it to require, for example, that a filter is a `bool`.  
 `ResultCastType` forces the return type with an explicit cast, so unrelated expressions can share one delegate signature. It also allows casts that are not implicit, such as `double` -> `int`.
 
 The two combine: to run many rules through a single `Func<object>` while still requiring each to be boolean, set `ResultType = typeof(bool)` (reject anything non-boolean) together with `ResultCastType = typeof(object)`.
+
+**Non-standard options:**  
+These opt-in options (all default to `false`) make the parser accept syntax or semantics that real C# does not:
+
+| Option | Purpose |
+|---|---|
+| `AllowRuntimeCast` | Allow custom keywords `typeis` / `typeas` / `typecast` against runtime type names. |
+| `AllowStringRelationalOperators` | Allow `<` / `<=` / `>` / `>=` on strings, compared ordinally via `string.Compare` - not valid in real C#. |
 
 ## Alternatives
 
