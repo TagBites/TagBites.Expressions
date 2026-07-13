@@ -723,6 +723,38 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("arr is [1, 2, 3]", true)]
+    [InlineData("arr is [1, 2]", false)]
+    [InlineData("arr is [1, 2, 4]", false)]
+    [InlineData("arr is [1, .., 3]", true)]
+    [InlineData("arr is [1, 2, .., 3]", true)]
+    [InlineData("arr is [.., 3]", true)]
+    [InlineData("arr is [1, ..]", true)]
+    [InlineData("arr is [..]", true)]
+    [InlineData("arr is [var a, var b, var c] && a + b + c == 6", true)]
+    [InlineData("arr is [1, 2, 3] r && r.Length == 3", true)]
+    [InlineData("arr is [> 0, > 0, > 0]", true)]
+    public void PatternList(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int[]), "arr") } };
+        ExecuteAndTest(script, options, expectedResult, new[] { 1, 2, 3 });
+    }
+
+    [Fact]
+    public void PatternList_NullArray_DoesNotMatch()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int[]), "arr") } };
+        ExecuteAndTest("arr is [1, 2, 3]", options, false, new object?[] { null });
+    }
+
+    [Fact]
+    public void PatternList_OnIListImplementation()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(IList<int>), "list") } };
+        ExecuteAndTest("list is [1, 2, 3]", options, true, new List<int> { 1, 2, 3 });
+    }
+
+    [Theory]
     [InlineData("sizeof(bool)", 1)]
     [InlineData("sizeof(byte)", 1)]
     [InlineData("sizeof(char)", 2)]

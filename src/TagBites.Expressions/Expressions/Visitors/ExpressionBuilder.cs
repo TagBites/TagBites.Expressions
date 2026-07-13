@@ -1326,10 +1326,116 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             case DiscardPatternSyntax:
                 return Expression.Constant(true);
 
-            // Not supported yet
-            case ListPatternSyntax:
+            // is [1, 2, 3], is [1, .., 3]
+            case ListPatternSyntax p:
+                {
+                    Expression checkExpression;
+
+                    if (!IsNullableType(expressionType))
+                        checkExpression = ToIsNotNull(expression);
+                    else
+                    {
+                        checkExpression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<>.HasValue))!);
+                        expression = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<>.Value))!);
+                    }
+
+                    var receiver = Expression.Variable(expression.Type, "receiver");
+
+                    Expression length;
+                    if (expression.Type.IsArray && expression.Type.GetArrayRank() == 1)
+                        length = Expression.ArrayLength(receiver);
+                    else
+                    {
+                        var lengthProperty = GetCountProperty(expression.Type, "Length") ?? GetCountProperty(expression.Type, "Count");
+                        if (lengthProperty == null)
+                            return ToError(pattern, $"List pattern requires a 'Length' or 'Count' property on type '{expression.Type.GetFriendlyTypeName()}'.");
+
+                        length = Expression.MakeMemberAccess(receiver, lengthProperty);
+                    }
+
+                    var subpatterns = p.Patterns;
+                    var sliceIndex = -1;
+                    for (var i = 0; i < subpatterns.Count; i++)
+                        if (subpatterns[i] is SlicePatternSyntax)
+                        {
+                            sliceIndex = i;
+                            break;
+                        }
+
+                    if (sliceIndex < 0)
+                    {
+                        checkExpression = Expression.AndAlso(checkExpression, Expression.Equal(length, Expression.Constant(subpatterns.Count)));
+
+                        for (var i = 0; i < subpatterns.Count; i++)
+                        {
+                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { Expression.Constant(i) });
+                            if (itemAccess == null)
+                                return null;
+
+                            var condition = ResolvePattern(itemAccess, subpatterns[i]);
+                            if (condition == null)
+                                return null;
+
+                            checkExpression = Expression.AndAlso(checkExpression, condition);
+                        }
+                    }
+                    else
+                    {
+                        var slice = (SlicePatternSyntax)subpatterns[sliceIndex];
+                        if (slice.Pattern != null)
+                            return ToError(slice, "List pattern slice with a sub-pattern is not supported.");
+
+                        var headCount = sliceIndex;
+                        var tailCount = subpatterns.Count - sliceIndex - 1;
+                        checkExpression = Expression.AndAlso(checkExpression, Expression.GreaterThanOrEqual(length, Expression.Constant(headCount + tailCount)));
+
+                        for (var i = 0; i < headCount; i++)
+                        {
+                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { Expression.Constant(i) });
+                            if (itemAccess == null)
+                                return null;
+
+                            var condition = ResolvePattern(itemAccess, subpatterns[i]);
+                            if (condition == null)
+                                return null;
+
+                            checkExpression = Expression.AndAlso(checkExpression, condition);
+                        }
+
+                        for (var i = 0; i < tailCount; i++)
+                        {
+                            var offset = Expression.Subtract(length, Expression.Constant(tailCount - i));
+                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { offset });
+                            if (itemAccess == null)
+                                return null;
+
+                            var condition = ResolvePattern(itemAccess, subpatterns[sliceIndex + 1 + i]);
+                            if (condition == null)
+                                return null;
+
+                            checkExpression = Expression.AndAlso(checkExpression, condition);
+                        }
+                    }
+
+                    if (p.Designation != null && p.Designation is not DiscardDesignationSyntax)
+                    {
+                        if (p.Designation is not SingleVariableDesignationSyntax v)
+                            return ToError(p.Designation);
+
+                        var name = v.Identifier.Text;
+                        var declareExpression = DeclareVariable(v, receiver, name);
+                        if (declareExpression == null)
+                            return null;
+
+                        checkExpression = Expression.AndAlso(checkExpression, Expression.Block(declareExpression, Expression.Constant(true)));
+                    }
+
+                    return Expression.Block([receiver], Expression.Assign(receiver, expression), checkExpression);
+                }
+
+            // is .. (only valid nested inside a list pattern)
             case SlicePatternSyntax:
-                return ToError(pattern);
+                return ToError(pattern, "Slice pattern is only valid inside a list pattern.");
         }
 
         return ToError(pattern);
