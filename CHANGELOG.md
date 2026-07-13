@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-13
+
+### Added
+- Anonymous objects (`new { X = 1, Y = 2 }`), internally mapped to `DynamicObject` with parse-time member validation and value equality (`Equals`/`GetHashCode`), without generating a new type.
+- Recursive/tuple deconstruction patterns (`x is (int a, int b)`, `x is Point(int x, int y)`), including `Deconstruct` methods.
+- List patterns (`arr is [1, 2, 3]`, `arr is [1, .., 3]`).
+- Target-typed `new()`, including inside object/collection initializers (`new List<Point> { new() { X = 1 } }`).
+- Collection initializers for `Add`-based collections (`new List<int> { 1, 2, 3 }`, `new Dictionary<string, int> { { "a", 1 } }`), not just arrays.
+- `AllowStringRelationalOperators` option to opt into `<` / `<=` / `>` / `>=` on strings (ordinal, via `string.Compare`) - disabled by default, matching real C#.
+
+### Fixed
+- `<` / `<=` / `>` / `>=` on strings are rejected by default, matching real C# (previously always allowed via `string.Compare`).
+- A discard (`_`) used as a nested sub-pattern (for example `(1, 2) is (1, _)`) returned the matched value instead of `true`.
+- Reflection-based member lookups are now trim/AOT-compatible (annotated for the trimmer, so publishing with trimming enabled no longer strips members the parser depends on).
+
+### Known limitations
+- Target-typed `new()` is not yet inferred as a method call argument (`obj.Method(new())`); use an explicit type there for now.
+
 ## [1.1.2] - 2026-07-08
 
 ### Added
@@ -90,6 +108,7 @@ A large expansion of the supported C# expression grammar, plus several correctne
 ### Added
 - Initial release. Converts C# text expressions into `System.Linq.Expressions` using Roslyn.
 
+[1.2.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.0.8...1.1.0

@@ -162,6 +162,7 @@ Statements (like `if`), `async`/`await`, and declarations (methods, types) are o
 
 Not currently supported:
 - The range operator (`1..2`, `arr[1..^1]`).
+- Target-typed `new()` as a method call argument (`obj.Method(new())`) - use an explicit type there for now.
 
 ## Configuration
 
