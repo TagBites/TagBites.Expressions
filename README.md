@@ -1,7 +1,10 @@
 # TagBites.Expressions
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
+![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4)
 [![License](https://img.shields.io/github/license/TagBites/TagBites.Expressions)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/TagBites/TagBites.Expressions/build-and-test.yml?branch=master)](https://github.com/TagBites/TagBites.Expressions/actions/workflows/build-and-test.yml)
+[![Downloads](https://img.shields.io/nuget/dt/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 
 **TagBites.Expressions is a Roslyn-based C# expression parser and evaluator for .NET.**
 It compiles runtime string expressions into strongly typed `Func<>` delegates or `LambdaExpression` expression trees, without creating a new assembly.
