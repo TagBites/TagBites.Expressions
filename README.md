@@ -150,7 +150,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Operators: arithmetic, bitwise, shifts, comparison, `&& || !`, `?:`, `??`, `?.`/`?[]`, `is`/`as`, `x!`.
 - Literals: all numeric types, `char`, `string`, verbatim and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
-- `new`: constructors, object initializers, arrays (jagged, multidimensional and sized), generic collections.
+- `new`: constructors, object and collection initializers, arrays (jagged, multidimensional and sized), target-typed `new()`.
 - Anonymous objects (`new { X = 1, Y = 2 }` — see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including element-wise equality.

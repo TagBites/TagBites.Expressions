@@ -31,6 +31,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private int _nextVariableIndex;
     private bool _checkedContext;
     private List<(Type SlotType, List<(string Name, Type Type)> Shape)>? _anonymousObjects;
+    private Type? _targetType;
 
     public string? FirstError { get; private set; }
     public bool HasReflectionCall { get; private set; }
@@ -47,6 +48,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
         else if (options.GlobalMembers.TryGetValue("this", out var item) && item.Value != null)
             _thisParameter = Expression.Constant(item.Value, GetGlobalMemberType("this", item));
+
+        _targetType = options.ResultType;
     }
 
 
@@ -793,75 +796,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
     {
-        // Parameters
-        var args = ResolveParameters(node.ArgumentList?.Arguments);
-        if (args == null)
-            return null;
-
-        // Type
         var type = ResolveType(node.Type);
         if (type == null)
             return null;
 
-        // Constructor
-        var constructors = type.GetConstructors()
-            .Select(x => (Method: x, Parameters: x.GetParameters()))
-            .Where(x => HasMatchingParameters(x.Parameters, args))
-            .OrderBy(x => x.Parameters.Length)
-            .ToList();
+        return CreateObject(node, type, node.ArgumentList, node.Initializer);
+    }
+    public override Expression? VisitImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node)
+    {
+        if (_targetType == null)
+            return ToError(node, "Cannot infer type for 'new()' here.");
 
-        switch (constructors.Count)
-        {
-            case 0:
-                return ToError(node, $"Constructor for '{type.GetFriendlyTypeName()}' not found.");
-            case > 1 when constructors[0].Parameters.Length == constructors[1].Parameters.Length:
-                return ToError(node, $"Ambiguous call for '{type.GetFriendlyTypeName()}' constructor.");
-        }
-
-        var constructorInfo = constructors[0].Method;
-        var constructorParams = constructorInfo.GetParameters();
-
-        // Default values
-        for (var i = args.Count; i < constructorParams.Length; i++)
-        {
-            if (!constructorParams[i].HasDefaultValue)
-                return ToError(node, "Mismatch argument count.");
-
-            if (args is not List<Expression>)
-                args = args.ToList();
-
-            args.Add(Expression.Constant(constructorParams[i].DefaultValue));
-        }
-
-        // Create
-        var instance = Expression.New(constructorInfo, args);
-
-        // Initializer
-        if (node.Initializer?.Expressions.Count > 0)
-        {
-            var bindings = new List<MemberBinding>();
-
-            foreach (var item in node.Initializer.Expressions)
-            {
-                if (item is not AssignmentExpressionSyntax { Left: IdentifierNameSyntax identifier } ae)
-                    return ToError(item);
-
-                var memberName = identifier.Identifier.Text;
-                var member = GetAssignMember(type, memberName);
-                if (member == null)
-                    return ToError(item, "Member not found.");
-
-                var expression = Visit(ae.Right);
-                if (expression == null)
-                    return null;
-
-                bindings.Add(Expression.Bind(member, expression));
-            }
-
-            return Expression.MemberInit(instance, bindings);
-        }
-
-        return instance;
+        return CreateObject(node, _targetType, node.ArgumentList, node.Initializer);
     }
     public override Expression? VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node)
     {
@@ -1592,6 +1538,141 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         _variables.Add((expression.Type, name, index));
 
         return Expression.Call(_variableContextParameter, typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.SetValue))!, Expression.Constant(index), ToCast(expression, typeof(object)));
+    }
+
+    private Expression? CreateObject(SyntaxNode node, Type type, ArgumentListSyntax? argumentList, InitializerExpressionSyntax? initializer)
+    {
+        var previousTargetType = _targetType;
+        _targetType = null;
+
+        var args = ResolveParameters(argumentList?.Arguments);
+        _targetType = previousTargetType;
+
+        if (args == null)
+            return null;
+
+        // Constructor
+        var constructors = type.GetConstructors()
+            .Select(x => (Method: x, Parameters: x.GetParameters()))
+            .Where(x => HasMatchingParameters(x.Parameters, args))
+            .OrderBy(x => x.Parameters.Length)
+            .ToList();
+
+        switch (constructors.Count)
+        {
+            case 0:
+                return ToError(node, $"Constructor for '{type.GetFriendlyTypeName()}' not found.");
+            case > 1 when constructors[0].Parameters.Length == constructors[1].Parameters.Length:
+                return ToError(node, $"Ambiguous call for '{type.GetFriendlyTypeName()}' constructor.");
+        }
+
+        var constructorInfo = constructors[0].Method;
+        var constructorParams = constructorInfo.GetParameters();
+
+        // Default values
+        for (var i = args.Count; i < constructorParams.Length; i++)
+        {
+            if (!constructorParams[i].HasDefaultValue)
+                return ToError(node, "Mismatch argument count.");
+
+            if (args is not List<Expression>)
+                args = args.ToList();
+
+            args.Add(Expression.Constant(constructorParams[i].DefaultValue));
+        }
+
+        // Create
+        var instance = Expression.New(constructorInfo, args);
+
+        // Initializer
+        if (initializer?.Expressions.Count > 0)
+        {
+            if (initializer.IsKind(SyntaxKind.CollectionInitializerExpression))
+                return CreateCollectionInitializer(instance, type, initializer);
+
+            var bindings = new List<MemberBinding>();
+
+            foreach (var item in initializer.Expressions)
+            {
+                if (item is not AssignmentExpressionSyntax { Left: IdentifierNameSyntax identifier } ae)
+                    return ToError(item);
+
+                var memberName = identifier.Identifier.Text;
+                var member = GetAssignMember(type, memberName);
+                if (member == null)
+                    return ToError(item, "Member not found.");
+
+                _targetType = member is PropertyInfo pi ? pi.PropertyType : ((FieldInfo)member).FieldType;
+                var expression = Visit(ae.Right);
+                _targetType = previousTargetType;
+                if (expression == null)
+                    return null;
+
+                bindings.Add(Expression.Bind(member, expression));
+            }
+
+            return Expression.MemberInit(instance, bindings);
+        }
+
+        return instance;
+    }
+    private Expression? CreateCollectionInitializer(Expression instance, Type type, InitializerExpressionSyntax initializer)
+    {
+        var previousTargetType = _targetType;
+        var elementType = type.IsGenericType && type.GetGenericArguments().Length == 1 ? type.GetGenericArguments()[0] : null;
+        var addMethods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => x.Name == "Add").ToList();
+
+        var instanceVariable = Expression.Variable(type, "collection");
+        var statements = new List<Expression> { Expression.Assign(instanceVariable, instance) };
+
+        foreach (var item in initializer.Expressions)
+        {
+            List<Expression> addArgs;
+
+            if (item is InitializerExpressionSyntax nested)
+            {
+                addArgs = new List<Expression>(nested.Expressions.Count);
+                _targetType = null;
+
+                foreach (var sub in nested.Expressions)
+                {
+                    var expression = Visit(sub);
+                    if (expression == null)
+                    {
+                        _targetType = previousTargetType;
+                        return null;
+                    }
+
+                    addArgs.Add(expression);
+                }
+            }
+            else
+            {
+                _targetType = elementType;
+
+                var expression = Visit(item);
+                if (expression == null)
+                {
+                    _targetType = previousTargetType;
+                    return null;
+                }
+
+                addArgs = [expression];
+            }
+
+            _targetType = previousTargetType;
+
+            if (!TryResolveMethodCall(item, instanceVariable, addArgs, addMethods, out var addCall))
+                return ToError(item, $"No suitable 'Add' method found on '{type.GetFriendlyTypeName()}'.");
+            if (addCall == null)
+                return null;
+
+            statements.Add(addCall);
+        }
+
+        statements.Add(instanceVariable);
+
+        return Expression.Block([instanceVariable], statements);
     }
 
     private Type? ResolveType(TypeSyntax type)

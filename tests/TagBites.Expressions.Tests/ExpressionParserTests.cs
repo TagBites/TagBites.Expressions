@@ -999,6 +999,28 @@ public class ExpressionParserTests
     }
 
     [Theory]
+    [InlineData("new ()")]
+    [InlineData("new () { Field1 = 1 }")]
+    public void TargetObjectCreation(string script)
+    {
+        var options = new ExpressionParserOptions
+        {
+            ResultType = typeof(TestModel)
+        };
+        var result = Execute(script, options);
+
+        Assert.IsType<TestModel>(result);
+    }
+
+    [Theory]
+    [InlineData("new List<int> { 1, 2, 3 }.Sum()", 6)]
+    [InlineData("new HashSet<int> { 1, 2, 2, 3 }.Count", 3)]
+    [InlineData("new List<List<int>> { new List<int> { 1, 2 }, new List<int> { 3, 4 } }[1][0]", 3)]
+    [InlineData("new List<List<int>> { new() { 1, 2 }, new() { 3, 4 } }[1][0]", 3)]
+    [InlineData(@"new Dictionary<string, int> { { ""a"", 1 }, { ""b"", 2 } }[""b""]", 2)]
+    public void CollectionInitializer(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new { X = 1, Y = 2 }.X", 1)]
     [InlineData("new { X = 1, Y = 2 }.Y", 2)]
     [InlineData(@"new { Name = ""Bob"", Age = 30 }.Name", "Bob")]
@@ -1210,6 +1232,7 @@ public class ExpressionParserTests
     [InlineData("1 switch { 1 => 'a', _ => \"a\" }")]
     [InlineData("2d == 2m")]
     [InlineData("2d + 2m")]
+    [InlineData("new()")]
     public void InvalidSyntax(string? script)
     {
         var options = new ExpressionParserOptions
