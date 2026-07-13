@@ -20,6 +20,6 @@ public class Program
             .WithOptions(ConfigOptions.DisableOptimizationsValidator)
             .WithOption(ConfigOptions.LogBuildOutput, false);
 
-        BenchmarkRunner.Run(typeof(Program).Assembly, config);
+        BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
     }
 }
