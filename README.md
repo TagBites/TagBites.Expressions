@@ -204,46 +204,49 @@ TagBites.Expressions fits between lightweight expression evaluators and full C# 
 | Startup / memory | Low | Low | Low | High |
 | Dependency | Roslyn | None | None | Roslyn |
 
-### C# syntax vs DynamicExpresso
+### Comparison
 
-Because TagBites parses with Roslyn, it accepts modern C# syntax that DynamicExpresso's own parser does not.  
-Verified against DynamicExpresso 2.19.3 (see [LibraryFeatureComparer.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/LibraryFeatureComparer.cs)):
+Because TagBites parses with Roslyn, it accepts modern C# syntax that neither DynamicExpresso's nor System.Linq.Dynamic.Core's own parsers do.  
+Verified against DynamicExpresso 2.19.3 and System.Linq.Dynamic.Core 1.7.3 (see [LibraryFeatureComparer.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/LibraryFeatureComparer.cs)):
 
-| C# syntax | TagBites | DynamicExpresso |
-|---|:---:|:---:|
-| String interpolation `$"{x,6:0.00}"` (alignment + format) | ✓ | ✗ |
-| Switch expressions | ✓ | ✗ |
-| Pattern matching: relational, `and`/`or`/`not`, property | ✓ | ✗ |
-| Tuple/recursive deconstruction patterns (`x is (int a, int b)`) | ✓ | ✗ |
-| List patterns (`arr is [1, 2, 3]`) | ✓ | ✗ |
-| Tuples and tuple equality | ✓ | ✗ |
-| Array creation: sized and multidimensional | ✓ | ✗ |
-| Target-typed `new()` | ✓ | ✗ |
-| Anonymous objects (`new { X = 1 }`) | ✓ | ✗ |
-| `checked` / `unchecked` | ✓ | ✗ |
-| `nameof`, `sizeof` | ✓ | ✗ |
-| Null-forgiving `x!` | ✓ | ✗ |
-| Verbatim strings `@"..."` | ✓ | ✗ |
-| Digit separators `1_000` | ✓ | ✗ |
-| Arithmetic and logical operators | ✓ | ✓ |
-| Member access and method calls | ✓ | ✓ |
-| Generics | ✓ | ✓ |
-| Lambdas and LINQ | ✓ | ✓ |
-| `is` / `as` | ✓ | ✓ |
-| `typeof`, `default(T)` | ✓ | ✓ |
-| Object and collection initializers | ✓ | ✓ |
-| Ternary and null-coalescing/-conditional | ✓ | ✓ |
+| C# syntax | TagBites | DynamicExpresso | System.Linq.Dynamic.Core |
+|---|:---:|:---:|:---:|
+| String interpolation `$"{x,6:0.00}"` (alignment + format) | ✓ | ✗ | ✗ |
+| Switch expressions | ✓ | ✗ | ✗ |
+| Pattern matching: relational, `and`/`or`/`not`, property | ✓ | ✗ | ✗ |
+| Tuple/recursive deconstruction patterns (`x is (int a, int b)`) | ✓ | ✗ | ✗ |
+| List patterns (`arr is [1, 2, 3]`) | ✓ | ✗ | ✗ |
+| Tuples and tuple equality | ✓ | ✗ | ✗ |
+| Array creation: sized and multidimensional | ✓ | ✗ | ✗ |
+| Target-typed `new()` | ✓ | ✗ | ✗ |
+| Anonymous objects (`new { X = 1 }`) | ✓ | ✗ | ✗ |
+| `checked` / `unchecked` | ✓ | ✗ | ✗ |
+| `nameof`, `sizeof` | ✓ | ✗ | ✗ |
+| Null-forgiving `x!` | ✓ | ✗ | ✗ |
+| Verbatim strings `@"..."` | ✓ | ✗ | ✗ |
+| Digit separators `1_000` | ✓ | ✗ | ✗ |
+| Generic method call with explicit type argument (`xs.OfType<int>()`) | ✓ | ✗ | ✗ |
+| `is` / `as` | ✓ | ✓ | ✗ |
+| `typeof`, `default(T)` | ✓ | ✓ | ✗ |
+| Object and collection initializers | ✓ | ✓ | ✗ |
+| Null-coalescing `??` / null-conditional `?.` | ✓ | ✓ | ✗ |
+| Arithmetic and logical operators | ✓ | ✓ | ✓ |
+| Member access and method calls | ✓ | ✓ | ✓ |
+| Lambdas and LINQ | ✓ | ✓ | ✓ |
+| Ternary | ✓ | ✓ | ✓ |
 
 #### Benchmark
 
-Parsing `"Math.Pow(x, y) + 5"` into a LINQ expression. TagBites (v. 1.1.0) vs DynamicExpresso (v. 2.19.3).
+Parsing `"Math.Pow(x, y) + 5"` into a LINQ expression. TagBites (v. 1.2.0) vs DynamicExpresso (v. 2.19.3) vs System.Linq.Dynamic.Core (v. 1.7.3).
 
-| Method                                  | Mean      | Error     | StdDev    | Allocated |
-|---------------------------------------- |----------:|----------:|----------:|----------:|
-| TagBites_Parse                          |  8.198 us | 0.1567 us | 0.3338 us |   6.85 KB |
-| TagBites_Parse_SharedOptions            |  8.218 us | 0.1502 us | 0.3233 us |   6.51 KB |
-| DynamicExpresso_Parse                   | 26.280 us | 0.7047 us | 1.5017 us |  30.75 KB |
-| DynamicExpresso_Parse_SharedInterpreter | 13.428 us | 0.3094 us | 0.6390 us |  12.32 KB |
+| Method                                  | Mean         | Error      | StdDev     | Allocated |
+|---------------------------------------- |-------------:|-----------:|-----------:|----------:|
+| TagBites_Parse                          |     5.710 us |  0.0331 us |  0.0692 us |   6.87 KB |
+| TagBites_Parse_SharedOptions            |     6.979 us |  0.0318 us |  0.0691 us |   6.52 KB |
+| DynamicExpresso_Parse                   |    21.113 us |  0.1497 us |  0.3286 us |  30.75 KB |
+| DynamicExpresso_Parse_SharedInterpreter |    10.866 us |  0.0868 us |  0.1812 us |  12.32 KB |
+| DynamicLinqCore_Parse                   | 2,805.649 us | 28.0976 us | 61.0818 us | 271.85 KB |
+| DynamicLinqCore_Parse_SharedConfig      |    62.598 us |  0.4017 us |  0.8734 us | 101.01 KB |
 
 Benchmark source: [ParseToExpression.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/ParseToExpression.cs).
 

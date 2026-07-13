@@ -1,3 +1,4 @@
+using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using BenchmarkDotNet.Attributes;
 using DynamicExpresso;
@@ -20,6 +21,7 @@ public class ParseToExpression
         }
     };
     private readonly Interpreter _interpreter = new();
+    private readonly ParsingConfig _dynamicLinqConfig = new();
 
 
     [Benchmark]
@@ -59,5 +61,22 @@ public class ParseToExpression
         return _interpreter.Parse(Script,
             new Parameter("x", typeof(double), 10),
             new Parameter("y", typeof(double), 2));
+    }
+
+    [Benchmark]
+    public LambdaExpression DynamicLinqCore_Parse()
+    {
+        var config = new ParsingConfig();
+        var parameters = new[] { Expression.Parameter(typeof(double), "x"), Expression.Parameter(typeof(double), "y") };
+
+        return DynamicExpressionParser.ParseLambda(config, false, parameters, null, Script);
+    }
+
+    [Benchmark]
+    public LambdaExpression DynamicLinqCore_Parse_SharedConfig()
+    {
+        var parameters = new[] { Expression.Parameter(typeof(double), "x"), Expression.Parameter(typeof(double), "y") };
+
+        return DynamicExpressionParser.ParseLambda(_dynamicLinqConfig, false, parameters, null, Script);
     }
 }

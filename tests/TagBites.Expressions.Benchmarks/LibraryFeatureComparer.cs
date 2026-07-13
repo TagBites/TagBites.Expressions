@@ -1,3 +1,6 @@
+using System.Linq.Dynamic.Core;
+using System.Linq.Dynamic.Core.CustomTypeProviders;
+using System.Linq.Expressions;
 using System.Text;
 using DynamicExpresso;
 
@@ -35,6 +38,10 @@ public static class LibraryFeatureComparer
             ("Null-forgiving x!", "\"a\"!.Length"),
             ("Verbatim string", "@\"a\\b\".Length"),
             ("Digit separators", "1_000_000"),
+            ("Is operator", "1 is int"),
+            ("As operator", "((object)\"a\") as string"),
+            ("Arithmetic/logical operators", "1 < 2 && 2 < 3"),
+            ("Member access/method calls", "\"abc\".Substring(1).Length"),
             ("Lambda (LINQ)", "xs.Where(x => x > 1).Sum()"),
             ("Generic method call", "xs.OfType<int>().Count()"),
             ("Ternary", "1 < 2 ? 1 : 2"),
@@ -42,13 +49,14 @@ public static class LibraryFeatureComparer
             ("Null-conditional", "\"a\"?.Length"),
         };
 
-        Console.WriteLine($"| {"Feature",-28} | TagBites | DynamicExpresso |");
-        Console.WriteLine($"|{new string('-', 30)}|----------|-----------------|");
+        Console.WriteLine($"| {"Feature",-28} | TagBites | DynamicExpresso | System.Linq.Dynamic.Core |");
+        Console.WriteLine($"|{new string('-', 30)}|----------|-----------------|--------------------------|");
         foreach (var (name, expr) in features)
         {
             var t = TagBites(expr) ? "yes" : "NO";
             var d = DynamicExpresso(expr) ? "yes" : "NO";
-            Console.WriteLine($"| {name,-28} | {t,-8} | {d,-15} |");
+            var c = DynamicLinqCore(expr) ? "yes" : "NO";
+            Console.WriteLine($"| {name,-28} | {t,-8} | {d,-15} | {c,-24} |");
         }
     }
 
@@ -76,6 +84,23 @@ public static class LibraryFeatureComparer
             interpreter.Reference(typeof(Enumerable));
             interpreter.Reference(typeof(List<>));
             interpreter.Parse(expr, new Parameter("xs", typeof(int[])));
+            return true;
+        }
+        catch { return false; }
+    }
+    private static bool DynamicLinqCore(string expr)
+    {
+        try
+        {
+            var config = new ParsingConfig
+            {
+                CustomTypeProvider = new DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, new List<Type>
+                {
+                    typeof(StringBuilder), typeof(DateTime), typeof(List<int>), typeof(List<List<int>>)
+                }, false)
+            };
+            var parameter = Expression.Parameter(typeof(int[]), "xs");
+            DynamicExpressionParser.ParseLambda(config, false, new[] { parameter }, null, expr);
             return true;
         }
         catch { return false; }
