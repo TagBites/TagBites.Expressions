@@ -668,6 +668,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return ToError(node, $"Method '{methodName}' not found for this arguments.");
         }
 
+        // Custom member as delegate
+        if (instanceExpression != null && ResolveCustomMember(instanceExpression, methodName) is { } customMember && typeof(Delegate).IsAssignableFrom(customMember.Type))
+        {
+            var invokeMethod = customMember.Type.GetMethod("Invoke")!;
+            if (invokeMethod.GetParameters().Length != parameters.Count)
+                return ToError(node, $"Delegate '{methodName}' does not take {parameters.Count} arguments.");
+
+            return PropagateElementTypeInfo(instanceExpression, Expression.Invoke(customMember, parameters));
+        }
+
         // Instance or static method
         {
             var methods = GetMethods(instanceType, methodName, instanceExpression == null ? BindingFlags.Static : BindingFlags.Instance);
@@ -714,6 +724,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     _extensionInstance = oldExtensionInstance;
                 }
             }
+        }
+
+        // Member as delegate
+        if (instanceExpression != null && ResolveMember(node, instanceExpression, methodName, setErrorWhenNotFound: false) is { } member && typeof(Delegate).IsAssignableFrom(member.Type))
+        {
+            var invokeMethod = member.Type.GetMethod("Invoke")!;
+            if (invokeMethod.GetParameters().Length != parameters.Count)
+                return ToError(node, $"Delegate '{methodName}' does not take {parameters.Count} arguments.");
+
+            return PropagateElementTypeInfo(instanceExpression, Expression.Invoke(member, parameters));
         }
 
         return ToError(node, $"Method '{methodName}' not found for this arguments.");
