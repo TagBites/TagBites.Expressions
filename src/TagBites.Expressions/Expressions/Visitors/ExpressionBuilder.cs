@@ -682,7 +682,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 }
 
                 if (TryResolveMethodCall(node, instanceExpression, parameters, methods, out var expression))
-                    return expression;
+                    return instanceExpression != null && expression != null ? PropagateElementTypeInfo(instanceExpression, expression) : expression;
             }
         }
 
@@ -707,7 +707,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 try
                 {
                     if (TryResolveMethodCall(node, null, parameters, methods, out var expression))
-                        return expression;
+                        return expression != null ? PropagateElementTypeInfo(instanceExpression!, expression) : null;
                 }
                 finally
                 {
@@ -1966,13 +1966,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         var instanceType = instanceExpression.Type;
         if (instanceType.IsArray)
-            return Expression.ArrayAccess(instanceExpression, parameters);
+            return PropagateElementTypeInfo(instanceExpression, Expression.ArrayAccess(instanceExpression, parameters));
 
         // Select method override
         var methods = GetIndexers(instanceType);
 
         if (methods.Count > 0 && TryResolveMethodCall(relatedNode, instanceExpression, parameters, methods, out var expression))
-            return expression;
+            return expression != null ? PropagateElementTypeInfo(instanceExpression, expression) : null;
 
         return ToError(relatedNode, "Indexer not found for this arguments.");
     }
@@ -2870,6 +2870,27 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return null;
     }
     private static T TypeInfoWrapper<T>(T value, object typeInfo) => value;
+    private static Expression PropagateElementTypeInfo(Expression receiver, Expression result)
+    {
+        var typeInfo = ExtractTypeInfo(receiver);
+        if (typeInfo == null)
+            return result;
+
+        var receiverElementType = GetEnumerableElementType(receiver.Type);
+        if (receiverElementType == null)
+            return result;
+
+        var isSameShape = GetEnumerableElementType(result.Type) == receiverElementType // sequence -> sequence, e.g. Where/OrderBy/SelectMany
+            || result.Type == receiverElementType;                                     // sequence -> single element, e.g. FirstOrDefault/ElementAt/indexer
+
+        return isSameShape ? WrapWithTypeInfo(result, typeInfo) : result;
+
+        static Type? GetEnumerableElementType(Type type)
+        {
+            var elementTypes = TypeUtils.GetGenericArguments(type, typeof(IEnumerable<>));
+            return elementTypes.Length > 0 ? elementTypes[0] : null;
+        }
+    }
 
     private class MethodCallInfo
     {
