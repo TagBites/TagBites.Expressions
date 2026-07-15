@@ -83,7 +83,8 @@ public class ExpressionParserOptions
     internal IDictionary<string, Type> IncludedTypesMap => (TypeCollection)IncludedTypes;
 
     /// <summary>
-    /// Function to resolve properties dynamically at runtime based on the provided context.
+    /// Function to resolve property/field-style access for types whose shape only exists at runtime,
+    /// e.g. a database row, a CMS content type, a value that lives in another process. 
     /// </summary>
     public Func<IExpressionMemberResolverContext, Expression?>? CustomPropertyResolver { get; set; }
 

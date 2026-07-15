@@ -1,3 +1,5 @@
+// ReSharper disable UnusedMember.Global
+#pragma warning disable CA1822
 namespace TagBites.Expressions.Tests.Models;
 
 internal class ParamsModel

@@ -17,7 +17,7 @@ int r = func(2, 4); // 3
 
 Because Roslyn does the parsing, expressions use real C# syntax: operators, precedence, numeric promotion, implicit conversions, pattern matching, tuples, lambdas, LINQ and generics behave like they do in the C# compiler. If C# accepts the expression, TagBites.Expressions accepts it; if C# rejects it, so does the parser.
 
-[Try it online](https://tagbites.github.io/TagBites.Expressions/) — type an expression and evaluate it in the browser.
+[Try it online](https://tagbites.github.io/TagBites.Expressions/) - type an expression and evaluate it in the browser.
 
 ## Install
 
@@ -99,33 +99,6 @@ if (!ExpressionParser.TryParse("a + ", options, out var expr, out var error))
     Console.WriteLine(error);
 ```
 
-## FastExpressionCompiler
-
-`ExpressionParser.Parse()` returns a plain `LambdaExpression`, so it can be compiled with any compiler instead of the built-in `Compile()`. [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) is a drop-in, dependency-free replacement for `LambdaExpression.Compile()` that produces the same delegate much faster:
-
-```
-dotnet add package FastExpressionCompiler
-```
-
-```csharp
-using FastExpressionCompiler;
-
-var lambda = ExpressionParser.Parse("Math.Pow(x, y) + 5", options);
-var func = (Func<double, double, double>)lambda.CompileFast();
-```
-
-### Benchmark
-
-| Expression | `Compile()` | `CompileFast()` | Speedup |
-|---|---:|---:|---:|
-| `Math.Pow(x, y) + 5` | 28.23 µs | 2.24 µs | ~12.6x |
-| `x switch { ... }` with LINQ `Select`/`Sum` | 180.92 µs | 5.98 µs | ~30x |
-
-
-The more complex the expression tree, the bigger the gap, since most of the reflection-emit overhead `Compile()` pays per node is avoided by `CompileFast()`. 
-
-Benchmark source: [CompileToDelegate.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/CompileToDelegate.cs).
-
 ## Use cases
 
 Use TagBites.Expressions when you need to parse, validate, evaluate or compile C# expressions from strings at runtime:
@@ -138,11 +111,11 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 
 ## Why TagBites.Expressions?
 
-- **Real C# expression syntax** — parsed by Roslyn, not by a custom C#-like grammar.
-- **Runtime expression evaluation** — evaluate once or compile once and invoke many times.
-- **Delegates or expression trees** — compile to `Func<>` delegates or parse to `LambdaExpression`.
-- **Modern C# expressions** — supports LINQ, lambdas, pattern matching, switch expressions, tuples, generics, interpolated strings, etc.
-- **No generated assembly** — expressions are compiled without creating a new assembly.
+- **Real C# expression syntax** - parsed by Roslyn, not by a custom C#-like grammar.
+- **Runtime expression evaluation** - evaluate once or compile once and invoke many times.
+- **Delegates or expression trees** - compile to `Func<>` delegates or parse to `LambdaExpression`.
+- **Modern C# expressions** - supports LINQ, lambdas, pattern matching, switch expressions, tuples, generics, interpolated strings, etc.
+- **No generated assembly** - expressions are compiled without creating a new assembly.
 
 ## Supported C# expression syntax
 
@@ -151,7 +124,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Literals: all numeric types, `char`, `string`, verbatim and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
 - `new`: constructors, object and collection initializers, arrays (jagged, multidimensional and sized), target-typed `new()`.
-- Anonymous objects (`new { X = 1, Y = 2 }` — see Usage above).
+- Anonymous objects (`new { X = 1, Y = 2 }` - see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including element-wise equality.
 - `typeof`, `default(T)`, `nameof`, `sizeof`, `checked`, `unchecked`.
@@ -170,14 +143,17 @@ Not currently supported:
 
 | Option | Purpose |
 |---|---|
+| `AllowReflection` | Allow reflection APIs. (default: `false`) |
 | `Parameters` | Typed parameters of the resulting lambda. |
-| `GlobalMembers` | Named values and delegates usable by name; a member named `this` is implicit. |
 | `UseFirstParameterAsThis` | Use the first parameter as `this` so its members need no prefix. |
+| `GlobalMembers` | Named values and delegates usable by name; a member named `this` is implicit. |
 | `IncludedTypes` | Types (and static classes) an expression may reference by name. |
 | `CustomPropertyResolver` | Resolve members at runtime, e.g. against types defined only at runtime. |
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
 | `ResultCastType` | Force the result to this type with an explicit cast, e.g. to compile every expression as `Func<object>`. |
-| `AllowReflection` | Allow reflection APIs. (default: `false`) |
+
+**CustomPropertyResolver**:  
+It is only called for `instance.Member`, it needs an instance to work on. That can be an ordinary parameter, accessed explicitly - `p.Age` works for any parameter name. A bare name like `Age` also works, but it is then resolved implicitly as `this.Age`, so a `this` must be set up first: `UseFirstParameterAsThis`, or a `this` entry in `GlobalMembers`.
 
 **Result type:**  
 `ResultType` is a contract: the expression must produce this type. A C# implicit conversion (like `int` -> `long`) is applied automatically; anything else is a parse error. Use it to require, for example, that a filter is a `bool`.  
@@ -185,13 +161,129 @@ Not currently supported:
 
 The two combine: to run many rules through a single `Func<object>` while still requiring each to be boolean, set `ResultType = typeof(bool)` (reject anything non-boolean) together with `ResultCastType = typeof(object)`.
 
-**Non-standard options:**  
+### Non-standard options
 These opt-in options (all default to `false`) make the parser accept syntax or semantics that real C# does not:
 
 | Option | Purpose |
 |---|---|
-| `AllowRuntimeCast` | Allow custom keywords `typeis` / `typeas` / `typecast` against runtime type names. |
 | `AllowStringRelationalOperators` | Allow `<` / `<=` / `>` / `>=` on strings, compared ordinally via `string.Compare` - not valid in real C#. |
+| `AllowRuntimeCast` | Allow custom keywords `typeis` / `typeas` / `typecast` against runtime type names. |
+
+## Advanced usage
+
+### FastExpressionCompiler
+
+`ExpressionParser.Parse()` returns a plain `LambdaExpression`, so it can be compiled with any compiler instead of the built-in `Compile()`. [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) is a drop-in, dependency-free replacement for `LambdaExpression.Compile()` that produces the same delegate much faster:
+
+```
+dotnet add package FastExpressionCompiler
+```
+
+```csharp
+using FastExpressionCompiler;
+
+var lambda = ExpressionParser.Parse("Math.Pow(x, y) + 5", options);
+var func = (Func<double, double, double>)lambda.CompileFast();
+```
+
+#### Benchmark
+
+| Expression | `Compile()` | `CompileFast()` | Speedup |
+|---|---:|---:|---:|
+| `Math.Pow(x, y) + 5` | 28.23 µs | 2.24 µs | ~12.6x |
+| `x switch { ... }` with LINQ `Select`/`Sum` | 180.92 µs | 5.98 µs | ~30x |
+
+
+The more complex the expression tree, the bigger the gap, since most of the reflection-emit overhead `Compile()` pays per node is avoided by `CompileFast()`. 
+
+Benchmark source: [CompileToDelegate.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/CompileToDelegate.cs).
+
+### Dynamic / Runtime-defined types
+
+`CustomPropertyResolver` lets an expression navigate types whose shape only exists at runtime - a database row, a CMS content type, a value that lives in another process. 
+
+The pattern:
+1. Represent every runtime-shaped value with **one real, fixed .NET type** (not `object`, not a type generated per shape). Keep the actual field names/types in a separate schema object. (in example: Value/Instance = `DynamicRecord`, ValueType = `DynamicRecordSchema`)
+2. In `CustomPropertyResolver`, look up the requested member by name against that schema, and build a call to read it.
+3. Attach the schema to the *result* with `context.IncludeTypeInfo(expression, schema)`, so a later `.Member` further down the chain can retrieve it again through `context.InstanceTypeInfo`.
+
+```csharp
+// Schema (DynamicRecordSchema and DynamicRecord are example types)
+var personSchema = new TypeSchema(new Dictionary<string, TypeSchema> { ["Name"] = new(typeof(string)), ["Age"] = new(typeof(int)) });
+var rootSchema = new TypeSchema(new Dictionary<string, TypeSchema> { ["People"] = new("Person", true) });
+var dataSourceSchema = new DynamicRecordSchema { ["Person"] = personSchema, ["this"] = rootSchema };
+
+// Source
+var alice = new DynamicRecord { ["Name"] = "Alice", ["Age"] = 30 };
+var root = new DynamicRecord { ["People"] = new List<DynamicRecord> { alice } };
+
+// Parse
+var options = new ExpressionParserOptions
+{
+    Parameters = { (typeof(DynamicRecord), "this") },
+    UseFirstParameterAsThis = true,
+    CustomPropertyResolver = x => Resolver(dataSourceSchema, x)
+};
+var expression = "People.Where(p => p.Age > 18).Select(x => x.Name).First()";
+var result = ExpressionParser.Invoke<string>(expression, options, root); // Alice
+
+// Resolver
+Expression? Resolver(DynamicRecordSchema dataSourceSchema, IExpressionMemberResolverContext context)
+{
+    if (context.Instance.Type != typeof(DynamicRecord))
+        return null;
+
+    // Member type
+    var instanceSchema = context.InstanceTypeInfo as TypeSchema
+        ?? (context.MemberFullPath == "this." + context.MemberName ? dataSourceSchema.GetValueOrDefault("this") : null);
+    if (instanceSchema == null)
+        return null;
+
+    if (instanceSchema.Fields == null && instanceSchema.Name != null)
+    {
+        instanceSchema = dataSourceSchema.GetValueOrDefault(instanceSchema.Name);
+        if (instanceSchema == null)
+            return null;
+    }
+
+    // Value
+    if (instanceSchema.Fields?.TryGetValue(context.MemberName, out var fieldTypeScheme) != true)
+        return null;
+
+    var fieldType = fieldTypeScheme!.Type;
+    var isKnownType = fieldType != null;
+    if (fieldType == null)
+    {
+        fieldType = typeof(DynamicRecord);
+        if (fieldTypeScheme.IsCollection)
+            fieldType = typeof(IList<DynamicRecord>);
+    }
+
+    var method = typeof(DynamicRecord).GetMethod(nameof(DynamicRecord.GetValue))!.MakeGenericMethod(fieldType);
+    var result = Expression.Call(context.Instance, method, Expression.Constant(context.MemberName));
+
+    return !isKnownType
+        ? context.IncludeTypeInfo(result, fieldTypeScheme) // Wrap expression to include a type info
+        : result;
+}
+
+// Sample value and schema types
+class DynamicRecord : Dictionary<string, object>
+{
+    public T GetValue<T>(string name) => TryGetValue(name, out var value) && value is T v ? v : default;
+}
+class DynamicRecordSchema : Dictionary<string, TypeSchema>;
+class TypeSchema { /* ... */ }
+```
+
+**LINQ over a dynamic collection works without any extra code**, as long as the collection itself is exposed as a real, closed type - `IEnumerable<DynamicRecord>`. Because it's a real type, extensions like `Where` or `Select`, `Sum`, `Count` resolve as ordinary LINQ extension methods. `CustomPropertyResolver` never has to intercept a method call, only plain member access. And the element parameter of a lambda passed to one of those methods automatically inherits the collection's `InstanceTypeInfo`, so it's correctly typed too.
+
+> Parameters and global members have no type info, so every "dynamic" object must by resolved by resolver.
+
+> `People` resolves through `CustomPropertyResolver` and is tagged via `context.IncludeTypeInfo(call, PersonSchema)`. Inside the lambda, `p` "knows" it's a `Person` too, because parser extracts that same type info from the collection and applies it to `p`, so `p.Age` is resolved by the very same resolver branch that resolved `People`.  
+> Type info is propagated through method chains only for collections. The receiver has to be an `IEnumerable<X>`, and the info flows to a result that keeps the same element type: another `IEnumerable<X>` (`Where`, `Select`, `OrderBy`, ...) or a single `X` (`First`, `FirstOrDefault`, ...). That's why `People.Where(...).First().Name` still knows the element is a `Person`.
+
+Full example: [CustomPropertyResolverTests.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Tests/CustomPropertyResolverTests.cs).
 
 ## Alternatives
 

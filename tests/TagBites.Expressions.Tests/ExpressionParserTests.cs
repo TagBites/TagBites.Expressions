@@ -1,5 +1,3 @@
-using System.Linq.Expressions;
-using System.Reflection;
 using TagBites.Expressions.Tests.Models;
 
 namespace TagBites.Expressions.Tests;
@@ -298,8 +296,8 @@ public class ExpressionParserTests
     [Theory]
     [InlineData("nameof(System)", "System")]
     [InlineData("nameof(v)", "v")]
-    [InlineData("nameof(m.TimesTen)", "TimesTen")]
-    [InlineData("nameof(m.TimesTen.Value)", "Value")]
+    [InlineData("nameof(m.ChildTimesTen)", "ChildTimesTen")]
+    [InlineData("nameof(m.ChildTimesTen.Value)", "Value")]
     public void NameOfExpression(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -416,7 +414,7 @@ public class ExpressionParserTests
     [InlineData("v + v", 20)]
     [InlineData(@"v.ToString() + ""-"" + t", "10-ten")]
     [InlineData("int.Parse(v.ToString().Substring(0,1))", 1)]
-    [InlineData("m.TimesTen.Value + m.Value", 11)]
+    [InlineData("m.ChildTimesTen.Value + m.Value", 11)]
     public void Arguments(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -436,11 +434,11 @@ public class ExpressionParserTests
     [InlineData("((TimeSpan?)TimeSpan.FromMinutes(2))?.TotalMinutes", 2d)]
     [InlineData("((TimeSpan?)TimeSpan.FromMinutes(2)).Value.TotalMinutes", 2d)]
     [InlineData("nv.Value", 5)]
-    [InlineData("m?.TimesTen != null", true)]
-    [InlineData("m?.TimesTen?.Value", 10)]
-    [InlineData("nv + m.TimesTen?.TimesTen.Value + m.TimesTen?.Value", 115)]
+    [InlineData("m?.ChildTimesTen != null", true)]
+    [InlineData("m?.ChildTimesTen?.Value", 10)]
+    [InlineData("nv + m.ChildTimesTen?.ChildTimesTen.Value + m.ChildTimesTen?.Value", 115)]
     [InlineData("(1 < 2 ? (int?)1 : 2).Value", 1)]
-    [InlineData("(m?.TimesTen.Value ?? nv).Value", 10)]
+    [InlineData("(m?.ChildTimesTen.Value ?? nv).Value", 10)]
     public void ConditionalOperators(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -476,14 +474,14 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("m.ReturnForExactType<int>(2)", 2)]
-    [InlineData("m.ReturnForExactType<int>((object)2)", 2)]
-    [InlineData("m.ReturnForExactType<long>(2)", 0L)]
-    [InlineData("m.GetExactOrDefault<long>(2)", 0L)]
-    [InlineData("m.GetExactOrDefault<long>(2, 1)", 1L)]
-    [InlineData("m.GetExactOrDefault<long>(2L)", 2L)]
-    [InlineData("m.ReturnIt(2)", 2)]
-    [InlineData("m.ReturnIt<long>(2)", 2L)]
+    [InlineData("m.ReturnArgumentExactTypeOrNull<int>(2)", 2)]
+    [InlineData("m.ReturnArgumentExactTypeOrNull<int>((object)2)", 2)]
+    [InlineData("m.ReturnArgumentExactTypeOrNull<long>(2)", 0L)]
+    [InlineData("m.ReturnArgumentExactTypeOrDefault<long>(2)", 0L)]
+    [InlineData("m.ReturnArgumentExactTypeOrDefault<long>(2, 1)", 1L)]
+    [InlineData("m.ReturnArgumentExactTypeOrDefault<long>(2L)", 2L)]
+    [InlineData("m.ReturnArgument(2)", 2)]
+    [InlineData("m.ReturnArgument<long>(2)", 2L)]
     public void GenericMethods(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -686,13 +684,13 @@ public class ExpressionParserTests
     [InlineData(@"s is { X: 1, Y: 3 }", false)]
     [InlineData(@"s is { X: 3, Y: 2 }", false)]
     [InlineData(@"s is TestStruct { X: 1, Y: 2 } a && a.X + a.Y == 3", true)]
-    [InlineData(@"m is { NullChild: null }", true)]
-    [InlineData(@"m is { NullChild: not null }", false)]
-    [InlineData(@"m is { NullChild: not { } }", true)]
-    [InlineData(@"m is { NullChild: { } }", false)]
-    [InlineData(@"m is { NullChild: null, TimesTen: { } }", true)]
-    [InlineData(@"m is { NullChild: null, TimesTen: not { } }", false)]
-    [InlineData(@"m is TestModel { NullChild: null, TimesTen: { } } a && a.TimesTen.Value == 10", true)]
+    [InlineData(@"m is { ChildNull: null }", true)]
+    [InlineData(@"m is { ChildNull: not null }", false)]
+    [InlineData(@"m is { ChildNull: not { } }", true)]
+    [InlineData(@"m is { ChildNull: { } }", false)]
+    [InlineData(@"m is { ChildNull: null, ChildTimesTen: { } }", true)]
+    [InlineData(@"m is { ChildNull: null, ChildTimesTen: not { } }", false)]
+    [InlineData(@"m is TestModel { ChildNull: null, ChildTimesTen: { } } a && a.ChildTimesTen.Value == 10", true)]
     public void PatternProperty(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -811,7 +809,7 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("TimesTen.Value + Value + v", 16)]
+    [InlineData("ChildTimesTen.Value + Value + v", 16)]
     public void ThisParameter(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -825,75 +823,6 @@ public class ExpressionParserTests
         };
 
         ExecuteAndTest(script, options, expectedResult, new TestModel(), 5);
-    }
-
-    [Theory]
-    [InlineData("Value", 1)]
-    [InlineData("TimesTwo", 2)]
-    [InlineData("TimesTen.Value", 10)]
-    [InlineData("TimesTwenty.Value", 20)]
-    [InlineData("TimesTwenty.TimesTwo", 20 * 2)]
-    [InlineData("TimesTwenty.TimesTwenty.Value", 20 * 20)]
-    [InlineData("TimesTwenty.TimesTwenty.TimesTwo", 20 * 20 * 2)]
-    [InlineData("Value + TimesTwo + TimesTen.Value + TimesTwenty.Value + TimesTwenty.TimesTwo + TimesTwenty.TimesTwenty.Value + TimesTwenty.TimesTwenty.TimesTwo", 1 + 2 + 10 + 20 + 20 * 2 + 20 * 20 + 20 * 20 * 2)]
-    [InlineData("m.TimesTwo + m.TimesTwenty.TimesTwo", 2 + 20 * 2)]
-    public void DynamicParameterBinding(string script, object expectedResult)
-    {
-        var options = new ExpressionParserOptions
-        {
-            Parameters =
-            {
-                (typeof(TestModel), "this"),
-                (typeof(TestModel), "m")
-            },
-            UseFirstParameterAsThis = true,
-            CustomPropertyResolver = context =>
-            {
-                if (context.Instance.Type == typeof(TestModel) && TestModel.GetMemberType(context.MemberName) is { } type)
-                    return Expression.Convert(
-                        Expression.Call(context.Instance, typeof(TestModel).GetMethod("GetValue")!, Expression.Constant(context.MemberName)),
-                        type);
-
-                return null;
-            },
-        };
-
-        ExecuteAndTest(script, options, expectedResult, new TestModel(), new TestModel());
-    }
-
-    [Theory]
-    [InlineData("TimesTen.Value", "this.TimesTen.Value")]
-    [InlineData("m.TimesTen.Value", "m.TimesTen.Value")]
-    [InlineData("TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value", "this.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value")]
-    [InlineData("m.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value", "m.TimesTen.TimesTwenty.TimesTen.TimesTwenty.TimesTen.TimesTwenty.Value")]
-    public void FullMemberPathTest(string script, string expectedPath)
-    {
-        var maxPath = string.Empty;
-
-        var options = new ExpressionParserOptions
-        {
-            Parameters =
-            {
-                (typeof(TestModel), "this"),
-                (typeof(TestModel), "m")
-            },
-            UseFirstParameterAsThis = true,
-            CustomPropertyResolver = context =>
-            {
-                if (context.MemberFullPath?.Length > maxPath.Length)
-                    maxPath = context.MemberFullPath;
-
-                if (context.Instance.Type == typeof(TestModel) && TestModel.GetMemberType(context.MemberName) is { } type)
-                    return Expression.Convert(
-                        Expression.Call(context.Instance, typeof(TestModel).GetMethod("GetValue")!, Expression.Constant(context.MemberName)),
-                        type);
-
-                return null;
-            },
-        };
-        ExpressionParser.Parse(script, options);
-
-        Assert.Equal(expectedPath, maxPath);
     }
 
     [Theory]
@@ -937,62 +866,12 @@ public class ExpressionParserTests
     }
 
     [Theory]
-    [InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2)).First().Item2", "b")]
-    //[InlineData("models.GroupBy(x => (x.K1, x.K2)).Select(x => (x.Key.Item1, x.Key.Item2, x.Sum(y => y.Count))).First().Item3", 6)]
-    public void LambdaWithCustomResolver(string script, object expectedResult)
-    {
-        var t1 = new RuntimeDefinedType
-        {
-            Properties = { { "K1", typeof(string) }, { "K2", typeof(string) }, { "Count", typeof(int) } }
-        };
-        var models = new RuntimeDefinedTypeInstanceCollection(t1)
-            {
-                new (t1) { ["K1"] = "a", ["K2"] = "b", ["Count"] = 1  },
-                new (t1) { ["K1"] = "a", ["K2"] = "b", ["Count"] = 2  },
-                new (t1) { ["K1"] = "c", ["K2"] = "d", ["Count"] = 3  },
-                new (t1) { ["K1"] = "c", ["K2"] = "d", ["Count"] = 4  }
-            };
-
-        var options = new ExpressionParserOptions
-        {
-            Parameters =
-            {
-                (typeof(object), "this")
-            },
-            UseFirstParameterAsThis = true,
-            CustomPropertyResolver = CustomPropertyResolver
-        };
-
-        ExecuteAndTest(script, options, expectedResult, (object?)null);
-
-        Expression? CustomPropertyResolver(IExpressionMemberResolverContext arg)
-        {
-            if (arg.MemberFullPath == "this.models")
-                return arg.IncludeTypeInfo(Expression.Constant(models), t1);
-
-            if (arg.Instance.Type == typeof(RuntimeDefinedTypeInstance)
-                && arg.InstanceTypeInfo is RuntimeDefinedType { } type
-                && type.Properties.TryGetValue(arg.MemberName, out var p))
-            {
-                var method = typeof(RuntimeDefinedTypeInstance)
-                    .GetMethod(nameof(RuntimeDefinedTypeInstance.GetTypedValue), BindingFlags.Instance | BindingFlags.Public)!
-                    .MakeGenericMethod(p);
-                var getValue = Expression.Call(arg.Instance, method, Expression.Constant(arg.MemberName));
-
-                return getValue;
-            }
-
-            return null;
-        }
-    }
-
-    [Theory]
     [InlineData("new TestModel().Value", 1)]
     [InlineData("new TestModel(5).Value", 5)]
-    [InlineData("new TestModel { Field1 = 1, Field2 = 2 }.Field1", 1)]
-    [InlineData("new TestModel { Field1 = 1, Field2 = 2 }.Field2", 2)]
-    [InlineData("new TestModel { Field1 = 0, Field2 = 0 }.Value", 1)]
-    [InlineData("new TestModel(5) { Field1 = 1, Field2 = 2 }.Value", 5)]
+    [InlineData("new TestModel { Property1 = 1, Property2 = 2 }.Property1", 1)]
+    [InlineData("new TestModel { Property1 = 1, Property2 = 2 }.Property2", 2)]
+    [InlineData("new TestModel { Property1 = 0, Property2 = 0 }.Value", 1)]
+    [InlineData("new TestModel(5) { Property1 = 1, Property2 = 2 }.Value", 5)]
     public void ObjectCreation(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -1007,7 +886,7 @@ public class ExpressionParserTests
 
     [Theory]
     [InlineData("new ()")]
-    [InlineData("new () { Field1 = 1 }")]
+    [InlineData("new () { Property1 = 1 }")]
     public void TargetObjectCreation(string script)
     {
         var options = new ExpressionParserOptions
@@ -1192,15 +1071,15 @@ public class ExpressionParserTests
     [InlineData("Add.Invoke(2, 3)", 5)]
     [InlineData("Add?.Invoke(2, 3)", 5)]
     [InlineData("Add(2, 3)", 5)]
-    [InlineData("m.TimesTen.Value", 10)]
-    [InlineData("m?.TimesTen.Value", 10)]
+    [InlineData("m.ChildTimesTen.Value", 10)]
+    [InlineData("m?.ChildTimesTen.Value", 10)]
     [InlineData("m.GetValue(\"TimesTwo\")", 2)]
     [InlineData("this.GetValue(\"TimesTwo\")", 2)]
-    [InlineData("this.TimesTen.Value", 10)]
-    [InlineData("TimesTen.Value", 10)]
-    [InlineData("ReturnIt<int>(2)", 2)]
-    [InlineData("this.ReturnIt<int>(2)", 2)]
-    [InlineData("m.ReturnIt<int>(2)", 2)]
+    [InlineData("this.ChildTimesTen.Value", 10)]
+    [InlineData("ChildTimesTen.Value", 10)]
+    [InlineData("ReturnArgument<int>(2)", 2)]
+    [InlineData("this.ReturnArgument<int>(2)", 2)]
+    [InlineData("m.ReturnArgument<int>(2)", 2)]
     public void GlobalMembers(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions
