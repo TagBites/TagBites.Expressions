@@ -8,27 +8,37 @@ using DynamicExpresso;
 namespace TagBites.Expressions.Benchmarks;
 
 [MemoryDiagnoser]
-[SimpleJob(iterationCount: 60)]
 public class ParseToExpression
 {
     private const string Script = "Math.Pow(x, y) + 5";
+    private const string LambdaScript = "list.Where(x => x > limit).Select(x => Math.Pow(x, y)).Sum()";
 
-    private readonly ExpressionParserOptions _options = new()
-    {
-        Parameters =
-        {
-            (typeof(double), "x"),
-            (typeof(double), "y")
-        }
-    };
-    private readonly Interpreter _interpreter = new();
+    private readonly IList<int> _list = new List<int> { 1, 2, 3, 4 };
+
+    private readonly ExpressionParserOptions _options = CreateTagBitesParseOptions();
+    private readonly ExpressionParserOptions _lambdaOptions = CreateTagBitesParseLambdaOptions();
+
+    private readonly Interpreter _interpreter = CreateDynamicExpressoInterpreter();
+    private readonly Interpreter _lambdaInterpreter = CreateDynamicExpressoLambdaInterpreter();
+
     private readonly ParsingConfig _dynamicLinqConfig = new();
 
 
     [Benchmark]
+    [BenchmarkCategory("Parse")]
     public LambdaExpression TagBites_Parse()
     {
-        var options = new ExpressionParserOptions
+        return ExpressionParser.Parse(Script, CreateTagBitesParseOptions());
+    }
+    [Benchmark]
+    [BenchmarkCategory("Parse", "Shared")]
+    public LambdaExpression TagBites_Parse_SharedEnv()
+    {
+        return ExpressionParser.Parse(Script, _options);
+    }
+    private static ExpressionParserOptions CreateTagBitesParseOptions()
+    {
+        return new ExpressionParserOptions
         {
             Parameters =
             {
@@ -36,48 +46,113 @@ public class ParseToExpression
                 (typeof(double), "y")
             }
         };
-
-        return ExpressionParser.Parse(Script, options);
     }
 
     [Benchmark]
-    public LambdaExpression TagBites_Parse_SharedOptions()
+    [BenchmarkCategory("Lambda")]
+    public LambdaExpression TagBites_ParseLambda()
     {
-        return ExpressionParser.Parse(Script, _options);
+        return ExpressionParser.Parse(LambdaScript, CreateTagBitesParseLambdaOptions());
+    }
+    [Benchmark]
+    [BenchmarkCategory("Lambda", "Shared")]
+    public LambdaExpression TagBites_ParseLambda_SharedEnv()
+    {
+        return ExpressionParser.Parse(LambdaScript, _lambdaOptions);
+    }
+    private static ExpressionParserOptions CreateTagBitesParseLambdaOptions()
+    {
+        return new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(IList<int>), "list"),
+                (typeof(int), "limit"),
+                (typeof(double), "y")
+            }
+        };
     }
 
     [Benchmark]
+    [BenchmarkCategory("Parse")]
     public Lambda DynamicExpresso_Parse()
     {
-        var interpreter = new Interpreter();
-
-        return interpreter.Parse(Script,
-            new Parameter("x", typeof(double), 10),
-            new Parameter("y", typeof(double), 2));
+        var interpreter = CreateDynamicExpressoInterpreter();
+        return interpreter.Parse(Script, CreateDynamicExpressoParameters());
     }
-
     [Benchmark]
-    public Lambda DynamicExpresso_Parse_SharedInterpreter()
+    [BenchmarkCategory("Parse", "Shared")]
+    public Lambda DynamicExpresso_Parse_SharedEnv()
     {
-        return _interpreter.Parse(Script,
-            new Parameter("x", typeof(double), 10),
-            new Parameter("y", typeof(double), 2));
+        return _interpreter.Parse(Script, CreateDynamicExpressoParameters());
+    }
+    private static Interpreter CreateDynamicExpressoInterpreter()
+    {
+        return new Interpreter();
+    }
+    private Parameter[] CreateDynamicExpressoParameters()
+    {
+        return [new Parameter("x", typeof(double), 10),
+                new Parameter("y", typeof(double), 2)];
     }
 
     [Benchmark]
+    public Lambda DynamicExpresso_ParseLambda()
+    {
+        var interpreter = CreateDynamicExpressoLambdaInterpreter();
+        return interpreter.Parse(LambdaScript, CreateDynamicExpressoLambdaParameters());
+    }
+    [BenchmarkCategory("Lambda")]
+    [Benchmark]
+    [BenchmarkCategory("Lambda", "Shared")]
+    public Lambda DynamicExpresso_ParseLambda_SharedEnv()
+    {
+        return _lambdaInterpreter.Parse(LambdaScript, CreateDynamicExpressoLambdaParameters());
+    }
+    private static Interpreter CreateDynamicExpressoLambdaInterpreter()
+    {
+        return new Interpreter(InterpreterOptions.Default | InterpreterOptions.LambdaExpressions);
+    }
+    private Parameter[] CreateDynamicExpressoLambdaParameters()
+    {
+        return [new Parameter("list", typeof(IList<int>), _list),
+                new Parameter("limit", typeof(int), 2),
+                new Parameter("y", typeof(double), 2)];
+    }
+
+    [Benchmark]
+    [BenchmarkCategory("Parse")]
     public LambdaExpression DynamicLinqCore_Parse()
     {
         var config = new ParsingConfig();
-        var parameters = new[] { Expression.Parameter(typeof(double), "x"), Expression.Parameter(typeof(double), "y") };
-
-        return DynamicExpressionParser.ParseLambda(config, false, parameters, null, Script);
+        return DynamicExpressionParser.ParseLambda(config, false, CreateDynamicLinqCoreParameters(), null, Script);
+    }
+    [Benchmark]
+    [BenchmarkCategory("Parse", "Shared")]
+    public LambdaExpression DynamicLinqCore_Parse_SharedEnv()
+    {
+        return DynamicExpressionParser.ParseLambda(_dynamicLinqConfig, false, CreateDynamicLinqCoreParameters(), null, Script);
+    }
+    private static ParameterExpression[] CreateDynamicLinqCoreParameters()
+    {
+        return [Expression.Parameter(typeof(double), "x"), Expression.Parameter(typeof(double), "y")];
     }
 
     [Benchmark]
-    public LambdaExpression DynamicLinqCore_Parse_SharedConfig()
+    [BenchmarkCategory("Lambda")]
+    public LambdaExpression DynamicLinqCore_ParseLambda()
     {
-        var parameters = new[] { Expression.Parameter(typeof(double), "x"), Expression.Parameter(typeof(double), "y") };
-
-        return DynamicExpressionParser.ParseLambda(_dynamicLinqConfig, false, parameters, null, Script);
+        var config = new ParsingConfig();
+        return DynamicExpressionParser.ParseLambda(config, false, CreateDynamicLinqCoreLambdaParameters(), null, LambdaScript);
+    }
+    [Benchmark]
+    [BenchmarkCategory("Lambda", "Shared")]
+    public LambdaExpression DynamicLinqCore_ParseLambda_SharedEnv()
+    {
+        return DynamicExpressionParser.ParseLambda(_dynamicLinqConfig, false, CreateDynamicLinqCoreLambdaParameters(), null, LambdaScript);
+    }
+    private static ParameterExpression[] CreateDynamicLinqCoreLambdaParameters()
+    {
+        return [Expression.Parameter(typeof(IList<int>), "list"), Expression.Parameter(typeof(int), "limit"), Expression.Parameter(typeof(double), "y")];
     }
 }
