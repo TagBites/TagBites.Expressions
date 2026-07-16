@@ -151,6 +151,7 @@ Not currently supported:
 | `CustomPropertyResolver` | Resolve members at runtime, e.g. against types defined only at runtime. |
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
 | `ResultCastType` | Force the result to this type with an explicit cast, e.g. to compile every expression as `Func<object>`. |
+| `UseMemberCache` | Caches reflected members (methods, indexers, extension methods) on this options instance. |
 
 **CustomPropertyResolver**:  
 It is only called for `instance.Member`, it needs an instance to work on. That can be an ordinary parameter, accessed explicitly - `p.Age` works for any parameter name. A bare name like `Age` also works, but it is then resolved implicitly as `this.Age`, so a `this` must be set up first: `UseFirstParameterAsThis`, or a `this` entry in `GlobalMembers`.
@@ -329,16 +330,18 @@ Verified against DynamicExpresso 2.19.3 and System.Linq.Dynamic.Core 1.7.3 (see 
 
 #### Benchmark
 
-Parsing `"Math.Pow(x, y) + 5"` into a LINQ expression. TagBites (v. 1.2.0) vs DynamicExpresso (v. 2.19.3) vs System.Linq.Dynamic.Core (v. 1.7.3).
+Parsing expressions: `"Math.Pow(x, y) + 5"` and `list.Where(x => x > limit).Select(x => Math.Pow(x, y)).Sum()`.  
+Compared: TagBites.Expressions (v. 1.2.1) vs DynamicExpresso (v. 2.19.3) vs System.Linq.Dynamic.Core (v. 1.7.3).
 
-| Method                                  | Mean         | Error      | StdDev     | Allocated |
-|---------------------------------------- |-------------:|-----------:|-----------:|----------:|
-| TagBites_Parse                          |     5.710 us |  0.0331 us |  0.0692 us |   6.87 KB |
-| TagBites_Parse_SharedOptions            |     6.979 us |  0.0318 us |  0.0691 us |   6.52 KB |
-| DynamicExpresso_Parse                   |    21.113 us |  0.1497 us |  0.3286 us |  30.75 KB |
-| DynamicExpresso_Parse_SharedInterpreter |    10.866 us |  0.0868 us |  0.1812 us |  12.32 KB |
-| DynamicLinqCore_Parse                   | 2,805.649 us | 28.0976 us | 61.0818 us | 271.85 KB |
-| DynamicLinqCore_Parse_SharedConfig      |    62.598 us |  0.4017 us |  0.8734 us | 101.01 KB |
+| TestCase | TagBites.Expressions | DynamicExpresso | System.Linq.Dynamic.Core |
+|---|---:|---:|---:|
+| Parse | **`6,90 us`** (1,00x)<br>**6,02 KB** (1,00x) | `26,30 us` (3,81x)<br>30,75 KB (5,10x) | `3530,30 us` (512,0x)<br>276,79 KB (45,95x) |
+| Parse_SharedEnv | **`4,72 us`** (1,00x)<br>**3,18 KB** (1,00x) | `14,02 us` (2,97x)<br>12,32 KB (3,88x) | `74,91 us` (15,85x)<br>101,08 KB (31,79x) |
+| ParseLambda | **`84,85 us`** (1,00x)<br>**36,39 KB** (1,00x) | `244,32 us` (2,88x)<br>122,14 KB (3,36x) | `3661,42 us` (43,15x)<br>206,77 KB (5,68x) |
+| ParseLambda_SharedEnv | **`29,69 us`** (1,00x)<br>**12,36 KB** (1,00x) | `220,56 us` (7,43x)<br>103,79 KB (8,40x) | `38,57 us` (1,30x)<br>35,26 KB (2,85x) |
+
+> SharedEnv = shared options/interptreter/config.  
+> SharedOptions for TagBites.Expressions uses `UseMemberCache = true`.
 
 Benchmark source: [ParseToExpression.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/ParseToExpression.cs).
 
