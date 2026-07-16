@@ -11,8 +11,6 @@ using TagBites.Utils;
 
 namespace TagBites.Expressions;
 
-// TODO namespaces support VisitQualifiedName
-
 internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 {
     private static MethodInfo? s_typeInfoWrapper;
@@ -80,9 +78,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         if (_variableContextParameter != null)
         {
-            var innerLambda = Expression.Lambda(expression, _parameters.Concat(new[] { _variableContextParameter }));
-            var lvcConstructor = typeof(LambdaVariableContext).GetConstructor(new[] { typeof(int) })!;
-            expression = Expression.Invoke(innerLambda, _parameters.Cast<Expression>().Concat(new[] { Expression.New(lvcConstructor, Expression.Constant(_nextVariableIndex)) }));
+            var innerLambda = Expression.Lambda(expression, _parameters.Concat([_variableContextParameter]));
+            var lvcConstructor = typeof(LambdaVariableContext).GetConstructor([typeof(int)])!;
+            expression = Expression.Invoke(innerLambda, _parameters.Cast<Expression>().Concat([Expression.New(lvcConstructor, Expression.Constant(_nextVariableIndex))]));
         }
 
         return Expression.Lambda(expression, _parameters);
@@ -175,7 +173,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         if (value == null)
                             return null;
 
-                        if (!EnsureArgumentType(arm.Pattern, governing.Type, ref value))
+                        if (!EnsureArgumentType(governing.Type, ref value))
                             return ToError(arm.Pattern, "Switch governing and arm type mismatch.");
 
                         condition = Expression.MakeBinary(ExpressionType.Equal, governing, value);
@@ -286,6 +284,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         };
 
         // Special operators
+        // ReSharper disable once ConvertIfStatementToSwitchStatement
         if (expressionType == ExpressionType.Throw)
         {
             // operator ??
@@ -294,7 +293,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 var condition = left;
 
                 if (IsNullableType(left.Type))
-                    left = Expression.MakeMemberAccess(left, left.Type.GetProperty(nameof(Nullable<int>.Value))!);
+                    left = Expression.MakeMemberAccess(left, left.Type.GetProperty(nameof(Nullable<>.Value))!);
 
                 if (!EnsureTheSameTypes(node, ref left, ref right))
                     return null;
@@ -317,7 +316,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Operator + is not defined for string - use Contact instead
         if (expressionType == ExpressionType.Add && (left.Type == typeof(string) || right.Type == typeof(string)))
         {
-            var contactMethod = typeof(string).GetMethod(nameof(string.Concat), BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(object), typeof(object) }, null);
+            var contactMethod = typeof(string).GetMethod(nameof(string.Concat), BindingFlags.Public | BindingFlags.Static, null, [typeof(object), typeof(object)], null);
             var toStringMethod = typeof(object).GetMethod("ToString", BindingFlags.Public | BindingFlags.Instance);
 
             if (left.Type != typeof(string))
@@ -334,7 +333,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             && left.Type == typeof(string) && right.Type == typeof(string)
             && expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
         {
-            var compareMethod = typeof(string).GetMethod(nameof(string.Compare), BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(string), typeof(string) }, null);
+            var compareMethod = typeof(string).GetMethod(nameof(string.Compare), BindingFlags.Public | BindingFlags.Static, null, [typeof(string), typeof(string)], null);
             var compareExpression = Expression.Call(null, compareMethod!, left, right);
             return Expression.MakeBinary(expressionType, compareExpression, Expression.Constant(0));
         }
@@ -922,7 +921,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (exp == null)
                         return null;
 
-                    if (!EnsureArgumentType(expression, elementType, ref exp))
+                    if (!EnsureArgumentType(elementType, ref exp))
                         return ToError(expression, $"Cannot convert array element to '{elementType.GetFriendlyTypeName()}'.");
 
                     expressions.Add(exp);
@@ -1005,7 +1004,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (exp == null)
                         return false;
 
-                    if (!EnsureArgumentType(expression, elementType, ref exp))
+                    if (!EnsureArgumentType(elementType, ref exp))
                     {
                         ToError(expression, $"Cannot convert array element to '{elementType.GetFriendlyTypeName()}'.");
                         return false;
@@ -1077,7 +1076,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     if (IsNullableType(expressionType))
                     {
-                        var hasValue = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<int>.HasValue))!);
+                        var hasValue = Expression.MakeMemberAccess(expression, expressionType.GetProperty(nameof(Nullable<>.HasValue))!);
                         return isNullCheck ? Expression.Not(hasValue) : hasValue;
                     }
 
@@ -1476,12 +1475,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return Expression.Call(
             null,
-            typeof(string).GetMethod(nameof(string.Format), new[] { typeof(string), typeof(object[]) })!,
-            new Expression[]
-            {
+            typeof(string).GetMethod(nameof(string.Format), [typeof(string), typeof(object[])])!,
+            [
                 Expression.Constant(format.ToString()),
                 Expression.NewArrayInit(typeof(object), args)
-            });
+            ]);
     }
     public override Expression? VisitTupleExpression(TupleExpressionSyntax node)
     {
@@ -1556,7 +1554,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var index = _nextVariableIndex++;
 
         _variableContextParameter ??= Expression.Parameter(typeof(LambdaVariableContext), "__lvc_");
-        _variables ??= new List<(Type, string, int)>();
+        _variables ??= [];
         _variables.Add((expression.Type, name, index));
 
         return Expression.Call(_variableContextParameter, typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.SetValue))!, Expression.Constant(index), ToCast(expression, typeof(object)));
@@ -1872,10 +1870,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Anonymous object
         if (staticType == null && _anonymousObjects != null && typeof(AnonymousObject).IsAssignableFrom(expressionType))
         {
-            var slot = _anonymousObjects.FirstOrDefault(x => x.SlotType == expressionType);
-            if (slot.Shape != null)
+            var (_, shape) = _anonymousObjects.FirstOrDefault(x => x.SlotType == expressionType);
+            if (shape != null)
             {
-                var memberType = slot.Shape.FirstOrDefault(x => x.Name == name).Type;
+                var memberType = shape.FirstOrDefault(x => x.Name == name).Type;
                 if (memberType == null)
                     return setErrorWhenNotFound ? ToError(node, $"'{name}' is not a member of this anonymous object.") : null;
 
@@ -1908,12 +1906,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return next;
     }
 
-    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, Type? resultType)
+    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes)
     {
         var simple = node as SimpleLambdaExpressionSyntax;
         var parenthesized = node as ParenthesizedLambdaExpressionSyntax;
         var parametersSyntax = simple != null
-            ? new[] { simple.Parameter }
+            ? [simple.Parameter]
             : parenthesized!.ParameterList.Parameters.ToArray();
         if (parametersSyntax.Length != parameterTypes.Length)
             return null;
@@ -1922,7 +1920,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var nestedVariableStartIndex = -1;
         ParameterExpression[]? parameters = null;
 
-        _nestedParameters ??= new List<ParameterExpression>();
+        _nestedParameters ??= [];
         try
         {
             // Parameters
@@ -2081,7 +2079,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // They may still succeed via a mixed-type operator overload (e.g. DateTime - TimeSpan) or throw error otherwise.
         return true;
     }
-    private bool EnsureArgumentType(SyntaxNode node, Type parameterType, ref Expression argument)
+    private bool EnsureArgumentType(Type parameterType, ref Expression argument)
     {
         if (TryConvertExpression(argument, parameterType) is not { } converted)
             return false;
@@ -2145,6 +2143,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var enumType = left.Type;
             var underlyingType = Enum.GetUnderlyingType(enumType);
 
+            // ReSharper disable once ConvertSwitchStatementToSwitchExpression
             switch (expressionType)
             {
                 case ExpressionType.Equal:
@@ -2276,18 +2275,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (underlying.IsEnum)
             return expression;
 
-        switch (Type.GetTypeCode(underlying))
+        return Type.GetTypeCode(underlying) switch
         {
-            case TypeCode.SByte:
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.UInt16:
-            case TypeCode.Char:
-                return ToCast(expression, IsNullableType(expression.Type) ? typeof(int?) : typeof(int));
-
-            default:
-                return expression;
-        }
+            TypeCode.SByte or TypeCode.Byte or TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Char => ToCast(expression, IsNullableType(expression.Type) ? typeof(int?) : typeof(int)),
+            _ => expression
+        };
     }
     private static Expression CallWhenNotNull(Expression instance, MethodInfo method)
     {
@@ -2567,7 +2559,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var newBestMethod = GetBestMatchingMethod(bestMethod, info);
             if (newBestMethod == null)
             {
-                ambiguous ??= new List<MethodCallInfo>();
+                ambiguous ??= [];
                 ambiguous.Add(info);
                 ambiguous.Add(bestMethod);
             }
@@ -2639,7 +2631,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (!lambdaType.IsGenericType)
                         return null;
 
-                    Type? resultType = null;
                     var lambdaParameters = lambdaType.GetGenericArguments();
 
                     for (var j = 0; j < lambdaParameters.Length; j++)
@@ -2659,13 +2650,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     // var invokeMethod = lambdaType.GetMethod("Invoke")!;
                     if (lambdaType.Name.StartsWith("Func`"))
-                    {
-                        resultType = lambdaParameters.Last();
                         lambdaParameters = lambdaParameters.Take(lambdaParameters.Length - 1).ToArray();
-                    }
 
                     // Expression
-                    var expression = TryResolveLambda(dl.Node, lambdaParameters, resultType);
+                    var expression = TryResolveLambda(dl.Node, lambdaParameters);
                     if (expression == null)
                         return null;
 
@@ -2720,7 +2708,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     for (var i = paramsIndex; i < methodArguments.Count; i++)
                     {
                         var element = methodArguments[i];
-                        if (!EnsureArgumentType(relatedNode, elementType, ref element))
+                        if (!EnsureArgumentType(elementType, ref element))
                             return null;
 
                         elements.Add(element);
@@ -2740,7 +2728,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 if (parameterType != argumentType)
                 {
                     var argument = methodArguments[i];
-                    if (!EnsureArgumentType(relatedNode, parameterType, ref argument))
+                    if (!EnsureArgumentType(parameterType, ref argument))
                         return null;
 
                     methodArguments[i] = argument;
@@ -2889,6 +2877,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return null;
     }
+    // ReSharper disable once UnusedParameter.Local
     private static T TypeInfoWrapper<T>(T value, object typeInfo) => value;
     private static Expression PropagateElementTypeInfo(Expression receiver, Expression result)
     {

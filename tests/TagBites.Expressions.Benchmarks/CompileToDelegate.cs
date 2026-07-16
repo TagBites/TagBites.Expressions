@@ -30,6 +30,7 @@ public class CompileToDelegate
         _richLambda = ExpressionParser.Parse(RichScript, options);
     }
 
+
     [Benchmark(Baseline = true)]
     public Delegate Simple_Compile() => _simpleLambda.Compile();
 

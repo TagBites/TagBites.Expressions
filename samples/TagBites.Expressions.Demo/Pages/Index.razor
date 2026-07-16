@@ -44,7 +44,7 @@
     private bool _hasResult;
 
     private static readonly string[] Examples =
-    {
+    [
         "1 + 2 * 3",
         "Math.Pow(2, 10)",
         "new [] { 3, 1, 2 }.OrderBy(x => x)",
@@ -54,7 +54,7 @@
         "$\"{1.0 / 3.0:0.000}\"",
         "Enumerable.Range(1, 5).Sum()",
         "5 is var a and > 0 ? a * 2 : 0"
-    };
+    ];
 
 
     protected override void OnInitialized() => Evaluate();

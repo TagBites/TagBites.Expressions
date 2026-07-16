@@ -7,8 +7,8 @@ internal static class TypeUtils
 {
     #region Types
 
-    private static readonly HashSet<(TypeCode From, TypeCode To)> s_implicitNumericConversions = new()
-    {
+    private static readonly HashSet<(TypeCode From, TypeCode To)> s_implicitNumericConversions =
+    [
         (TypeCode.Char, TypeCode.UInt16), (TypeCode.Char, TypeCode.Int32), (TypeCode.Char, TypeCode.UInt32),
         (TypeCode.Char, TypeCode.Int64), (TypeCode.Char, TypeCode.UInt64), (TypeCode.Char, TypeCode.Single),
         (TypeCode.Char, TypeCode.Double), (TypeCode.Char, TypeCode.Decimal),
@@ -37,8 +37,8 @@ internal static class TypeUtils
 
         (TypeCode.UInt64, TypeCode.Single), (TypeCode.UInt64, TypeCode.Double), (TypeCode.UInt64, TypeCode.Decimal),
 
-        (TypeCode.Single, TypeCode.Double),
-    };
+        (TypeCode.Single, TypeCode.Double)
+    ];
 
 
     public static bool IsNumericType(Type type)
@@ -160,7 +160,7 @@ internal static class TypeUtils
                 return item.GenericTypeArguments;
         }
 
-        return Array.Empty<Type>();
+        return [];
     }
 
     #endregion

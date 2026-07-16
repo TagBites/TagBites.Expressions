@@ -8,9 +8,6 @@ namespace TagBites.Expressions;
 [PublicAPI]
 public class ExpressionParserOptions
 {
-    private IList<(Type Type, string Name)> _parameters = new List<(Type, string)>();
-    private IDictionary<string, (Type? Type, object? Value)> _globalMembers = new Dictionary<string, (Type? Type, object? Value)>();
-
     /// <summary>
     /// Expected and required result type of the expression.
     /// Used only for validation. If null, the result type is not checked.
@@ -25,22 +22,14 @@ public class ExpressionParserOptions
     /// <summary>
     /// List of parameters of the function.
     /// </summary>
-    public IList<(Type Type, string Name)> Parameters
-    {
-        get => _parameters;
-        set => _parameters = value ?? throw new ArgumentNullException(nameof(value));
-    }
+    public IList<(Type Type, string Name)> Parameters { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); } = new List<(Type, string)>();
     /// <summary>
     /// List of global members (values or delegates).
     /// Member type is optional; if null, the type is based on the value.  
     /// If both member type and value are null, the type is object.  
     /// Member with name 'this' can be access implicitly (when <see cref="UseFirstParameterAsThis"/> is <c>false</c>).
     /// </summary>
-    public IDictionary<string, (Type? Type, object? Value)> GlobalMembers
-    {
-        get => _globalMembers;
-        set => _globalMembers = value ?? throw new ArgumentNullException(nameof(value));
-    }
+    public IDictionary<string, (Type? Type, object? Value)> GlobalMembers { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); } = new Dictionary<string, (Type? Type, object? Value)>();
 
     /// <summary>
     /// True if the first parameter should be used as 'this' so its members can be accessed implicitly.

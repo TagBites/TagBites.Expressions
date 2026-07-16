@@ -3,6 +3,7 @@ using System.Linq.Dynamic.Core.CustomTypeProviders;
 using System.Linq.Expressions;
 using System.Text;
 using DynamicExpresso;
+// ReSharper disable IdentifierTypo
 
 namespace TagBites.Expressions.Benchmarks;
 
@@ -100,7 +101,7 @@ public static class LibraryFeatureComparer
                 }, false)
             };
             var parameter = Expression.Parameter(typeof(int[]), "xs");
-            DynamicExpressionParser.ParseLambda(config, false, new[] { parameter }, null, expr);
+            DynamicExpressionParser.ParseLambda(config, false, [parameter], null, expr);
             return true;
         }
         catch { return false; }

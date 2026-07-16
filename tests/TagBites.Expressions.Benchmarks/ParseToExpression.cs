@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using BenchmarkDotNet.Attributes;
 using DynamicExpresso;
 // ReSharper disable IdentifierTypo
+#pragma warning disable CA1822
 
 namespace TagBites.Expressions.Benchmarks;
 
