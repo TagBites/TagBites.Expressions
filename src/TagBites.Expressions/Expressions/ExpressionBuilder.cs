@@ -18,7 +18,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private readonly ExpressionParserOptions _options;
     private readonly Expression? _thisParameter;
-    private readonly List<ParameterExpression> _parameters;
+    private readonly ParameterExpression[] _parameters;
     private Expression? _tmp;
     private Expression? _extensionInstance;
     private List<ParameterExpression>? _nestedParameters;
@@ -37,11 +37,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     public ExpressionBuilder(ExpressionParserOptions options)
     {
         _options = options;
-        _parameters = options.Parameters.Select(x => Expression.Parameter(x.Type, x.Name)).ToList();
+        _parameters = options.Parameters.ToFastArray(x => Expression.Parameter(x.Type, x.Name));
 
         if (options.UseFirstParameterAsThis)
         {
-            if (_parameters.Count > 0)
+            if (_parameters.Length > 0)
                 _thisParameter = _parameters[0];
         }
         else if (options.GlobalMembers.TryGetValue("this", out var item) && item.Value != null)
@@ -563,7 +563,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     // Parameter as method
                     var name = methodNameSyntax.Identifier.Text;
-                    var parameter = _parameters.FirstOrDefault(x => x.Name == name && x != _thisParameter);
+                    var parameter = _parameters.FastFirstOrDefault(x => x.Name == name && x != _thisParameter);
                     if (parameter != null && typeof(Delegate).IsAssignableFrom(parameter.Type))
                     {
                         instanceExpression = parameter;
@@ -684,10 +684,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             {
                 if (genericTypes != null)
                 {
-                    methods = methods
-                        .Where(x => x.IsGenericMethodDefinition && x.GetGenericArguments().Length == genericTypes.Length)
-                        .Select(x => x.MakeGenericMethod(genericTypes))
-                        .ToList();
+                    methods = methods.ToListFast(
+                        x => x.IsGenericMethodDefinition && x.GetGenericArguments().Length == genericTypes.Length,
+                        x => x.MakeGenericMethod(genericTypes));
                 }
 
                 if (TryResolveMethodCall(node, instanceExpression, parameters, methods, out var expression))
@@ -703,10 +702,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             {
                 if (genericTypes != null)
                 {
-                    methods = methods
-                        .Where(x => x.IsGenericMethodDefinition && x.GetGenericArguments().Length == genericTypes.Length)
-                        .Select(x => x.MakeGenericMethod(genericTypes))
-                        .ToList();
+                    methods = methods.ToListFast(
+                        x => x.IsGenericMethodDefinition && x.GetGenericArguments().Length == genericTypes.Length,
+                        x => x.MakeGenericMethod(genericTypes));
                 }
 
                 parameters = new[] { instanceExpression! }.Concat(parameters).ToList();
@@ -782,7 +780,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             }
 
             // Access
-            var access = ResolveItemCall(node, receiver, new List<Expression> { Expression.Subtract(length, offset) });
+            var access = ResolveItemCall(node, receiver, [Expression.Subtract(length, offset)]);
             if (access == null)
                 return null;
 
@@ -913,10 +911,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             // Simple array
             if (rank == 1)
             {
-                var expressions = new List<Expression>(node.Initializer.Expressions.Count);
+                var initializerExpressions = node.Initializer.Expressions;
+                var expressions = new Expression[initializerExpressions.Count];
 
-                foreach (var expression in node.Initializer.Expressions)
+                for (var i = 0; i < expressions.Length; i++)
                 {
+                    var expression = initializerExpressions[i];
                     var exp = Visit(expression);
                     if (exp == null)
                         return null;
@@ -924,7 +924,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (!EnsureArgumentType(elementType, ref exp))
                         return ToError(expression, $"Cannot convert array element to '{elementType.GetFriendlyTypeName()}'.");
 
-                    expressions.Add(exp);
+                    expressions[i] = exp;
                 }
 
                 return Expression.NewArrayInit(elementType, expressions);
@@ -942,7 +942,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             var statements = new List<Expression>(elements.Count + 2)
             {
-                Expression.Assign(arrayVariable, Expression.NewArrayBounds(elementType, dimensions.Select(x => (Expression)Expression.Constant(x)).ToArray()))
+                Expression.Assign(arrayVariable, Expression.NewArrayBounds(elementType, dimensions.ToFastArray(x => (Expression)Expression.Constant(x))))
             };
 
             // Convert the flat indexes i into a per-dimension indexes (row-major order)
@@ -1238,8 +1238,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                             if (deconstruct == null)
                                 return ToError(p.PositionalPatternClause, $"No Deconstruct method for '{expression.Type.GetFriendlyTypeName()}' with {subpatterns.Count} parameters.");
 
-                            deconstructVariables = deconstruct.GetParameters().Select(x => Expression.Variable(x.ParameterType.GetElementType()!)).ToArray();
-                            elements = deconstructVariables.Cast<Expression>().ToArray();
+                            deconstructVariables = deconstruct.GetParameters().ToFastArray(x => Expression.Variable(x.ParameterType.GetElementType()!));
+                            elements = deconstructVariables.ToFastArray(x => (Expression)x);
                             checkExpression = Expression.Block(Expression.Call(expression, deconstruct, elements), checkExpression);
                         }
 
@@ -1335,7 +1335,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                         for (var i = 0; i < subpatterns.Count; i++)
                         {
-                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { Expression.Constant(i) });
+                            var itemAccess = ResolveItemCall(pattern, receiver, [Expression.Constant(i)]);
                             if (itemAccess == null)
                                 return null;
 
@@ -1358,7 +1358,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                         for (var i = 0; i < headCount; i++)
                         {
-                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { Expression.Constant(i) });
+                            var itemAccess = ResolveItemCall(pattern, receiver, [Expression.Constant(i)]);
                             if (itemAccess == null)
                                 return null;
 
@@ -1372,7 +1372,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         for (var i = 0; i < tailCount; i++)
                         {
                             var offset = Expression.Subtract(length, Expression.Constant(tailCount - i));
-                            var itemAccess = ResolveItemCall(pattern, receiver, new List<Expression> { offset });
+                            var itemAccess = ResolveItemCall(pattern, receiver, [offset]);
                             if (itemAccess == null)
                                 return null;
 
@@ -1493,7 +1493,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (initMethod == null)
             return ToError(node);
 
-        return Expression.Call(null, initMethod.MakeGenericMethod(args.Select(x => x!.Type).ToArray()), args);
+        return Expression.Call(null, initMethod.MakeGenericMethod(args.ToFastArray(x => x!.Type)), args);
     }
 
     public override Expression? VisitIdentifierName(IdentifierNameSyntax node)
@@ -1514,7 +1514,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return parameter;
 
         // Parameter
-        parameter = _parameters.FirstOrDefault(x => x.Name == name && x != _thisParameter);
+        parameter = _parameters.FastFirstOrDefault(x => x.Name == name && x != _thisParameter);
 
         if (parameter != null)
             return parameter;
@@ -1565,7 +1565,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var previousTargetType = _targetType;
         _targetType = null;
 
-        var args = ResolveParameters(argumentList?.Arguments);
+        var args = argumentList != null ? ResolveParameters(argumentList.Arguments) : Array.Empty<Expression>();
         _targetType = previousTargetType;
 
         if (args == null)
@@ -1640,31 +1640,35 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         var previousTargetType = _targetType;
         var elementType = type.IsGenericType && type.GetGenericArguments().Length == 1 ? type.GetGenericArguments()[0] : null;
-        var addMethods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(x => x.Name == "Add").ToList();
+        var addMethods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance).ToListFast(x => x.Name == "Add");
 
         var instanceVariable = Expression.Variable(type, "collection");
         var statements = new List<Expression> { Expression.Assign(instanceVariable, instance) };
 
         foreach (var item in initializer.Expressions)
         {
-            List<Expression> addArgs;
+            IList<Expression> addArgs;
 
             if (item is InitializerExpressionSyntax nested)
             {
-                addArgs = new List<Expression>(nested.Expressions.Count);
                 _targetType = null;
 
-                foreach (var sub in nested.Expressions)
+                var nestedExpressions = nested.Expressions;
+                var args = new Expression[nestedExpressions.Count];
+
+                for (var i = 0; i < args.Length; i++)
                 {
-                    var expression = Visit(sub);
+                    var expression = Visit(nestedExpressions[i]);
                     if (expression == null)
                     {
                         _targetType = previousTargetType;
                         return null;
                     }
 
-                    addArgs.Add(expression);
+                    args[i] = expression;
                 }
+
+                addArgs = args;
             }
             else
             {
@@ -1962,20 +1966,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     _variables.RemoveAt(_variables.Count - 1);
         }
     }
-    private IList<Expression>? ResolveParameters(IEnumerable<ArgumentSyntax>? node)
+    private IList<Expression>? ResolveParameters(SeparatedSyntaxList<ArgumentSyntax> node)
     {
-        if (node == null)
+        var count = node.Count;
+        if (count == 0)
             return Array.Empty<Expression>();
 
-        var parameters = new List<Expression>();
+        var parameters = new Expression[count];
 
-        foreach (var arg in node)
+        for (var i = 0; i < count; i++)
         {
-            var argExpression = Visit(arg);
+            var argExpression = Visit(node[i]);
             if (argExpression == null)
                 return null;
 
-            parameters.Add(argExpression);
+            parameters[i] = argExpression;
         }
 
         return parameters;
@@ -2110,6 +2115,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         MethodInfo? FindIn(Type declaringType)
         {
+            // Primitive types conversions are runtime intrinsics, not reflectable methods.
+            if (declaringType.IsPrimitive)
+                return null;
+
             foreach (var method in declaringType.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
                 if (method.Name != operatorName)
@@ -2536,7 +2545,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return result;
     }
 
-    private bool TryResolveMethodCall(SyntaxNode relatedNode, Expression? instanceExpression, IList<Expression> arguments, IEnumerable<MethodInfo> candidates, out Expression? expression)
+    private bool TryResolveMethodCall(SyntaxNode relatedNode, Expression? instanceExpression, IList<Expression> arguments, IList<MethodInfo> candidates, out Expression? expression)
     {
         expression = null;
 
@@ -2544,9 +2553,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         MethodCallInfo? bestMethod = null;
         List<MethodCallInfo>? ambiguous = null;
 
-        foreach (var item in candidates)
+        // ReSharper disable once ForCanBeConvertedToForeach
+        for (var i = 0; i < candidates.Count; i++)
         {
-            var info = ToMatchingMethod(item);
+            var info = ToMatchingMethod(candidates[i]);
             if (info == null || !HasMatchingParameters(info.Parameters, info.Arguments))
                 continue;
 
@@ -2703,7 +2713,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         return null;
 
                     var elementType = paramsArrayType.GetElementType()!;
-                    var elements = new List<Expression>(methodArguments.Count - paramsIndex);
+                    var elements = new Expression[methodArguments.Count - paramsIndex];
 
                     for (var i = paramsIndex; i < methodArguments.Count; i++)
                     {
@@ -2711,7 +2721,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         if (!EnsureArgumentType(elementType, ref element))
                             return null;
 
-                        elements.Add(element);
+                        elements[i - paramsIndex] = element;
                     }
 
                     methodArguments.RemoveRange(paramsIndex, methodArguments.Count - paramsIndex);

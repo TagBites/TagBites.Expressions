@@ -76,9 +76,10 @@ public static class ExpressionParser
         options ??= new ExpressionParserOptions();
 
         var root = PrepareCore(expressionText);
-        var diagnostics = root.GetDiagnostics();
 
-        var error = diagnostics.FirstOrDefault(x => x.Severity == DiagnosticSeverity.Error && x.Id != "CS1002");
+        var error = root.ContainsDiagnostics
+            ? root.GetDiagnostics().FirstOrDefault(x => x.Severity == DiagnosticSeverity.Error && x.Id != "CS1002")
+            : null;
         if (error != null)
         {
             expression = null;
