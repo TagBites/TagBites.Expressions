@@ -2662,14 +2662,32 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         MethodCallInfo? ToMatchingMethod(MethodInfo x)
         {
-            var info = new MethodCallInfo(x, arguments);
-            ref var method = ref info.Method;
-            var methodParameters = info.Parameters;
-            var methodArguments = info.Arguments;
+            var methodParameters = x.GetParameters();
+            var hasParams = methodParameters.Length > 0 && methodParameters[methodParameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
 
-            // A params method accepts more arguments than declared parameters.
-            if (methodParameters.Length < methodArguments.Count && !info.HasParams)
-                return null;
+            if (!hasParams)
+            {
+                // A params method accepts more arguments than declared parameters.
+                if (methodParameters.Length < arguments.Count)
+                    return null;
+
+                // Too few arguments, reject if any unfilled parameter is required (no default value).
+                for (var i = arguments.Count; i < methodParameters.Length; i++)
+                    if (!methodParameters[i].HasDefaultValue)
+                        return null;
+            }
+
+            // Build method info
+            var info = new MethodCallInfo
+            {
+                Method = x,
+                RawArguments = arguments,
+                Arguments = arguments.ToList(),
+                Parameters = methodParameters,
+                HasParams = hasParams
+            };
+            ref var method = ref info.Method;
+            var methodArguments = info.Arguments;
 
             // Try extract arguments
             Type[]? genericParameters = null;
@@ -2688,8 +2706,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 for (var i = 0; i < genericParameters.Length; i++)
                 {
-                    var type = genericParameters[i];
-                    var fullType = argumentTypes.FirstOrDefault(y => y.Item1 == type.Name).Item2;
+                    var typeName = genericParameters[i].Name;
+                    var fullType = argumentTypes.FastFirstOrDefault(y => y.Item1 == typeName).Item2;
                     genericArguments[i] = fullType;
                 }
             }
@@ -2748,8 +2766,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                             if (genericArguments[j] != null)
                                 continue;
 
-                            var type = genericParameters![i];
-                            var fullType = argumentTypes.FirstOrDefault(y => y.Item1 == type.Name).Item2;
+                            var typeName = genericParameters![i].Name;
+                            var fullType = argumentTypes.FastFirstOrDefault(y => y.Item1 == typeName).Item2;
                             genericArguments[j] = fullType;
                         }
                     }
@@ -2981,23 +2999,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private class MethodCallInfo
     {
-        public MethodInfo Method;
+        public MethodInfo Method = null!;
 
-        public ParameterInfo[] Parameters { get; }
-        public bool HasParams { get; }
+        public ParameterInfo[] Parameters { get; set; } = null!;
+        public bool HasParams { get; set; }
 
-        public IList<Expression> RawArguments { get; }
-        public List<Expression> Arguments { get; }
-
-        public MethodCallInfo(MethodInfo method, IList<Expression> rawArguments)
-        {
-            Method = method;
-            Parameters = method.GetParameters();
-            HasParams = Parameters.Length > 0 && Parameters[Parameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
-
-            RawArguments = rawArguments;
-            Arguments = rawArguments.ToList();
-        }
+        public IList<Expression> RawArguments { get; set; } = null!;
+        public List<Expression> Arguments { get; set; } = null!;
 
 
         public override string ToString() => Method.ToString();
