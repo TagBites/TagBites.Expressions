@@ -1,4 +1,6 @@
 using System.Linq.Expressions;
+using System.Reflection;
+using MemberCacheKey = (TagBites.Expressions.MemberLookupKind Kind, System.Type Type, string Name, System.Reflection.BindingFlags Flags);
 
 namespace TagBites.Expressions;
 
@@ -68,8 +70,8 @@ public class ExpressionParserOptions
     /// <summary>
     /// Collection of types that can be used in expressions.
     /// </summary>
-    public ICollection<Type> IncludedTypes { get; } = new TypeCollection();
-    internal IDictionary<string, Type> IncludedTypesMap => (TypeCollection)IncludedTypes;
+    public ICollection<Type> IncludedTypes => IncludedTypesMap;
+    internal TypeCollection IncludedTypesMap { get; } = new();
 
     /// <summary>
     /// Function to resolve property/field-style access for types whose shape only exists at runtime,
@@ -77,34 +79,18 @@ public class ExpressionParserOptions
     /// </summary>
     public Func<IExpressionMemberResolverContext, Expression?>? CustomPropertyResolver { get; set; }
 
+    /// <summary>
+    /// Caches reflected members (methods, indexers, extension methods) on this options instance.
+    /// <see cref="IncludedTypes"/> becomes immutable after the first call.
+    /// Default: <c>false</c>.
+    /// </summary>
+    public bool UseMemberCache { get; set; }
+    internal Dictionary<MemberCacheKey, MethodInfo[]>? MemberCache;
+
     public ExpressionParserOptions()
     {
 #if !DEBUG
         UseReducedExpressions = true;
 #endif
-    }
-
-    private class TypeCollection : Dictionary<string, Type>, ICollection<Type>
-    {
-        public bool IsReadOnly => false;
-
-
-        public bool Contains(Type item) => TryGetValue(item.Name, out var t) && item == t;
-        public void CopyTo(Type[] array, int arrayIndex) => Values.CopyTo(array, arrayIndex);
-
-        public void Add(Type item)
-        {
-            if (TryGetValue(item.Name, out var t))
-                if (item != t)
-                    throw new ArgumentException($"Different type with the same name '{t.Name}' has already been included.");
-                else
-                    return;
-
-            Add(item.Name, item);
-        }
-        public bool Remove(Type item) => Remove(item.Name);
-
-        IEnumerator<Type> IEnumerable<Type>.GetEnumerator() => Values.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => Values.GetEnumerator();
     }
 }

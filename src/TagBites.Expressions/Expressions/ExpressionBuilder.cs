@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using TagBites.Utils;
+using MemberCacheKey = (TagBites.Expressions.MemberLookupKind Kind, System.Type Type, string Name, System.Reflection.BindingFlags Flags);
 
 namespace TagBites.Expressions;
 
@@ -30,6 +31,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private bool _checkedContext;
     private List<(Type SlotType, List<(string Name, Type Type)> Shape)>? _anonymousObjects;
     private Type? _targetType;
+    private readonly Dictionary<MemberCacheKey, MethodInfo[]>? _memberCache;
 
     public string? FirstError { get; private set; }
     public bool HasReflectionCall { get; private set; }
@@ -48,6 +50,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _thisParameter = Expression.Constant(item.Value, GetGlobalMemberType("this", item));
 
         _targetType = options.ResultType;
+
+        if (options.UseMemberCache)
+        {
+            if (options.MemberCache == null)
+            {
+                var created = new Dictionary<MemberCacheKey, MethodInfo[]>();
+                _memberCache = Interlocked.CompareExchange(ref options.MemberCache, created, null) ?? created;
+            }
+            else
+                _memberCache = _options.MemberCache;
+        }
     }
 
 
@@ -2342,7 +2355,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return ToError(node, $"Cannot convert value type '{left.Type}' to '{right.Type}' using build-in conversion.");
     }
 
-    private static IList<MethodInfo> GetIndexers(Type instanceType)
+    private IList<MethodInfo> GetIndexers(Type instanceType)
+    {
+        if (_memberCache == null)
+            return GetIndexersCore(instanceType);
+
+        var key = (MemberLookupKind.Indexers, instanceType, "", default(BindingFlags));
+
+        lock (_memberCache)
+            if (_memberCache.TryGetValue(key, out var cached))
+                return cached;
+
+        var result = GetIndexersCore(instanceType);
+
+        lock (_memberCache)
+            _memberCache[key] = result.ToArray();
+
+        return result;
+    }
+    private static IList<MethodInfo> GetIndexersCore(Type instanceType)
     {
         var members = new List<MethodInfo>();
 
@@ -2380,7 +2411,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return true;
     }
-    private static IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
+    private IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
+    {
+        if (_memberCache == null)
+            return GetMethodsCore(instanceType, name, additionalFlags);
+
+        var key = (MemberLookupKind.Methods, instanceType, name, additionalFlags);
+
+        lock (_memberCache)
+            if (_memberCache.TryGetValue(key, out var cached))
+                return cached;
+
+        var result = GetMethodsCore(instanceType, name, additionalFlags);
+
+        lock (_memberCache)
+            _memberCache[key] = result;
+
+        return result;
+    }
+    private static MethodInfo[] GetMethodsCore(Type instanceType, string name, BindingFlags additionalFlags)
     {
         var members = new List<MethodInfo>();
         var names = new HashSet<string>();
@@ -2416,24 +2465,43 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             }
         }
 
-        return members;
+        return members.ToArray();
     }
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(Enumerable))]
     private IList<MethodInfo> GetExtensionMethods(Type instanceType, string name)
     {
-        IList<MethodInfo>? members = null;
+        if (_memberCache == null)
+            return GetExtensionMethodsCore(instanceType, name, _options.IncludedTypesMap) ?? [];
+
+        var key = (MemberLookupKind.ExtensionMethods, instanceType, name, default(BindingFlags));
+
+        lock (_memberCache)
+            if (_memberCache.TryGetValue(key, out var cached))
+                return cached;
+
+        _options.IncludedTypesMap.IsReadOnly = true;
+        var result = GetExtensionMethodsCore(instanceType, name, _options.IncludedTypesMap)?.ToArray() ?? [];
+
+        lock (_memberCache)
+            _memberCache[key] = result;
+
+        return result;
+    }
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(Enumerable))]
+    private static IList<MethodInfo>? GetExtensionMethodsCore(Type instanceType, string name, TypeCollection includedTypes)
+    {
+        List<MethodInfo>? members = null;
 
         // From known extensions
         if (TypeUtils.ContainsGenericDefinition(instanceType, typeof(IEnumerable<>)))
             FindMembers(typeof(Enumerable));
 
         // From included types
-        if (_options.IncludedTypes.Count > 0)
-            foreach (var type in _options.IncludedTypes)
+        if (includedTypes.Count > 0)
+            foreach (var type in includedTypes.Values)
                 if (type.IsAbstract && type.IsSealed && type != typeof(Enumerable))
                     FindMembers(type);
 
-        return members ?? Array.Empty<MethodInfo>();
+        return members;
 
         void FindMembers(Type type)
         {
@@ -2453,7 +2521,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (!IsMatchingParameterType(thisParameter.ParameterType, instanceType))
                         continue;
 
-                    members ??= new List<MethodInfo>();
+                    members ??= [];
                     members.Add(item);
                 }
             }

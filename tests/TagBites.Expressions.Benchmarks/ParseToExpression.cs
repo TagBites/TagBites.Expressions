@@ -15,8 +15,8 @@ public class ParseToExpression
 
     private readonly IList<int> _list = new List<int> { 1, 2, 3, 4 };
 
-    private readonly ExpressionParserOptions _options = CreateTagBitesParseOptions();
-    private readonly ExpressionParserOptions _lambdaOptions = CreateTagBitesParseLambdaOptions();
+    private readonly ExpressionParserOptions _options = CreateTagBitesParseOptions(true);
+    private readonly ExpressionParserOptions _lambdaOptions = CreateTagBitesParseLambdaOptions(true);
 
     private readonly Interpreter _interpreter = CreateDynamicExpressoInterpreter();
     private readonly Interpreter _lambdaInterpreter = CreateDynamicExpressoLambdaInterpreter();
@@ -28,7 +28,8 @@ public class ParseToExpression
     [BenchmarkCategory("Parse")]
     public LambdaExpression TagBites_Parse()
     {
-        return ExpressionParser.Parse(Script, CreateTagBitesParseOptions());
+        var options = CreateTagBitesParseOptions();
+        return ExpressionParser.Parse(Script, options);
     }
     [Benchmark]
     [BenchmarkCategory("Parse", "Shared")]
@@ -36,7 +37,7 @@ public class ParseToExpression
     {
         return ExpressionParser.Parse(Script, _options);
     }
-    private static ExpressionParserOptions CreateTagBitesParseOptions()
+    private static ExpressionParserOptions CreateTagBitesParseOptions(bool useCache = false)
     {
         return new ExpressionParserOptions
         {
@@ -44,7 +45,8 @@ public class ParseToExpression
             {
                 (typeof(double), "x"),
                 (typeof(double), "y")
-            }
+            },
+            UseMemberCache = useCache
         };
     }
 
@@ -52,7 +54,8 @@ public class ParseToExpression
     [BenchmarkCategory("Lambda")]
     public LambdaExpression TagBites_ParseLambda()
     {
-        return ExpressionParser.Parse(LambdaScript, CreateTagBitesParseLambdaOptions());
+        var options = CreateTagBitesParseLambdaOptions();
+        return ExpressionParser.Parse(LambdaScript, options);
     }
     [Benchmark]
     [BenchmarkCategory("Lambda", "Shared")]
@@ -60,7 +63,7 @@ public class ParseToExpression
     {
         return ExpressionParser.Parse(LambdaScript, _lambdaOptions);
     }
-    private static ExpressionParserOptions CreateTagBitesParseLambdaOptions()
+    private static ExpressionParserOptions CreateTagBitesParseLambdaOptions(bool useCache = false)
     {
         return new ExpressionParserOptions
         {
@@ -69,7 +72,8 @@ public class ParseToExpression
                 (typeof(IList<int>), "list"),
                 (typeof(int), "limit"),
                 (typeof(double), "y")
-            }
+            },
+            UseMemberCache = useCache
         };
     }
 
