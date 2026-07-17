@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Null-conditional access (`?.`) evaluated its receiver twice (once for the null check, once for the access) instead of once; a receiver with a side effect, like a method call, was invoked twice.
+
+### Deprecated
+- `UseReducedExpressions` is obsolete, the parser always produces standard expression nodes, so there is nothing left to reduce.
+
+## [1.2.1] - 2026-07-17
+
+### Added
+- Delegate-typed members can be invoked with method-call syntax (`DelegateField(args)`), including delegates returned from `CustomPropertyResolver`, matching C#.
+- `UseMemberCache` option (default `false`): when enabled, reflected members (methods, indexers, extension methods) are memoized per `ExpressionParserOptions` instance. Turn it on when reusing the same options across many parses to skip repeated reflection.
+
+### Fixed
+- `CustomPropertyResolver`: element type info now propagates through method and indexer chains over dynamic collections, so chains like `people.Where(p => p.Age > 18).FirstOrDefault()?.Name` resolve members correctly (previously only a bare lambda parameter inherited it).
+
+### Performance
+- Overload resolution rejects candidates with unfilled required parameters before running generic inference and lambda binding - a large speedup and allocation drop for LINQ-heavy expressions with many overloads (for example `Sum`).
+- Conversion-operator lookups are short-circuited for primitive types, so numeric conversions (`int` -> `double`) no longer scan reflection.
+- Fewer allocations across the parse hot path: eliminated enumerator boxing and several intermediate lists/arrays, and index-based loops replace LINQ in hot spots.
+
 ## [1.2.0] - 2026-07-13
 
 ### Added
@@ -108,6 +130,7 @@ A large expansion of the supported C# expression grammar, plus several correctne
 ### Added
 - Initial release. Converts C# text expressions into `System.Linq.Expressions` using Roslyn.
 
+[1.2.1]: https://github.com/TagBites/TagBites.Expressions/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.0...1.1.1

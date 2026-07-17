@@ -151,7 +151,7 @@ Not currently supported:
 | `CustomPropertyResolver` | Resolve members at runtime, e.g. against types defined only at runtime. |
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
 | `ResultCastType` | Force the result to this type with an explicit cast, e.g. to compile every expression as `Func<object>`. |
-| `UseMemberCache` | Caches reflected members (methods, indexers, extension methods) on this options instance. |
+| `UseMemberCache` | Cache reflected members (methods, indexers, extension methods) on this options instance; enable when reusing the same options across many parses. (default: `false`) |
 
 **CustomPropertyResolver**:  
 It is only called for `instance.Member`, it needs an instance to work on. That can be an ordinary parameter, accessed explicitly - `p.Age` works for any parameter name. A bare name like `Age` also works, but it is then resolved implicitly as `this.Age`, so a `this` must be set up first: `UseFirstParameterAsThis`, or a `this` entry in `GlobalMembers`.
