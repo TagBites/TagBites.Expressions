@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Linq.Expressions;
 using System.Reflection;
 using MemberCacheKey = (TagBites.Expressions.MemberLookupKind Kind, System.Type Type, string Name, System.Reflection.BindingFlags Flags);
@@ -39,11 +40,6 @@ public class ExpressionParserOptions
     /// Default: <c>false</c>.
     /// </summary>
     public bool UseFirstParameterAsThis { get; set; }
-    /// <summary>
-    /// Indicates whether to use reduced expressions.
-    /// Default: <c>true</c>.
-    /// </summary>
-    public bool UseReducedExpressions { get; set; }
     /// <summary>
     /// Indicates whether to allow reflection.
     /// Default: <c>false</c>.
@@ -87,10 +83,15 @@ public class ExpressionParserOptions
     public bool UseMemberCache { get; set; }
     internal Dictionary<MemberCacheKey, MethodInfo[]>? MemberCache;
 
-    public ExpressionParserOptions()
+
+    /// <summary>
+    /// Now parser produces only standard expression. No reduce is needed.
+    /// </summary>
+    [Obsolete, EditorBrowsable(EditorBrowsableState.Never)]
+    public bool UseReducedExpressions
     {
-#if !DEBUG
-        UseReducedExpressions = true;
-#endif
+        get => true;
+        // ReSharper disable once ValueParameterNotUsed
+        set { }
     }
 }

@@ -57,6 +57,22 @@ public class ParsingTests : ExpressionTestBase
         Assert.Contains("Unsupported expression", ex.Message);
     }
 
+    [Fact]
+    public void ConditionalAccessCallInstanceOnce()
+    {
+        var hitCount = 0;
+
+        ExpressionParser.Invoke<string>("GetValue()?.ToString()", ("GetValue", (Func<object>)GetValue));
+
+        Assert.Equal(1, hitCount);
+
+        object GetValue()
+        {
+            ++hitCount;
+            return new object();
+        }
+    }
+
     [Theory]
     [InlineData("1 switch { 1 => new [] { 1, 2, 3 }.Select(x => (x, x + 1).Item2).Sum() }", 9)]
     public void ComplexExpressions(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);

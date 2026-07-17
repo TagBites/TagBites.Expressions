@@ -111,9 +111,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             {
                 if (!_options.AllowReflection)
                     DetectReflection(expression);
-
-                if (_options.UseReducedExpressions && expression is not DelayLambdaExpression && expression.NodeType == ExpressionType.Extension)
-                    return expression.Reduce();
             }
 
             return expression;
@@ -545,7 +542,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (whenNotNull == null)
             return null;
 
-        return new ConditionalAccessExpression(instance, whenNotNull);
+        return new ConditionalAccessExpression(instance, whenNotNull).Reduce();
     }
     public override Expression? VisitInvocationExpression(InvocationExpressionSyntax node)
     {
@@ -2306,11 +2303,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static Expression CallWhenNotNull(Expression instance, MethodInfo method)
     {
         if (Nullable.GetUnderlyingType(instance.Type) is { })
-            return new ConditionalAccessExpression(instance, Expression.Call(Expression.MakeMemberAccess(instance, instance.Type.GetProperty("Value")!), method));
+            return new ConditionalAccessExpression(instance, Expression.Call(Expression.MakeMemberAccess(instance, instance.Type.GetProperty("Value")!), method)).Reduce();
 
         return instance.Type.IsValueType
             ? Expression.Call(instance, method)
-            : new ConditionalAccessExpression(instance, Expression.Call(instance, method));
+            : new ConditionalAccessExpression(instance, Expression.Call(instance, method)).Reduce();
     }
     private static Expression ToIsOperator(Expression left, Expression right)
     {
@@ -3111,18 +3108,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         public override Expression Reduce()
         {
-            var member = Member;
-            if (_type != member.Type)
-                member = Convert(Member, _type);
+            var instanceVariable = Variable(Instance.Type, "instance");
+            var member = new ReplaceExpressionVisitor(Instance, instanceVariable).Visit(Member)!;
 
-            var constantExpression = _type == typeof(void)
-                ? (Expression)Invoke(Constant(() => { }))
+            if (_type != member.Type)
+                member = Convert(member, _type);
+
+            Expression nullResult = _type == typeof(void)
+                ? Empty()
                 : Constant(null, _type);
 
-            return Condition(
-                ToIsNotNull(Instance),
-                member,
-                constantExpression);
+            return Block(
+                [instanceVariable],
+                Assign(instanceVariable, Instance),
+                Condition(
+                    ToIsNotNull(instanceVariable),
+                    member,
+                    nullResult));
         }
         public override string ToString()
         {
@@ -3133,6 +3135,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return $"{instance}?{member.Substring(instance.Length)}";
 
             return $"({instance != null} ? {member} : default)";
+        }
+    }
+    private sealed class ReplaceExpressionVisitor(Expression source, Expression replacement) : ExpressionVisitor
+    {
+        public override Expression? Visit(Expression? node)
+        {
+            if (node == null)
+                return null;
+
+            return ReferenceEquals(node, source)
+                ? replacement
+                : base.Visit(node)!;
         }
     }
 
