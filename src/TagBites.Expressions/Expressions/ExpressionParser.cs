@@ -78,7 +78,7 @@ public static class ExpressionParser
         var root = PrepareCore(expressionText);
 
         var error = root.ContainsDiagnostics
-            ? root.GetDiagnostics().FirstOrDefault(x => x.Severity == DiagnosticSeverity.Error && x.Id != "CS1002")
+            ? root.GetDiagnostics().FirstOrDefault(x => x.Severity == DiagnosticSeverity.Error)
             : null;
         if (error != null)
         {
