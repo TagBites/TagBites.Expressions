@@ -46,20 +46,10 @@ public class Program
         var libraries = rows.Select(x => x.Library).Distinct().OrderByDescending(x => string.Equals(x, "TagBites")).ThenBy(x => x).ToList();
         var testCases = rows.Select(x => x.TestCase).Distinct().OrderBy(x => x).ToList();
 
-        static string FormatTime(double ns) => ns switch
-        {
-            < 1_000 => $"{ns:F1} ns",
-            _ => $"{ns / 1_000:F2} us",
-        };
-
-        static string FormatBytes(double b) => b < 1024 ? $"{b:F0} B" : $"{b / 1024:F2} KB";
-
-        static string FormatRatio(double ratio) => ratio >= 100 ? $"{ratio:F1}x" : $"{ratio:F2}x";
-
         var sb = new StringBuilder();
 
         sb.Append("| TestCase |");
-        foreach (var lib in libraries) sb.Append($" {lib} |");
+        foreach (var lib in libraries) sb.Append($" {GetLibraryDisplayName(lib)}<br>v. {GetLibraryVersion(lib)} |");
         sb.AppendLine();
 
         sb.Append("|---|");
@@ -113,4 +103,28 @@ public class Program
             logger.WriteLine($"Pivot table saved to {path}");
         }
     }
+
+    private static string FormatTime(double ns) => ns switch
+    {
+        < 1_000 => $"{ns:F1} ns",
+        _ => $"{ns / 1_000:F2} us",
+    };
+    private static string FormatBytes(double b) => b < 1024 ? $"{b:F0} B" : $"{b / 1024:F2} KB";
+    private static string FormatRatio(double ratio) => ratio >= 100 ? $"{ratio:F1}x" : $"{ratio:F2}x";
+
+    private static string FormatVersion(Version? version) => version == null ? "?" : $"{version.Major}.{version.Minor}.{version.Build}";
+    private static string GetLibraryDisplayName(string lib) => lib switch
+    {
+        "TagBites" => "TagBites.Expressions",
+        "DynamicExpresso" => "DynamicExpresso",
+        "DynamicLinqCore" => "System.Linq.Dynamic.Core",
+        _ => lib
+    };
+    private static string GetLibraryVersion(string lib) => lib switch
+    {
+        "TagBites" => FormatVersion(typeof(TagBites.Expressions.ExpressionParser).Assembly.GetName().Version),
+        "DynamicExpresso" => FormatVersion(typeof(DynamicExpresso.Interpreter).Assembly.GetName().Version),
+        "DynamicLinqCore" => FormatVersion(typeof(System.Linq.Dynamic.Core.ParsingConfig).Assembly.GetName().Version),
+        _ => "?"
+    };
 }
