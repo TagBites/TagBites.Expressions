@@ -169,6 +169,7 @@ These opt-in options (all default to `false`) make the parser accept syntax or s
 |---|---|
 | `AllowStringRelationalOperators` | Allow `<` / `<=` / `>` / `>=` on strings, compared ordinally via `string.Compare` - not valid in real C#. |
 | `AllowRuntimeCast` | Allow custom keywords `typeis` / `typeas` / `typecast` against runtime type names. |
+| `IgnoreCase` | Resolve parameters, variables, global members, type members and `IncludedTypes` case-insensitively. For `GlobalMembers`/`IncludedTypes`, case-insensitive name collisions are checked before parsing. |
 
 ## Advanced usage
 

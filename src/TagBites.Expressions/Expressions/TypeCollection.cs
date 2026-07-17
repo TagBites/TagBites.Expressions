@@ -4,6 +4,9 @@ internal class TypeCollection : Dictionary<string, Type>, ICollection<Type>
 {
     public bool IsReadOnly { get; internal set; }
 
+    public TypeCollection() { }
+    public TypeCollection(IEqualityComparer<string> comparer) : base(comparer) { }
+
 
     public bool Contains(Type item) => TryGetValue(item.Name, out var t) && item == t;
     public void CopyTo(Type[] array, int arrayIndex) => Values.CopyTo(array, arrayIndex);

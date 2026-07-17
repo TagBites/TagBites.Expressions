@@ -46,6 +46,11 @@ public class ExpressionParserOptions
     /// </summary>
     public bool AllowReflection { get; set; }
     /// <summary>
+    /// True to resolve parameters, variables, global members, type members and <see cref="IncludedTypes"/> case-insensitively.
+    /// Default: <c>false</c>.
+    /// </summary>
+    public bool IgnoreCase { get; set; }
+    /// <summary>
     /// True to allow runtime casting using custom operators.
     /// Default: <c>false</c>.
     /// </summary>
