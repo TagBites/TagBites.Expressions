@@ -105,6 +105,33 @@ public class MethodCallTests : ExpressionTestBase
     }
 
     [Theory]
+    [InlineData("models.GenericFirstExtension().Value", 10)]
+    [InlineData("models.GenericFirstExtension<TestModel>().Value", 10)]
+    [InlineData("models.GenericFirstExtension(m).Value", 1)]
+    [InlineData("array.GenericFirstExtension().Value", 10)]
+    [InlineData("dict.GenericDictionaryExtension().Value", 10)]
+    public void GenericExtensionMethodsWithInferredTypeArguments(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(TestModel), "m"),
+                (typeof(IList<TestModel>), "models"),
+                (typeof(TestModel[]), "array"),
+                (typeof(IDictionary<string, TestModel>), "dict")
+            },
+            IncludedTypes = { typeof(TestModelExtensions) }
+        };
+
+        ExecuteAndTest(script, options, expectedResult,
+            new TestModel(),
+            new List<TestModel> { new(10), new(20) },
+            new[] { new TestModel(10), new TestModel(20) },
+            new Dictionary<string, TestModel> { ["a"] = new(10) });
+    }
+
+    [Theory]
     [InlineData("Math.Min(2d, 2m)")]
     [InlineData("Math.Min(2m, 2d)")]
     public void AmbiguousMethodCall(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, null));
