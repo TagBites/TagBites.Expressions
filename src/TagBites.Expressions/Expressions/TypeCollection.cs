@@ -1,8 +1,11 @@
+using TagBites.Utils;
+
 namespace TagBites.Expressions;
 
 internal class TypeCollection : Dictionary<string, Type>, ICollection<Type>
 {
     public bool IsReadOnly { get; internal set; }
+    public bool AllowStaticOnly { get; set; }
 
     public TypeCollection() { }
     public TypeCollection(IEqualityComparer<string> comparer) : base(comparer) { }
@@ -15,6 +18,9 @@ internal class TypeCollection : Dictionary<string, Type>, ICollection<Type>
     {
         if (IsReadOnly)
             throw new NotSupportedException("Collection is read-only.");
+
+        if (AllowStaticOnly && (!item.IsAbstract || !item.IsSealed))
+            throw new ArgumentException($"Type '{item.GetFriendlyTypeName()}' is not a static class and cannot be used as a static import.", nameof(item));
 
         if (TryGetValue(item.Name, out var t))
             if (item != t)

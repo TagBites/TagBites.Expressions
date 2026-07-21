@@ -46,6 +46,7 @@ public static class LibraryFeatureComparer
         ("Target-typed `new()`", "new List<List<int>> { new() { 1, 2 } }[0][0]", "1"),
         ("Lambdas and LINQ", "xs.Where(x => x > 1).Sum()", "5"),
         ("Generic method call with explicit type argument (`xs.OfType<int>()`)", "xs.OfType<int>().Count()", "3"),
+        ("Static imports (`using static`, unqualified `Sqrt(16)`)", "Sqrt(16)", "4"),
         ("User-defined operator overloads (`DateTime.Now + TimeSpan.FromDays(1)`)", "DateTime.Now + TimeSpan.FromDays(1) > DateTime.Now", "True"),
         ("User-defined implicit/explicit conversion operators", "Math.Sqrt(m)", "4"),
         ("Switch expressions", "1 switch { 1 => 10, _ => 0 }", "10"),
@@ -91,7 +92,8 @@ public static class LibraryFeatureComparer
             var options = new ExpressionParserOptions
             {
                 Parameters = { (typeof(int[]), "xs"), (typeof(Meters), "m") },
-                IncludedTypes = { typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Enumerable) }
+                IncludedTypes = { typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Enumerable) },
+                StaticImports = { typeof(Math) }
             };
 
             var result = ExpressionParser.Parse(expr, options).Compile().DynamicInvoke(s_xsValue, s_mValue);
@@ -109,6 +111,7 @@ public static class LibraryFeatureComparer
             interpreter.Reference(typeof(TimeSpan));
             interpreter.Reference(typeof(Enumerable));
             interpreter.Reference(typeof(List<>));
+            // No static import option
 
             var result = interpreter.Parse(expr, new Parameter("xs", typeof(int[])), new Parameter("m", typeof(Meters)))
                 .Invoke(s_xsValue, s_mValue);
@@ -127,6 +130,8 @@ public static class LibraryFeatureComparer
                     typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Meters), typeof(List<int>), typeof(List<List<int>>)
                 }, false)
             };
+            // No static import option
+
             var xsParameter = Expression.Parameter(typeof(int[]), "xs");
             var mParameter = Expression.Parameter(typeof(Meters), "m");
 

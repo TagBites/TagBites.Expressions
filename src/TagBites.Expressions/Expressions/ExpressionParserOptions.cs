@@ -25,14 +25,25 @@ public class ExpressionParserOptions
     /// <summary>
     /// List of parameters of the function.
     /// </summary>
-    public IList<(Type Type, string Name)> Parameters { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); } = new List<(Type, string)>();
+    public IList<(Type Type, string Name)> Parameters
+    {
+        get => ParametersInternal ??= new List<(Type, string)>();
+        set => ParametersInternal = value ?? throw new ArgumentNullException(nameof(value));
+    }
+    internal IList<(Type Type, string Name)>? ParametersInternal { get; private set; }
+
     /// <summary>
     /// List of global members (values or delegates).
     /// Member type is optional; if null, the type is based on the value.  
     /// If both member type and value are null, the type is object.  
     /// Member with name 'this' can be access implicitly (when <see cref="UseFirstParameterAsThis"/> is <c>false</c>).
     /// </summary>
-    public IDictionary<string, (Type? Type, object? Value)> GlobalMembers { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); } = new Dictionary<string, (Type? Type, object? Value)>();
+    public IDictionary<string, (Type? Type, object? Value)> GlobalMembers
+    {
+        get => GlobalMembersInternal ??= new Dictionary<string, (Type? Type, object? Value)>();
+        set => GlobalMembersInternal = value ?? throw new ArgumentNullException(nameof(value));
+    }
+    internal IDictionary<string, (Type? Type, object? Value)>? GlobalMembersInternal { get; private set; }
 
     /// <summary>
     /// True if the first parameter should be used as 'this' so its members can be accessed implicitly.
@@ -75,6 +86,15 @@ public class ExpressionParserOptions
     internal TypeCollection IncludedTypesMap { get; } = new();
 
     /// <summary>
+    /// Collection of types imported statically, as if <c>using static</c> was applied.
+    /// Their public static methods, fields, properties and constants can be used unqualified.
+    /// For example, adding <see cref="Math"/> makes <c>Sqrt(x)</c>, <c>Max(a, b)</c>, <c>PI</c> and <c>E</c> available.
+    /// Members of instance parameters, global members and instance types always take precedence.
+    /// </summary>
+    public ICollection<Type> StaticImports => StaticImportsMap ??= new TypeCollection { AllowStaticOnly = true };
+    internal TypeCollection? StaticImportsMap { get; private set; }
+
+    /// <summary>
     /// Function to resolve property/field-style access for types whose shape only exists at runtime,
     /// e.g. a database row, a CMS content type, a value that lives in another process. 
     /// </summary>
@@ -82,7 +102,7 @@ public class ExpressionParserOptions
 
     /// <summary>
     /// Caches reflected members (methods, indexers, extension methods) on this options instance.
-    /// <see cref="IncludedTypes"/> becomes immutable after the first call.
+    /// <see cref="IncludedTypes"/> and <see cref="StaticImports"/> becomes immutable after the first call.
     /// Default: <c>false</c>.
     /// </summary>
     public bool UseMemberCache { get; set; }
