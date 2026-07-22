@@ -4,7 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-07-23
+
+### Added
+- Named tuple element names (`(Name: "Bob", Age: 30).Name`): supports names declared explicitly, names inferred from identifiers and member accesses (`(a, x.B)`), and names that flow through generic and LINQ chains (`people.Select(p => (Name: p.Name, Age: p.Age)).First().Name`), matching C# - including the same rules for reserved (`ItemN`, `Rest`, ...), duplicate and conflicting names.
+- `StaticImports` option: a collection of static classes whose public static methods, fields, properties and constants can be used unqualified, as if `using static` was applied (for example, importing `Math` makes `Sqrt(x)`, `Max(a, b)`, `PI` and `E` available). Non-static classes are rejected, and instance members, global members and instance types always take precedence.
+- `IgnoreCase` option: resolve parameters, variables, global members, type members and `IncludedTypes` case-insensitively.
+- Full support for the bare `default` literal: it is now target-typed wherever C# can infer the type (method arguments, comparisons, `??`, ternary, casts), not only when `ResultType` is set. It still fails, like C#, where there is no target type (a bare `default`, `default == default`, an overloaded-method argument).
+- Named arguments on method, constructors, indexers and extension-method calls (`obj.Sum(b: 2, a: 1)`) now can bind by name instead of being passed positionally. Supports reordering, mixing positional and named arguments, and skipping optional parameters (`obj.Concat3("x", c: "z")`), and participates in overload and generic-method resolution. Honors the `IgnoreCase` option. 
+
+### Changed
+- `ExpressionParserOptions` is now read-only after it is first used for parsing: property setters throw `InvalidOperationException` and the `Parameters`, `GlobalMembers`, `IncludedTypes` and `StaticImports` collections throw `NotSupportedException` on mutation.
 
 ### Fixed
 - Null-conditional access (`?.`) evaluated its receiver twice (once for the null check, once for the access) instead of once; a receiver with a side effect, like a method call, was invoked twice.

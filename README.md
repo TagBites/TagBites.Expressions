@@ -71,6 +71,14 @@ var func = ExpressionParser.Compile<Func<int, int>>("a switch { 1 => b, 2 => b *
 func(3); // 5
 ```
 
+Import static classes, as if `using static` was applied:
+
+```csharp
+var options = new ExpressionParserOptions { StaticImports = { typeof(Math) } };
+
+ExpressionParser.Invoke<double>("Sqrt(Max(9, 16)) + PI", options); // 7.14159...
+```
+
 String interpolation, including alignment and format specifiers (formatting follows the current culture):
 
 ```csharp
@@ -123,20 +131,18 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - User-defined operator overloads and user-defined implicit/explicit conversions.
 - Literals: all numeric types, `char`, `string`, verbatim, raw and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
+- Named arguments (`Method(digits: 2, value: 1)`), including reordering, mixing positional and named arguments, and skipping optional parameters.
 - `new`: constructors, object and collection initializers, arrays (jagged, multidimensional and sized), target-typed `new()`.
 - Anonymous objects (`new { X = 1, Y = 2 }` - see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
-- Tuples, including element-wise equality.
-- `typeof`, `default(T)`, `nameof`, `sizeof`, `checked`, `unchecked`.
+- Tuples, including named elements (`(Name: "Bob", Age: 30).Name`) and element-wise equality.
+- `typeof`, `default(T)`, the bare `default` literal (target-typed), `nameof`, `sizeof`, `checked`, `unchecked`.
 - Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property, positional and
   `var` patterns, `when` guards.
 
 Not currently supported:
 - The range operator (`1..2`, `arr[1..^1]`).
 - Target-typed `new()` as a method call argument (`obj.Method(new())`) - use an explicit type there for now.
-- Named arguments (`Method(value: 1, digits: 2)`) are parsed but **not matched by name** - they're passed to parameters positionally, as if the names weren't there. 
-- Named tuple elements are not preserved - `(Name: "Bob", Age: 30).Name` fails, only `.Item1`/`.Item2` work.
-- The bare `default` literal (as opposed to `default(T)`) is only resolved when the whole expression's `ExpressionParserOptions.ResultType` is set; inside a method argument or `??` it fails with "Default keyword is not supported."
 
 Not supported:
  - Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.
@@ -190,6 +196,22 @@ DateTime.Now + TimeSpan.FromDays(1) > DateTime.Now
 
 // Tuple equality
 (1, 2) == (1, 2)
+
+// Tuple with named elements
+(Name: "Bob", Age: 30).Name
+
+// Named arguments, reordered
+Math.Round(digits: 2, value: 2.567)
+
+// Bare default literal, target-typed from the other argument
+Math.Max(default, 5)
+
+// Anonymous object carrying a named tuple, combined with named args and lambdas
+new[] { 1, 2, 3 }
+    .Select(n => new { N = n, Stats = (Sum: n + n, Label: $"#{n}") })
+    .Where(x => x.Stats.Sum >= 4)
+    .Select(x => Math.Round(digits: 0, value: (double)x.Stats.Sum) + x.Stats.Label.Length)
+    .Sum() // 14
 ```
 
 ## Configuration
@@ -203,6 +225,7 @@ DateTime.Now + TimeSpan.FromDays(1) > DateTime.Now
 | `UseFirstParameterAsThis` | Use the first parameter as `this` so its members need no prefix. |
 | `GlobalMembers` | Named values and delegates usable by name; a member named `this` is implicit. |
 | `IncludedTypes` | Types (and static classes) an expression may reference by name. |
+| `StaticImports` | Imported static classes, as if `using static` was applied (e.g. `Sqrt(x)`, `PI`). Parameters and global members take precedence. |
 | `CustomPropertyResolver` | Resolve members at runtime, e.g. against types defined only at runtime. |
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
 | `ResultCastType` | Force the result to this type with an explicit cast, e.g. to compile every expression as `Func<object>`. |
@@ -216,6 +239,9 @@ It is only called for `instance.Member`, it needs an instance to work on. That c
 `ResultCastType` forces the return type with an explicit cast, so unrelated expressions can share one delegate signature. It also allows casts that are not implicit, such as `double` -> `int`.
 
 The two combine: to run many rules through a single `Func<object>` while still requiring each to be boolean, set `ResultType = typeof(bool)` (reject anything non-boolean) together with `ResultCastType = typeof(object)`.
+
+**Reuse and immutability**:  
+Like `JsonSerializerOptions`, an `ExpressionParserOptions` instance becomes read-only after it is first used for parsing, enabling fast concurrent use.
 
 ### Non-standard options
 These opt-in options (all default to `false`) make the parser accept syntax or semantics that real C# does not:
@@ -358,11 +384,12 @@ TagBites.Expressions fits between lightweight expression evaluators and full C# 
 The table below is generated by [LibraryFeatureComparer.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/LibraryFeatureComparer.cs) (run the benchmarks project with the `feature-comparer` argument).
 Rows are ordered by how many of the three libraries support each feature, most first:
 
-| C# syntax | [TagBites.Expressions](https://github.com/TagBites/TagBites.Expressions)<br>v. 1.2.1 | [DynamicExpresso](https://github.com/dynamicexpresso/DynamicExpresso)<br>v. 2.19.3 | [System.Linq.Dynamic.Core](https://github.com/zzzprojects/System.Linq.Dynamic.Core)<br>v. 1.7.3 |
+| C# syntax | [TagBites.Expressions](https://github.com/TagBites/TagBites.Expressions)<br>v. 1.3.0 | [DynamicExpresso](https://github.com/dynamicexpresso/DynamicExpresso)<br>v. 2.19.3 | [System.Linq.Dynamic.Core](https://github.com/zzzprojects/System.Linq.Dynamic.Core)<br>v. 1.7.3 |
 |---|:---:|:---:|:---:|
 | Arithmetic and logical operators | ✅ | ✅ | ✅ |
 | Ternary | ✅ | ✅ | ✅ |
 | Member access and method calls | ✅ | ✅ | ✅ |
+| `params` method call (`string.Format("{0}{1}", 1, 2)`) | ✅ | ✅ | ✅ |
 | Lambdas and LINQ | ✅ | ✅ | ✅ |
 | `is` / `as` | ✅ | ✅ | ❌ |
 | `typeof`, `default(T)` | ✅ | ✅ | ❌ |
@@ -370,11 +397,15 @@ Rows are ordered by how many of the three libraries support each feature, most f
 | Object and collection initializers | ✅ | ✅ | ❌ |
 | User-defined operator overloads (`DateTime.Now + TimeSpan.FromDays(1)`) | ✅ | ❌ | ✅ |
 | User-defined implicit/explicit conversion operators | ✅ | ❌ | ✅ |
+| Named arguments, reordered (`Substring(length: 2, startIndex: 1)`) | ✅ | ❌ | ❌ |
+| Indexers and index-from-end (`xs[^1]`) | ✅ | ❌ | ❌ |
+| Bare `default` literal (target-typed) | ✅ | ❌ | ❌ |
 | Verbatim strings `@"..."` | ✅ | ❌ | ❌ |
 | Digit separators `1_000` | ✅ | ❌ | ❌ |
 | String interpolation `$"{x,6:0.00}"` (alignment + format) | ✅ | ❌ | ❌ |
 | Raw string literals `"""..."""` | ✅ | ❌ | ❌ |
 | Tuples and tuple equality | ✅ | ❌ | ❌ |
+| Tuples with named elements | ✅ | ❌ | ❌ |
 | Anonymous objects (`new { X = 1 }`) | ✅ | ❌ | ❌ |
 | Null-forgiving `x!` | ✅ | ❌ | ❌ |
 | `checked` / `unchecked` | ✅ | ❌ | ❌ |
@@ -382,6 +413,7 @@ Rows are ordered by how many of the three libraries support each feature, most f
 | Array creation: sized and multidimensional | ✅ | ❌ | ❌ |
 | Target-typed `new()` | ✅ | ❌ | ❌ |
 | Generic method call with explicit type argument (`xs.OfType<int>()`) | ✅ | ❌ | ❌ |
+| Static imports (`using static`, unqualified `Sqrt(16)`) | ✅ | ❌ | ❌ |
 | Switch expressions | ✅ | ❌ | ❌ |
 | Pattern matching: relational, `and`/`or`/`not`, property | ✅ | ❌ | ❌ |
 | List patterns (`arr is [1, 2, 3]`) | ✅ | ❌ | ❌ |
@@ -394,12 +426,12 @@ Rows are ordered by how many of the three libraries support each feature, most f
 Parsing expressions: `"Math.Pow(x, y) + 5"` and `list.Where(x => x > limit).Select(x => Math.Pow(x, y)).Sum()`.
 The table below is generated by [Program.cs](https://github.com/TagBites/TagBites.Expressions/blob/master/tests/TagBites.Expressions.Benchmarks/Program.cs).
 
-| TestCase | TagBites.Expressions<br>v. 1.2.1 | DynamicExpresso<br>v. 2.19.3 | System.Linq.Dynamic.Core<br>v. 1.7.3 |
-|---|---:|---:|---:|
-| Parse | **`6,90 us`** (1,00x)<br>**6,02 KB** (1,00x) | `26,30 us` (3,81x)<br>30,75 KB (5,10x) | `3530,30 us` (512,0x)<br>276,79 KB (45,95x) |
-| Parse_SharedEnv | **`4,72 us`** (1,00x)<br>**3,18 KB** (1,00x) | `14,02 us` (2,97x)<br>12,32 KB (3,88x) | `74,91 us` (15,85x)<br>101,08 KB (31,79x) |
-| ParseLambda | **`84,85 us`** (1,00x)<br>**36,39 KB** (1,00x) | `244,32 us` (2,88x)<br>122,14 KB (3,36x) | `3661,42 us` (43,15x)<br>206,77 KB (5,68x) |
-| ParseLambda_SharedEnv | **`29,69 us`** (1,00x)<br>**12,36 KB** (1,00x) | `220,56 us` (7,43x)<br>103,79 KB (8,40x) | `38,57 us` (1,30x)<br>35,26 KB (2,85x) |
+|       TestCase        |        TagBites.Expressions<br>v. 1.3.0        |       DynamicExpresso<br>v. 2.19.3       |    System.Linq.Dynamic.Core<br>v. 1.7.3     |
+| --------------------- | ---------------------------------------------: | ---------------------------------------: | ------------------------------------------: |
+| Parse                 |   **`6,24 us`** (1,00x)<br>**6,05 KB** (1,00x) |   `22,29 us` (3,57x)<br>30,75 KB (5,08x) | `2975,19 us` (476,7x)<br>276,86 KB (45,78x) |
+| Parse_SharedEnv       |   **`3,78 us`** (1,00x)<br>**3,16 KB** (1,00x) |   `11,28 us` (2,99x)<br>12,32 KB (3,90x) |   `63,36 us` (16,77x)<br>100,96 KB (31,99x) |
+| ParseLambda           | **`69,15 us`** (1,00x)<br>**36,47 KB** (1,00x) | `187,39 us` (2,71x)<br>122,33 KB (3,35x) |  `2917,11 us` (42,19x)<br>206,84 KB (5,67x) |
+| ParseLambda_SharedEnv | **`23,61 us`** (1,00x)<br>**12,36 KB** (1,00x) | `173,01 us` (7,33x)<br>103,85 KB (8,40x) |      `31,44 us` (1,33x)<br>35,26 KB (2,85x) |
 
 > SharedEnv = shared options/interptreter/config.  
 > SharedOptions for TagBites.Expressions uses `UseMemberCache = true`.
