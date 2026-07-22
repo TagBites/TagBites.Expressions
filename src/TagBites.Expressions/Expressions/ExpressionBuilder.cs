@@ -627,6 +627,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (parameters == null)
             return null;
 
+        var argumentNames = GetArgumentNames(node.ArgumentList.Arguments);
+
         // Find instance, type, name syntax
         Expression? instanceExpression;
         Type? instanceType;
@@ -740,7 +742,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (instanceType == null)
         {
             // Static import
-            if (_staticImports?.Count > 0 && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticExpression))
+            if (_staticImports?.Count > 0 && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticExpression, argumentNames))
                 return staticExpression;
 
             if (FirstError != null)
@@ -771,7 +773,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         x => x.MakeGenericMethod(genericTypes));
                 }
 
-                if (TryResolveMethodCall(node, instanceExpression, parameters, methods, out var expression))
+                if (TryResolveMethodCall(node, instanceExpression, parameters, methods, out var expression, argumentNames))
                     return instanceExpression != null && expression != null ? PropagateElementTypeInfo(instanceExpression, expression) : expression;
             }
         }
@@ -791,11 +793,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 parameters = new[] { instanceExpression! }.Concat(parameters).ToList();
 
+                // The instance becomes the first (positional) argument, so shift the names to match
+                var extensionArgumentNames = argumentNames;
+                if (argumentNames != null)
+                {
+                    extensionArgumentNames = new string?[argumentNames.Length + 1];
+                    argumentNames.CopyTo(extensionArgumentNames, 1);
+                }
+
                 var oldExtensionInstance = _extensionInstance;
                 _extensionInstance = instanceExpression;
                 try
                 {
-                    if (TryResolveMethodCall(node, null, parameters, methods, out var expression))
+                    if (TryResolveMethodCall(node, null, parameters, methods, out var expression, extensionArgumentNames))
                         return expression != null ? PropagateElementTypeInfo(instanceExpression!, expression) : null;
                 }
                 finally
@@ -818,7 +828,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Static import
         if (_staticImports?.Count > 0
             && node.Expression is IdentifierNameSyntax or GenericNameSyntax
-            && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticImportExpression))
+            && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticImportExpression, argumentNames))
         {
             return staticImportExpression;
         }
@@ -887,7 +897,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (instanceExpression == null)
             return null;
 
-        return ResolveItemCall(node, instanceExpression, parameters);
+        return ResolveItemCall(node, instanceExpression, parameters, GetArgumentNames(node.ArgumentList.Arguments));
     }
     public override Expression? VisitElementBindingExpression(ElementBindingExpressionSyntax node)
     {
@@ -901,7 +911,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (instanceExpression == null)
             return null;
 
-        return ResolveItemCall(node, instanceExpression, parameters);
+        return ResolveItemCall(node, instanceExpression, parameters, GetArgumentNames(node.ArgumentList.Arguments));
     }
     public override Expression? VisitObjectCreationExpression(ObjectCreationExpressionSyntax node)
     {
@@ -1724,38 +1734,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (args == null)
             return null;
 
-        // Constructor
-        var constructors = type.GetConstructors()
-            .Select(x => (Method: x, Parameters: x.GetParameters()))
-            .Where(x => HasMatchingParameters(x.Parameters, args))
-            .OrderBy(x => x.Parameters.Length)
-            .ToList();
+        var argumentNames = argumentList != null
+            ? GetArgumentNames(argumentList.Arguments)
+            : null;
+        if (!TryResolveCall(node, null, args, type.GetConstructors(), out var created, argumentNames))
+            return ToError(node, $"Constructor for '{type.GetFriendlyTypeName()}' not found.");
 
-        switch (constructors.Count)
+        if (created is not NewExpression instance)
         {
-            case 0:
-                return ToError(node, $"Constructor for '{type.GetFriendlyTypeName()}' not found.");
-            case > 1 when constructors[0].Parameters.Length == constructors[1].Parameters.Length:
-                return ToError(node, $"Ambiguous call for '{type.GetFriendlyTypeName()}' constructor.");
+            // Ambiguity or another error already reported by the engine.
+            return null;
         }
-
-        var constructorInfo = constructors[0].Method;
-        var constructorParams = constructorInfo.GetParameters();
-
-        // Default values
-        for (var i = args.Count; i < constructorParams.Length; i++)
-        {
-            if (!constructorParams[i].HasDefaultValue)
-                return ToError(node, "Mismatch argument count.");
-
-            if (args is not List<Expression>)
-                args = args.ToList();
-
-            args.Add(Expression.Constant(constructorParams[i].DefaultValue));
-        }
-
-        // Create
-        var instance = Expression.New(constructorInfo, args);
 
         // Initializer
         if (initializer?.Expressions.Count > 0)
@@ -2169,7 +2158,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return parameters;
     }
-    private Expression? ResolveItemCall(SyntaxNode relatedNode, Expression instanceExpression, IList<Expression> parameters)
+    private Expression? ResolveItemCall(SyntaxNode relatedNode, Expression instanceExpression, IList<Expression> parameters, IReadOnlyList<string?>? argumentNames = null)
     {
         var instanceType = instanceExpression.Type;
         if (instanceType.IsArray)
@@ -2178,7 +2167,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Select method override
         var methods = GetIndexers(instanceType);
 
-        if (methods.Count > 0 && TryResolveMethodCall(relatedNode, instanceExpression, parameters, methods, out var expression))
+        if (methods.Count > 0 && TryResolveMethodCall(relatedNode, instanceExpression, parameters, methods, out var expression, argumentNames))
             return expression != null ? PropagateElementTypeInfo(instanceExpression, expression) : null;
 
         return ToError(relatedNode, "Indexer not found for this arguments.");
@@ -2606,7 +2595,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return true;
     }
-    private bool TryResolveStaticImportCall(SyntaxNode node, string methodName, Type[]? genericTypes, IList<Expression> parameters, out Expression? expression)
+    private bool TryResolveStaticImportCall(SyntaxNode node, string methodName, Type[]? genericTypes, IList<Expression> parameters, out Expression? expression, IReadOnlyList<string?>? argumentNames = null)
     {
         expression = null;
 
@@ -2623,7 +2612,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     x => x.MakeGenericMethod(genericTypes));
             }
 
-            if (TryResolveMethodCall(node, null, parameters, methods, out expression))
+            if (TryResolveMethodCall(node, null, parameters, methods, out expression, argumentNames))
                 return true;
         }
 
@@ -2835,7 +2824,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return result;
     }
 
-    private bool TryResolveMethodCall(SyntaxNode relatedNode, Expression? instanceExpression, IList<Expression> arguments, IList<MethodInfo> candidates, out Expression? expression)
+    private bool TryResolveMethodCall(SyntaxNode relatedNode, Expression? instanceExpression, IList<Expression> arguments, IList<MethodInfo> candidates, out Expression? expression, IReadOnlyList<string?>? argumentNames = null)
+    {
+        var baseCandidates = candidates as IReadOnlyList<MethodBase>
+                             ?? candidates.ToArray();
+        return TryResolveCall(relatedNode, instanceExpression, arguments, baseCandidates, out expression, argumentNames);
+    }
+    private bool TryResolveCall(SyntaxNode relatedNode, Expression? instanceExpression, IList<Expression> arguments, IReadOnlyList<MethodBase> candidates, out Expression? expression, IReadOnlyList<string?>? argumentNames = null)
     {
         expression = null;
 
@@ -2879,24 +2874,45 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (bestMethod == null)
             return false;
 
-        expression = Expression.Call(instanceExpression, bestMethod.Method, bestMethod.Arguments);
+        if (bestMethod.Method is ConstructorInfo constructor)
+        {
+            expression = Expression.New(constructor, bestMethod.Arguments);
+            return true;
+        }
+
+        var method0 = (MethodInfo)bestMethod.Method;
+        expression = Expression.Call(instanceExpression, method0, bestMethod.Arguments);
         if (_tupleShapes != null)
-            SetTupleShape(expression, ValueTupleShape.ComputeCallResultShape(bestMethod.Method, instanceExpression, bestMethod.Arguments, GetTupleShape, _nameComparison));
+            SetTupleShape(expression, ValueTupleShape.ComputeCallResultShape(method0, instanceExpression, bestMethod.Arguments, GetTupleShape, _nameComparison));
         return true;
 
-        MethodCallInfo? ToMatchingMethod(MethodInfo x)
+        MethodCallInfo? ToMatchingMethod(MethodBase x)
         {
             var methodParameters = x.GetParameters();
             var hasParams = methodParameters.Length > 0 && methodParameters[methodParameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
 
+            // Reorder named arguments into declared parameter order, filling omitted optional parameters with their default values.
+            // arguments stays in source order (RawArguments) so overload resolution can compare candidates by the argument the caller actually wrote;
+            // argumentMap records where each source argument landed for that comparison.
+            var effectiveArguments = arguments;
+            int[]? argumentMap = null;
+            if (argumentNames != null)
+            {
+                var bound = TryBindNamedArguments(arguments, argumentNames, methodParameters, hasParams, out argumentMap);
+                if (bound == null)
+                    return null;
+
+                effectiveArguments = bound;
+            }
+
             if (!hasParams)
             {
                 // A params method accepts more arguments than declared parameters.
-                if (methodParameters.Length < arguments.Count)
+                if (methodParameters.Length < effectiveArguments.Count)
                     return null;
 
                 // Too few arguments, reject if any unfilled parameter is required (no default value).
-                for (var i = arguments.Count; i < methodParameters.Length; i++)
+                for (var i = effectiveArguments.Count; i < methodParameters.Length; i++)
                     if (!methodParameters[i].HasDefaultValue)
                         return null;
             }
@@ -2906,9 +2922,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             {
                 Method = x,
                 RawArguments = arguments,
-                Arguments = arguments.ToList(),
+                Arguments = effectiveArguments.ToList(),
                 Parameters = methodParameters,
-                HasParams = hasParams
+                HasParams = hasParams,
+                ArgumentMap = argumentMap
             };
             ref var method = ref info.Method;
             var methodArguments = info.Arguments;
@@ -2938,16 +2955,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             if (method.IsGenericMethodDefinition && genericArguments!.All(y => y != null))
             {
-                method = method.MakeGenericMethod(genericArguments!);
+                method = ((MethodInfo)method).MakeGenericMethod(genericArguments!);
                 methodParameters = method.GetParameters();
             }
 
             // Tuple shape flow into lambda parameters
             Dictionary<Type, ValueTupleShape?>? lambdaBindings = null;
-            var openDefinition = x.IsGenericMethodDefinition
+            MethodBase? openDefinition = x.IsGenericMethodDefinition
                 ? x
                 : x.IsGenericMethod
-                    ? x.GetGenericMethodDefinition()
+                    ? ((MethodInfo)x).GetGenericMethodDefinition()
                     : null;
             if (openDefinition != null && _tupleShapes != null)
             {
@@ -3054,7 +3071,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 if (genericArguments!.Any(y => y == null))
                     return null;
 
-                method = method.MakeGenericMethod(genericArguments!);
+                method = ((MethodInfo)method).MakeGenericMethod(genericArguments!);
                 methodParameters = method.GetParameters();
             }
 
@@ -3135,6 +3152,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private static MethodCallInfo? GetBestMatchingMethod(MethodCallInfo method1, MethodCallInfo method2)
     {
+        // Both candidates get the same source-order args. If named arguments were used, each candidate's ArgumentMap tells which parameter a given arg was bound to.
         var args = method1.RawArguments;
 
         for (var i = 0; i < args.Count; i++)
@@ -3144,8 +3162,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 continue;
 
             var argType = args[i].Type;
-            var t1 = method1.Parameters[method1.HasParams ? Math.Min(i, method1.Parameters.Length - 1) : i].ParameterType;
-            var t2 = method2.Parameters[method2.HasParams ? Math.Min(i, method2.Parameters.Length - 1) : i].ParameterType;
+            var p1 = method1.ArgumentMap?[i] ?? (method1.HasParams ? Math.Min(i, method1.Parameters.Length - 1) : i);
+            var p2 = method2.ArgumentMap?[i] ?? (method2.HasParams ? Math.Min(i, method2.Parameters.Length - 1) : i);
+            var t1 = method1.Parameters[p1].ParameterType;
+            var t2 = method2.Parameters[p2].ParameterType;
 
             if (GetBestMatchingType(argType, t1, t2) is { } best)
                 return best == t1 ? method1 : method2;
@@ -3198,6 +3218,133 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return type2;
 
         return null;
+    }
+
+    private List<Expression>? TryBindNamedArguments(IList<Expression> arguments, IReadOnlyList<string?> names, ParameterInfo[] methodParameters, bool hasParams, out int[]? argumentMap)
+    {
+        argumentMap = null;
+
+        var outOfPositionNamed = false; // Once a named argument lands out of position, no positional argument may follow it.
+        var fixedCount = hasParams
+            ? methodParameters.Length - 1
+            : methodParameters.Length;
+        var slots = new Expression?[fixedCount];
+        var filled = new bool[fixedCount];
+        var map = new int[arguments.Count];
+        List<Expression>? paramsTail = null;
+
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            var name = i < names.Count ? names[i] : null;
+
+            if (name == null)
+            {
+                if (outOfPositionNamed)
+                    return null;
+
+                if (i < fixedCount)
+                {
+                    if (filled[i])
+                    {
+                        // Slot already taken by a named argument.
+                        return null;
+                    }
+
+                    slots[i] = arguments[i];
+                    filled[i] = true;
+                    map[i] = i;
+                }
+                else if (hasParams)
+                {
+                    (paramsTail ??= []).Add(arguments[i]);
+                    map[i] = fixedCount;
+                }
+                else
+                {
+                    // Too many positional arguments
+                    return null;
+                }
+            }
+            else
+            {
+                // Named arguments cannot target the params array
+                var index = -1;
+                for (var p = 0; p < fixedCount; p++)
+                    if (string.Equals(methodParameters[p].Name, name, _nameComparison))
+                    {
+                        index = p;
+                        break;
+                    }
+
+                if (index < 0 || filled[index])
+                {
+                    // Unknown name, duplicate, or params-array target.
+                    return null;
+                }
+
+                slots[index] = arguments[i];
+                filled[index] = true;
+                map[i] = index;
+
+                if (index != i)
+                    outOfPositionNamed = true;
+            }
+        }
+
+        var result = new List<Expression>(methodParameters.Length);
+
+        for (var p = 0; p < fixedCount; p++)
+        {
+            if (filled[p])
+            {
+                result.Add(slots[p]!);
+                continue;
+            }
+
+            var parameter = methodParameters[p];
+            if (!parameter.HasDefaultValue)
+            {
+                // Required parameter left unfilled
+                return null;
+            }
+
+            result.Add(CreateDefaultArgument(parameter));
+        }
+
+        if (paramsTail != null)
+            result.AddRange(paramsTail);
+
+        argumentMap = map;
+        return result;
+    }
+    private static Expression CreateDefaultArgument(ParameterInfo parameter)
+    {
+        var parameterType = parameter.ParameterType;
+
+        if (parameterType.ContainsGenericParameters)
+            return new DelayDefaultExpression();
+
+        var defaultValue = parameter.DefaultValue;
+        if (defaultValue == null && parameterType.IsValueType)
+            defaultValue = Activator.CreateInstance(parameterType);
+
+        return Expression.Constant(defaultValue, parameterType);
+    }
+    private static string?[]? GetArgumentNames(SeparatedSyntaxList<ArgumentSyntax> node)
+    {
+        string?[]? names = null;
+
+        for (var i = 0; i < node.Count; i++)
+        {
+            var name = node[i].NameColon?.Name.Identifier.Text;
+            if (name == null)
+                continue;
+
+            names ??= new string?[node.Count];
+            names[i] = name;
+        }
+
+        return names;
     }
 
     private static bool IsNullableType(Type type) => Nullable.GetUnderlyingType(type) != null;
@@ -3303,13 +3450,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private class MethodCallInfo
     {
-        public MethodInfo Method = null!;
+        public MethodBase Method = null!;
 
         public ParameterInfo[] Parameters { get; set; } = null!;
         public bool HasParams { get; set; }
 
         public IList<Expression> RawArguments { get; set; } = null!;
         public List<Expression> Arguments { get; set; } = null!;
+
+        /// <summary>
+        /// Maps each source (RawArguments) index to the parameter it binds to.
+        /// Null when arguments are positional.
+        /// </summary>
+        public int[]? ArgumentMap { get; set; }
 
 
         public override string ToString() => Method.ToString();

@@ -23,10 +23,15 @@ internal class TestModel(int value = 1) : ITestModel
     }
 
     public int Sum(int a, int b) => a + b;
+    public int Subtract(int a, int b) => a - b;
+    public string Concat3(string a, string b = "-", string c = "!") => a + b + c;
     public string Echo(string s) => s ?? "<null>";
 
     public string Overloaded(int a) => "int";
     public string Overloaded(string a) => "string";
+
+    public string Widen(int a, int b) => "int";
+    public string Widen(long a, long b) => "long";
 
     public T ReturnArgument<T>(T value) => value;
     public T? ReturnArgumentExactTypeOrNull<T>(object v) => v is T v1 ? v1 : default;
