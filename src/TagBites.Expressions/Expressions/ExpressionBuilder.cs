@@ -34,7 +34,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private Dictionary<Expression, string>? _fullMemberPath;
     private int _nextVariableIndex;
     private bool _checkedContext;
-    private List<(Type SlotType, List<(string Name, Type Type)> Shape)>? _anonymousObjects;
+    private List<(Type SlotType, List<(string Name, Type Type, ValueTupleShape? TupleShape)> Shape)>? _anonymousObjects;
+    private Dictionary<Expression, ValueTupleShape>? _tupleShapes;
     private Type? _targetType;
     private readonly Dictionary<MemberCacheKey, MethodInfo[]>? _memberCache;
 
@@ -894,7 +895,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     public override Expression? VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node)
     {
         var members = new List<(string Name, Expression Value)>();
-        var shape = new List<(string Name, Type Type)>();
+        var shape = new List<(string Name, Type Type, ValueTupleShape? TupleShape)>();
 
         foreach (var member in node.Initializers)
         {
@@ -924,35 +925,37 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return null;
 
             members.Add((name, valueExpression));
-            shape.Add((name, valueExpression.Type));
+            shape.Add((name, valueExpression.Type, GetTupleShape(valueExpression)));
         }
 
-        var backingType = GetOrAssignAnonymousObjectSlot();
+        var (backingType, canonicalShape) = GetOrAssignAnonymousObjectSlot();
 
         var instanceVariable = Expression.Variable(backingType);
         var asDictionary = Expression.Convert(instanceVariable, typeof(IDictionary<string, object>));
         var constructor = backingType.GetConstructor(Type.EmptyTypes)!;
 
+        // Store each member under its slot's canonical (first-registered) name, so all instances of a shared
+        // slot use the same dictionary keys - required once IgnoreCase merges case-differing literals.
         var statements = new List<Expression> { Expression.Assign(instanceVariable, Expression.New(constructor)) };
-        foreach (var (name, value) in members)
-            statements.Add(Expression.Call(asDictionary, s_anonymousObjectIndexer.SetMethod!, Expression.Constant(name), Expression.Convert(value, typeof(object))));
+        for (var i = 0; i < members.Count; i++)
+            statements.Add(Expression.Call(asDictionary, s_anonymousObjectIndexer.SetMethod!, Expression.Constant(canonicalShape[i].Name), Expression.Convert(members[i].Value, typeof(object))));
 
         statements.Add(instanceVariable);
 
         return Expression.Block([instanceVariable], statements);
 
-        Type GetOrAssignAnonymousObjectSlot()
+        (Type SlotType, List<(string Name, Type Type, ValueTupleShape? TupleShape)> Shape) GetOrAssignAnonymousObjectSlot()
         {
             if (_anonymousObjects != null)
-                foreach (var (slotType, existingShape) in _anonymousObjects)
-                    if (existingShape.SequenceEqual(shape))
-                        return slotType;
+                foreach (var existing in _anonymousObjects)
+                    if (AnonymousObject.AnonymousShapesEqual(existing.Shape, shape, _nameComparison))
+                        return existing;
 
             var newSlotType = AnonymousObject.GetAnonymousObjectType(_anonymousObjects?.Count ?? 0);
             _anonymousObjects ??= [];
             _anonymousObjects.Add((newSlotType, shape));
 
-            return newSlotType;
+            return (newSlotType, shape);
         }
     }
     public override Expression? VisitArrayCreationExpression(ArrayCreationExpressionSyntax node)
@@ -1556,7 +1559,67 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (initMethod == null)
             return ToError(node);
 
-        return Expression.Call(null, initMethod.MakeGenericMethod(args.ToFastArray(x => x!.Type)), args);
+        var result = Expression.Call(null, initMethod.MakeGenericMethod(args.ToFastArray(x => x!.Type)), args);
+
+        // ValueTuple with defined or inferred element names
+        string?[]? names = null;
+        ValueTupleShape?[]? argShapes = null;
+
+        for (var i = 0; i < node.Arguments.Count; i++)
+        {
+            var argument = node.Arguments[i];
+
+            // Explicit name
+            var elementName = argument.NameColon?.Name.Identifier.Text;
+            if (elementName != null)
+            {
+                switch (ValueTupleShape.GetReservedElementPosition(elementName))
+                {
+                    case 0:
+                        return ToError(argument, $"Tuple element name '{elementName}' is disallowed at any position.");
+                    case var p and > 0 when p != i + 1:
+                        return ToError(argument, $"Tuple element name '{elementName}' is only allowed at position {p}.");
+                }
+            }
+
+            // Implicit name, e.g. (n, a.B) -> n, B; but not reserved name and not duplicated
+            else if (ValueTupleShape.GetImplicitElementName(argument.Expression) is { } inferred && !IsDuplicateElementName(i, inferred))
+                elementName = inferred;
+
+            if (elementName != null)
+            {
+                names ??= new string?[node.Arguments.Count];
+                names[i] = elementName;
+            }
+
+            var childShape = GetTupleShape(args[i]!);
+            if (childShape != null)
+            {
+                argShapes ??= new ValueTupleShape?[node.Arguments.Count];
+                argShapes[i] = childShape;
+            }
+        }
+
+        if (names != null || argShapes != null)
+            SetTupleShape(result, new ValueTupleShape { Names = names, Args = argShapes });
+
+        return result;
+
+        bool IsDuplicateElementName(int index, string name)
+        {
+            for (var i = node.Arguments.Count - 1; i >= 0; i--)
+                if (i != index)
+                {
+                    var argument = node.Arguments[i];
+                    var other = argument.NameColon?.Name.Identifier.Text
+                                ?? ValueTupleShape.GetImplicitElementName(argument.Expression);
+
+                    if (other != null && string.Equals(other, name, _nameComparison))
+                        return true;
+                }
+
+            return false;
+        }
     }
 
     public override Expression? VisitIdentifierName(IdentifierNameSyntax node)
@@ -1908,6 +1971,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var staticType = (expression as ConstantExpression)?.Value as Type;
         var expressionType = staticType ?? expression.Type;
 
+        // Named tuple element
+        if (staticType == null
+            && GetTupleShape(expression) is { } tupleShape
+            && tupleShape.GetRealField(name, _nameComparison) is ({ } tupleFieldName, var index)
+            && expressionType.GetField(tupleFieldName) is { } tupleField)
+        {
+            var access = Expression.MakeMemberAccess(expression, tupleField);
+            var shape = tupleShape.Args?.Length > index ? tupleShape.Args[index] : null;
+            SetTupleShape(access, shape);
+            return access;
+        }
+
         // From instance
         for (var type = expressionType; type != null; type = type.BaseType)
         {
@@ -1946,13 +2021,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var (_, shape) = _anonymousObjects.FirstOrDefault(x => x.SlotType == expressionType);
             if (shape != null)
             {
-                var (memberName, memberType) = shape.FirstOrDefault(x => string.Equals(x.Name, name, _nameComparison));
+                var (memberName, memberType, memberShape) = shape.FirstOrDefault(x => string.Equals(x.Name, name, _nameComparison));
                 if (memberType == null)
                     return setErrorWhenNotFound ? ToError(node, $"'{name}' is not a member of this anonymous object.") : null;
 
                 var asSlotDictionary = Expression.Convert(expression, typeof(IDictionary<string, object>));
                 var slotValue = Expression.MakeIndex(asSlotDictionary, s_anonymousObjectIndexer, [Expression.Constant(memberName)]);
-                return Expression.Convert(slotValue, memberType);
+                var result = Expression.Convert(slotValue, memberType);
+
+                // Save member value's tuple shape stored in an anonymous member
+                SetTupleShape(result, memberShape);
+
+                return result;
             }
         }
 
@@ -1979,7 +2059,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return next;
     }
 
-    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes)
+    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, ValueTupleShape?[]? parameterShapes = null)
     {
         var simple = node as SimpleLambdaExpressionSyntax;
         var parenthesized = node as ParenthesizedLambdaExpressionSyntax;
@@ -2008,6 +2088,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     return null;
 
                 parameters[i] = Expression.Parameter(parameterTypes[i], name);
+
+                // Flow the incoming element's shape onto the lambda parameter
+                if (parameterShapes != null && i < parameterShapes.Length)
+                    SetTupleShape(parameters[i], parameterShapes[i]);
             }
 
             nestedParametersStartIndex = _nestedParameters.Count;
@@ -2022,7 +2106,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return null;
 
             // Result
-            return Expression.Lambda(body, parameters);
+            var lambda = Expression.Lambda(body, parameters);
+
+            // Save body's tuple shape as the delegate's return-type shape
+            if (GetTupleShape(body) is { } bodyShape && lambda.Type.IsGenericType && lambda.Type.Name.StartsWith("Func`", StringComparison.Ordinal))
+            {
+                var slots = new ValueTupleShape?[lambda.Type.GetGenericArguments().Length];
+                slots[slots.Length - 1] = bodyShape;
+                SetTupleShape(lambda, new ValueTupleShape { Args = slots });
+            }
+
+            return lambda;
         }
         finally
         {
@@ -2157,6 +2251,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         if (TryConvertExpression(argument, parameterType) is not { } converted)
             return false;
+
+        // A conversion makes a new expression; carry the shape across so names keep flowing,
+        // e.g. OrderBy().First() converts IOrderedEnumerable<T> to IEnumerable<T>.
+        if (!ReferenceEquals(converted, argument))
+            SetTupleShape(converted, GetTupleShape(argument));
 
         argument = converted;
         return true;
@@ -2741,6 +2840,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return false;
 
         expression = Expression.Call(instanceExpression, bestMethod.Method, bestMethod.Arguments);
+        if (_tupleShapes != null)
+            SetTupleShape(expression, ValueTupleShape.ComputeCallResultShape(bestMethod.Method, instanceExpression, bestMethod.Arguments, GetTupleShape, _nameComparison));
         return true;
 
         MethodCallInfo? ToMatchingMethod(MethodInfo x)
@@ -2801,6 +2902,36 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 methodParameters = method.GetParameters();
             }
 
+            // Tuple shape flow into lambda parameters
+            Dictionary<Type, ValueTupleShape?>? lambdaBindings = null;
+            var openDefinition = x.IsGenericMethodDefinition
+                ? x
+                : x.IsGenericMethod
+                    ? x.GetGenericMethodDefinition()
+                    : null;
+            if (openDefinition != null && _tupleShapes != null)
+            {
+                var openParameters = openDefinition.GetParameters();
+                var count = Math.Min(methodArguments.Count, openParameters.Length);
+
+                var anyShape = false;
+                for (var i = 0; i < count; i++)
+                    if (methodArguments[i] is not DelayLambdaExpression && GetTupleShape(methodArguments[i]) != null)
+                    {
+                        anyShape = true;
+                        break;
+                    }
+
+                if (anyShape)
+                {
+                    lambdaBindings = new Dictionary<Type, ValueTupleShape?>();
+                    var bound = new HashSet<Type>();
+                    for (var i = 0; i < count; i++)
+                        if (methodArguments[i] is not DelayLambdaExpression)
+                            ValueTupleShape.BindShape(openParameters[i].ParameterType, GetTupleShape(methodArguments[i]), lambdaBindings, bound, !typeof(Delegate).IsAssignableFrom(methodArguments[i].Type), _nameComparison, 0);
+                }
+            }
+
             // Parse lambda
             for (var i = 0; i < methodArguments.Count; i++)
                 if (methodArguments[i] is DelayLambdaExpression dl)
@@ -2831,8 +2962,28 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (lambdaType.Name.StartsWith("Func`"))
                         lambdaParameters = lambdaParameters.Take(lambdaParameters.Length - 1).ToArray();
 
+                    // Shapes for the lambda parameters, read from the bindings by matching the open delegate's generic arguments
+                    // (e.g. Func<TSource, bool> -> TSource) against this method's bindings.
+                    ValueTupleShape?[]? lambdaParameterShapes = null;
+
+                    if (lambdaBindings != null && openDefinition != null)
+                    {
+                        var openParameters = openDefinition.GetParameters();
+                        var openDelegateType = openParameters[Math.Min(i, openParameters.Length - 1)].ParameterType;
+                        if (openDelegateType.IsGenericType)
+                        {
+                            var openDelegateArgs = openDelegateType.GetGenericArguments();
+                            for (var j = 0; j < lambdaParameters.Length && j < openDelegateArgs.Length; j++)
+                                if (openDelegateArgs[j].IsGenericParameter && lambdaBindings.TryGetValue(openDelegateArgs[j], out var parameterShape) && parameterShape != null)
+                                {
+                                    lambdaParameterShapes ??= new ValueTupleShape?[lambdaParameters.Length];
+                                    lambdaParameterShapes[j] = parameterShape;
+                                }
+                        }
+                    }
+
                     // Expression
-                    var expression = TryResolveLambda(dl.Node, lambdaParameters);
+                    var expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes);
                     if (expression == null)
                         return null;
 
@@ -3058,6 +3209,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     // ReSharper disable once UnusedParameter.Local
     private static T TypeInfoWrapper<T>(T value, object typeInfo) => value;
+
     private static Expression PropagateElementTypeInfo(Expression receiver, Expression result)
     {
         var typeInfo = ExtractTypeInfo(receiver);
@@ -3078,6 +3230,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var elementTypes = TypeUtils.GetGenericArguments(type, typeof(IEnumerable<>));
             return elementTypes.Length > 0 ? elementTypes[0] : null;
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ValueTupleShape? GetTupleShape(Expression expression)
+    {
+        return _tupleShapes != null && _tupleShapes.TryGetValue(expression, out var shape) ? shape : null;
+    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void SetTupleShape(Expression expression, ValueTupleShape? shape)
+    {
+        if (shape == null)
+            return;
+
+        _tupleShapes ??= new Dictionary<Expression, ValueTupleShape>();
+        _tupleShapes[expression] = shape;
     }
 
     private class MethodCallInfo

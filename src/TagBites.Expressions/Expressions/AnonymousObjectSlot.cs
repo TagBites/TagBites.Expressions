@@ -96,6 +96,18 @@ internal abstract class AnonymousObject : DynamicObject, IDictionary<string, obj
 
         return typeof(Tuple<,>).MakeGenericType(first, rest);
     }
+
+    public static bool AnonymousShapesEqual(List<(string Name, Type Type, ValueTupleShape? TupleShape)> a, List<(string Name, Type Type, ValueTupleShape? TupleShape)> b, StringComparison nameComparison)
+    {
+        if (a.Count != b.Count)
+            return false;
+
+        for (var i = 0; i < a.Count; i++)
+            if (!string.Equals(a[i].Name, b[i].Name, nameComparison) || a[i].Type != b[i].Type || !ValueTupleShape.NameShapesEqual(a[i].TupleShape, b[i].TupleShape, nameComparison))
+                return false;
+
+        return true;
+    }
 }
 
 // ReSharper disable once UnusedTypeParameter

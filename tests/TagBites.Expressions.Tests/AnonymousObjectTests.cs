@@ -78,4 +78,25 @@ public class AnonymousObjectTests : ExpressionTestBase
 
         Assert.Equal(3, result);
     }
+
+    [Theory]
+    // Under IgnoreCase, literals differing only in member-name case are one shape (share a slot type), so a
+    // common type exists for the ternary. Case-sensitive (default), they are distinct types and it fails.
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void AnonymousObjectCreation_CaseDifferingShapes_MergeUnderIgnoreCase(bool ignoreCase, bool sharesType)
+    {
+        var script = "(cond ? new { A = 1 } : new { a = 2 }).A";
+        var options = new ExpressionParserOptions { IgnoreCase = ignoreCase, Parameters = { (typeof(bool), "cond") } };
+
+        if (sharesType)
+            ExecuteAndTest(script, options, 1, true);
+        else
+            Assert.False(ExpressionParser.TryParse(script, options, out _, out _));
+    }
+
+    [Fact]
+    public void AnonymousObjectCreation_CaseDifferingShapes_EqualUnderIgnoreCase()
+        => ExecuteAndTest("new { A = 1, B = 2 }.Equals(new { a = 1, b = 2 })",
+            new ExpressionParserOptions { IgnoreCase = true }, true);
 }
