@@ -112,6 +112,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expression == null)
             return null;
 
+        if (expression is DelayDefaultExpression)
+        {
+            if (_options.ResultType == null)
+            {
+                ToError(node, "Cannot infer the type of 'default' because the result type is not set.");
+                return null;
+            }
+
+            expression = Expression.Default(_options.ResultType);
+        }
+
         if (_options.ResultType != null && expression.Type != _options.ResultType)
         {
             var isNullableResult = !_options.ResultType.IsValueType || IsNullableType(_options.ResultType);
@@ -301,6 +312,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (right == null)
             return null;
 
+        if (left is DelayDefaultExpression || right is DelayDefaultExpression)
+        {
+            if (left is DelayDefaultExpression && right is DelayDefaultExpression)
+                return ToError(node, "Cannot infer the type of 'default' when both operands are 'default'.");
+
+            if (left is DelayDefaultExpression)
+                left = Expression.Default(right.Type);
+            else
+                right = Expression.Default(left.Type);
+        }
+
         var expressionType = (SyntaxKind)node.OperatorToken.RawKind switch
         {
             // Math
@@ -485,6 +507,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var type = ResolveType(node.Type);
         if (type == null)
             return null;
+
+        // (T)default -> default(T)
+        if (expression is DelayDefaultExpression)
+            return Expression.Default(type);
 
         return _checkedContext
             ? Expression.ConvertChecked(expression, type)
@@ -1499,15 +1525,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         return _thisParameter ?? ToError(node, "Keyword 'this' is not valid in a static property or method.");
     }
-    public override Expression? VisitLiteralExpression(LiteralExpressionSyntax node)
+    public override Expression VisitLiteralExpression(LiteralExpressionSyntax node)
     {
         if (Equals(node.Token.Value, "default"))
-        {
-            if (_options.ResultType != null)
-                return Expression.Default(_options.ResultType);
-
-            return ToError(node, "Default keyword is not supported.");
-        }
+            return new DelayDefaultExpression();
 
         return Expression.Constant(node.Token.Value);
     }
@@ -2186,6 +2207,25 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
     {
+        // Default
+        if (e1 is DelayDefaultExpression || e2 is DelayDefaultExpression)
+        {
+            switch (e1)
+            {
+                case DelayDefaultExpression when e2 is DelayDefaultExpression:
+                    ToError(node, "Cannot infer the type of 'default' when both sides are 'default'.");
+                    return false;
+                case DelayDefaultExpression:
+                    e1 = Expression.Default(e2.Type);
+                    break;
+                default:
+                    e2 = Expression.Default(e1.Type);
+                    break;
+            }
+
+            return true;
+        }
+
         // Null mismatch
         if (e1 is ConstantExpression c && c.Type == typeof(object) && c.Value == null)
         {
@@ -2885,7 +2925,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 var argumentTypes = new List<(string, Type)>();
 
                 for (var i = 0; i < methodArguments.Count; i++)
-                    if (methodArguments[i] is not DelayLambdaExpression)
+                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression)
                         TryExtractGenericArguments(methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType, methodArguments[i].Type, argumentTypes);
 
                 for (var i = 0; i < genericParameters.Length; i++)
@@ -2916,7 +2956,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 var anyShape = false;
                 for (var i = 0; i < count; i++)
-                    if (methodArguments[i] is not DelayLambdaExpression && GetTupleShape(methodArguments[i]) != null)
+                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression && GetTupleShape(methodArguments[i]) != null)
                     {
                         anyShape = true;
                         break;
@@ -2927,7 +2967,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     lambdaBindings = new Dictionary<Type, ValueTupleShape?>();
                     var bound = new HashSet<Type>();
                     for (var i = 0; i < count; i++)
-                        if (methodArguments[i] is not DelayLambdaExpression)
+                        if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression)
                             ValueTupleShape.BindShape(openParameters[i].ParameterType, GetTupleShape(methodArguments[i]), lambdaBindings, bound, !typeof(Delegate).IsAssignableFrom(methodArguments[i].Type), _nameComparison, 0);
                 }
             }
@@ -3018,6 +3058,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 methodParameters = method.GetParameters();
             }
 
+            // Resolve defaults
+            for (var i = methodArguments.Count - 1; i >= 0; i--)
+                if (methodArguments[i] is DelayDefaultExpression)
+                {
+                    var targetType = info.HasParams && i >= methodParameters.Length - 1 && methodArguments.Count != methodParameters.Length
+                        ? methodParameters[methodParameters.Length - 1].ParameterType.GetElementType()!
+                        : methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType;
+                    methodArguments[i] = Expression.Default(targetType);
+                }
+
             // Params array: pass a matching array directly (normal form) or collect the trailing arguments into a new array,
             // converting each to the element type (expanded form).
             if (info.HasParams)
@@ -3089,6 +3139,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         for (var i = 0; i < args.Count; i++)
         {
+            // A 'default' matches any parameter type
+            if (args[i] is DelayDefaultExpression)
+                continue;
+
             var argType = args[i].Type;
             var t1 = method1.Parameters[method1.HasParams ? Math.Min(i, method1.Parameters.Length - 1) : i].ParameterType;
             var t2 = method2.Parameters[method2.HasParams ? Math.Min(i, method2.Parameters.Length - 1) : i].ParameterType;
@@ -3260,9 +3314,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         public override string ToString() => Method.ToString();
     }
-    private class MemberResolverContext : IExpressionMemberResolverContext
+    private class MemberResolverContext(ExpressionBuilder visitor) : IExpressionMemberResolverContext
     {
-        private readonly ExpressionBuilder _visitor;
         private string? _memberFullPath;
 
         public Expression Instance { get; private set; } = null!;
@@ -3312,8 +3365,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             set => _memberFullPath = value;
         }
 
-        public MemberResolverContext(ExpressionBuilder visitor) => _visitor = visitor;
-
 
         public void Switch(Expression? expressionInstance, Expression instance, string memberName)
         {
@@ -3324,18 +3375,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _memberFullPath = null;
         }
 
-        public ParameterExpression GetParameter(string name) => _visitor._parameters.First(x => x.Name == name);
+        public ParameterExpression GetParameter(string name) => visitor._parameters.First(x => x.Name == name);
         public Expression IncludeTypeInfo(Expression expression, object typeInfo) => WrapWithTypeInfo(expression, typeInfo);
     }
-    private class DelayLambdaExpression : Expression
-    {
-        public LambdaExpressionSyntax Node { get; }
 
-        public DelayLambdaExpression(LambdaExpressionSyntax node)
-        {
-            Node = node;
-        }
+    private class DelayLambdaExpression(LambdaExpressionSyntax node) : Expression
+    {
+        public LambdaExpressionSyntax Node { get; } = node;
     }
+    private class DelayDefaultExpression : Expression;
+
     private class ConditionalAccessExpression : Expression
     {
         private readonly Type _type;
@@ -3403,11 +3452,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
     }
 
-    private class LambdaVariableContext
+    private class LambdaVariableContext(int count)
     {
-        private readonly object[] _values;
-
-        public LambdaVariableContext(int count) => _values = new object[count];
+        private readonly object[] _values = new object[count];
 
 
         public T GetValue<T>(int index) => (T)_values[index];

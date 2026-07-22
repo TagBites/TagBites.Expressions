@@ -22,6 +22,12 @@ internal class TestModel(int value = 1) : ITestModel
         };
     }
 
+    public int Sum(int a, int b) => a + b;
+    public string Echo(string s) => s ?? "<null>";
+
+    public string Overloaded(int a) => "int";
+    public string Overloaded(string a) => "string";
+
     public T ReturnArgument<T>(T value) => value;
     public T? ReturnArgumentExactTypeOrNull<T>(object v) => v is T v1 ? v1 : default;
     public T? ReturnArgumentExactTypeOrDefault<T>(object v, T? defaultValue = default) => v is T v1 ? v1 : defaultValue;
