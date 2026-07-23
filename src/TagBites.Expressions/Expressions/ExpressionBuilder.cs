@@ -8,7 +8,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using TagBites.Utils;
-using MemberCacheKey = (TagBites.Expressions.MemberLookupKind Kind, System.Type Type, string Name, System.Reflection.BindingFlags Flags);
 
 namespace TagBites.Expressions;
 
@@ -18,13 +17,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static readonly PropertyInfo s_anonymousObjectIndexer = typeof(IDictionary<string, object>).GetProperty("Item")!;
 
     private readonly ExpressionParserOptions _options;
-    private readonly Expression? _thisParameter;
-    private readonly ParameterExpression[] _parameters;
-    private readonly IDictionary<string, (Type? Type, object? Value)>? _globalMembers;
-    private readonly TypeCollection _includedTypes;
-    private readonly TypeCollection? _staticImports;
+    private readonly ParserContext _context;
     private readonly StringComparison _nameComparison;
-    private readonly BindingFlags _caseInsensitiveFlag;
     private Expression? _tmp;
     private Expression? _extensionInstance;
     private List<ParameterExpression>? _nestedParameters;
@@ -37,7 +31,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private List<(Type SlotType, List<(string Name, Type Type, ValueTupleShape? TupleShape)> Shape)>? _anonymousObjects;
     private Dictionary<Expression, ValueTupleShape>? _tupleShapes;
     private Type? _targetType;
-    private readonly Dictionary<MemberCacheKey, MethodInfo[]>? _memberCache;
 
     public string? FirstError { get; private set; }
     public bool HasReflectionCall { get; private set; }
@@ -45,64 +38,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     public ExpressionBuilder(ExpressionParserOptions options)
     {
         _options = options;
-        _parameters = options.ParametersInternal?.ToFastArray(x => Expression.Parameter(x.Type, x.Name)) ?? [];
-
-        _nameComparison = options.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        _caseInsensitiveFlag = options.IgnoreCase ? BindingFlags.IgnoreCase : default;
-
-        _globalMembers = options.GlobalMembersInternal;
-        _includedTypes = options.IncludedTypesMap;
-        _staticImports = options.StaticImportsMap;
-
-        if (options.IgnoreCase)
-        {
-            if (_globalMembers?.Count > 0)
-            {
-                _globalMembers = new Dictionary<string, (Type? Type, object? Value)>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var item in options.GlobalMembers)
-                {
-                    if (_globalMembers.ContainsKey(item.Key))
-                        throw new ArgumentException($"Duplicate case-insensitive global member name '{item.Key}'.", nameof(ExpressionParserOptions.GlobalMembers));
-
-                    _globalMembers.Add(item.Key, item.Value);
-                }
-            }
-
-            if (_includedTypes.Count > 0)
-            {
-                _includedTypes = new TypeCollection(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var item in options.IncludedTypesMap)
-                {
-                    if (_includedTypes.ContainsKey(item.Key))
-                        throw new ArgumentException($"Duplicate case-insensitive type name '{item.Key}'.", nameof(ExpressionParserOptions.IncludedTypes));
-
-                    _includedTypes.Add(item.Key, item.Value);
-                }
-            }
-        }
-
-        if (options.UseFirstParameterAsThis)
-        {
-            if (_parameters.Length > 0)
-                _thisParameter = _parameters[0];
-        }
-        else if (_globalMembers?.TryGetValue("this", out var item) == true && item.Value != null)
-            _thisParameter = Expression.Constant(item.Value, GetGlobalMemberType("this", item));
-
+        _context = options.PrepareContext();
+        _nameComparison = _context.NameComparison;
         _targetType = options.ResultType;
-
-        if (options.UseMemberCache)
-        {
-            if (options.MemberCache == null)
-            {
-                var created = new Dictionary<MemberCacheKey, MethodInfo[]>();
-                _memberCache = Interlocked.CompareExchange(ref options.MemberCache, created, null) ?? created;
-            }
-            else
-                _memberCache = _options.MemberCache;
-        }
     }
 
 
@@ -144,12 +82,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         if (_variableContextParameter != null)
         {
-            var innerLambda = Expression.Lambda(expression, _parameters.Concat([_variableContextParameter]));
+            var innerLambda = Expression.Lambda(expression, _context.Parameters.Concat([_variableContextParameter]));
             var lvcConstructor = typeof(LambdaVariableContext).GetConstructor([typeof(int)])!;
-            expression = Expression.Invoke(innerLambda, _parameters.Cast<Expression>().Concat([Expression.New(lvcConstructor, Expression.Constant(_nextVariableIndex))]));
+            expression = Expression.Invoke(innerLambda, _context.Parameters.Cast<Expression>().Concat([Expression.New(lvcConstructor, Expression.Constant(_nextVariableIndex))]));
         }
 
-        return Expression.Lambda(expression, _parameters);
+        return Expression.Lambda(expression, _context.Parameters);
     }
 
     public override Expression? Visit(SyntaxNode? node)
@@ -643,7 +581,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     // Parameter as method
                     var name = methodNameSyntax.Identifier.Text;
-                    var parameter = _parameters.FastFirstOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _thisParameter);
+                    var parameter = _context.Parameters.FastFirstOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _context.ThisParameter);
                     if (parameter != null && typeof(Delegate).IsAssignableFrom(parameter.Type))
                     {
                         instanceExpression = parameter;
@@ -651,7 +589,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         methodName = "Invoke";
                     }
                     // Member as method
-                    else if (_globalMembers?.TryGetValue(name, out var item) == true
+                    else if (_context.GlobalMembers?.TryGetValue(name, out var item) == true
                              && GetGlobalMemberType(name, item) is var memberType
                              && typeof(Delegate).IsAssignableFrom(memberType))
                     {
@@ -671,7 +609,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                             return expression;
                         }
 
-                        instanceExpression = _thisParameter;
+                        instanceExpression = _context.ThisParameter;
                     }
                 }
                 break;
@@ -700,7 +638,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             case GenericNameSyntax g:
                 {
-                    instanceExpression = _thisParameter;
+                    instanceExpression = _context.ThisParameter;
                     methodNameSyntax = g;
                     methodName = methodNameSyntax.Identifier.Text;
                     break;
@@ -742,7 +680,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (instanceType == null)
         {
             // Static import
-            if (_staticImports?.Count > 0 && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticExpression, argumentNames))
+            if (_context.StaticImports?.Count > 0 && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticExpression, argumentNames))
                 return staticExpression;
 
             if (FirstError != null)
@@ -826,7 +764,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         // Static import
-        if (_staticImports?.Count > 0
+        if (_context.StaticImports?.Count > 0
             && node.Expression is IdentifierNameSyntax or GenericNameSyntax
             && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticImportExpression, argumentNames))
         {
@@ -1533,7 +1471,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitThisExpression(ThisExpressionSyntax node)
     {
-        return _thisParameter ?? ToError(node, "Keyword 'this' is not valid in a static property or method.");
+        return _context.ThisParameter ?? ToError(node, "Keyword 'this' is not valid in a static property or method.");
     }
     public override Expression VisitLiteralExpression(LiteralExpressionSyntax node)
     {
@@ -1666,27 +1604,27 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         // Local parameter
-        var parameter = _nestedParameters?.LastOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _thisParameter);
+        var parameter = _nestedParameters?.LastOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _context.ThisParameter);
         if (parameter != null)
             return parameter;
 
         // Parameter
-        parameter = _parameters.FastFirstOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _thisParameter);
+        parameter = _context.Parameters.FastFirstOrDefault(x => string.Equals(x.Name, name, _nameComparison) && x != _context.ThisParameter);
 
         if (parameter != null)
             return parameter;
 
         // This
-        if (_thisParameter != null)
+        if (_context.ThisParameter != null)
         {
-            var expression = ResolveCustomMember(_thisParameter, name)
-                             ?? ResolveMember(node, _thisParameter, name, false);
+            var expression = ResolveCustomMember(_context.ThisParameter, name)
+                             ?? ResolveMember(node, _context.ThisParameter, name, false);
             if (expression != null)
                 return expression;
         }
 
         // Members
-        if (_globalMembers?.TryGetValue(name, out var item) == true)
+        if (_context.GlobalMembers?.TryGetValue(name, out var item) == true)
             return Expression.Constant(item.Value, GetGlobalMemberType(name, item));
 
         // Static type
@@ -1695,8 +1633,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.Constant(type);
 
         // Static import
-        if (_staticImports?.Count > 0)
-            foreach (var import in _staticImports.Values)
+        if (_context.StaticImports?.Count > 0)
+            foreach (var import in _context.StaticImports.Values)
                 if (ResolveMember(node, Expression.Constant(import, typeof(Type)), name, setErrorWhenNotFound: false) is { } importedMember)
                     return importedMember;
 
@@ -1708,7 +1646,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private Expression? DeclareVariable(SyntaxNode node, Expression expression, string name)
     {
         if (_variables?.Any(x => string.Equals(x.Name, name, _nameComparison)) == true
-            || _parameters.Any(x => string.Equals(x.Name, name, _nameComparison))
+            || _context.Parameters.Any(x => string.Equals(x.Name, name, _nameComparison))
             || _nestedParameters?.Any(x => string.Equals(x.Name, name, _nameComparison)) == true)
         {
             return ToError(node, $"Variable '{name}' is already declared.");
@@ -1934,44 +1872,53 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return resultType;
         }
 
-        if (_includedTypes.TryGetValue(typeName, out var type) && type != null)
+        if (_context.IncludedTypes?.TryGetValue(typeName, out var type) == true && type != null)
             return type;
 
-        foreach (var parameter in _parameters)
+        foreach (var parameter in _context.Parameters)
             if (string.Equals(parameter.Type.Name, typeName, _nameComparison))
                 return parameter.Type;
 
         return typeName switch
         {
+            // Time
             "TimeSpan" => typeof(TimeSpan),
             "DateTime" => typeof(DateTime),
             "DateTimeOffset" => typeof(DateTimeOffset),
             "DateTimeKind" => typeof(DateTimeKind),
             "DayOfWeek" => typeof(DayOfWeek),
+
+            // Text
             "StringComparison" => typeof(StringComparison),
             "StringSplitOptions" => typeof(StringSplitOptions),
+            "CultureInfo" => typeof(CultureInfo), // Used for string formating
+
+            // Math
             "MidpointRounding" => typeof(MidpointRounding),
+            "Math" => typeof(Math),
+
+            // Common types
             "Guid" => typeof(Guid),
+            "KeyValuePair'2" => typeof(KeyValuePair<,>),
+
+            // Collections
+            "Enumerable" => typeof(Enumerable),
 
             "List'1" => typeof(List<>),
+            "Dictionary'2" => typeof(Dictionary<,>),
+            "HashSet'1" => typeof(HashSet<>),
+
             "IList'1" => typeof(IList<>),
             "IEnumerable'1" => typeof(IEnumerable<>),
             "ICollection'1" => typeof(ICollection<>),
             "IReadOnlyList'1" => typeof(IReadOnlyList<>),
             "IReadOnlyCollection'1" => typeof(IReadOnlyCollection<>),
-            "Dictionary'2" => typeof(Dictionary<,>),
             "IDictionary'2" => typeof(IDictionary<,>),
             "IReadOnlyDictionary'2" => typeof(IReadOnlyDictionary<,>),
-            "HashSet'1" => typeof(HashSet<>),
             "ISet'1" => typeof(ISet<>),
-            "KeyValuePair'2" => typeof(KeyValuePair<,>),
 
-            "CultureInfo" => typeof(CultureInfo),
-            //"Type" => typeof(Type),
-
-            "Math" => typeof(Math),
+            // Other
             "Convert" => typeof(Convert),
-            "Enumerable" => typeof(Enumerable),
 
             _ => ToTypeError(relatedNode, typeName)
         };
@@ -1996,7 +1943,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // From instance
         for (var type = expressionType; type != null; type = type.BaseType)
         {
-            var members = type.GetMember(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly | BindingFlags.Public | _caseInsensitiveFlag);
+            var members = type.GetMember(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly | BindingFlags.Public | _context.CaseInsensitiveFlag);
             switch (members.Length)
             {
                 case 1:
@@ -2014,7 +1961,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         {
             foreach (var interfaceType in expressionType.GetInterfaces())
             {
-                var members = interfaceType.GetMember(name, BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | _caseInsensitiveFlag);
+                var members = interfaceType.GetMember(name, BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | _context.CaseInsensitiveFlag);
                 switch (members.Length)
                 {
                     case 1:
@@ -2416,8 +2363,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         return _variables?.Any(x => string.Equals(x.Name, name, _nameComparison)) == true
                || _nestedParameters?.Any(x => string.Equals(x.Name, name, _nameComparison)) == true
-               || _parameters.Any(x => string.Equals(x.Name, name, _nameComparison))
-               || _globalMembers?.TryGetValue(name, out _) == true;
+               || _context.Parameters.Any(x => string.Equals(x.Name, name, _nameComparison))
+               || _context.GlobalMembers?.TryGetValue(name, out _) == true;
     }
     private static string? TryGetNameOfValue(ExpressionSyntax expression)
     {
@@ -2541,19 +2488,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private IList<MethodInfo> GetIndexers(Type instanceType)
     {
-        if (_memberCache == null)
+        if (_context.MemberCache == null)
             return GetIndexersCore(instanceType);
 
         var key = (MemberLookupKind.Indexers, instanceType, "", default(BindingFlags));
 
-        lock (_memberCache)
-            if (_memberCache.TryGetValue(key, out var cached))
-                return cached;
+        if (_context.MemberCache.TryGetValue(key, out var cached))
+            return cached;
 
-        var result = GetIndexersCore(instanceType);
-
-        lock (_memberCache)
-            _memberCache[key] = result.ToArray();
+        var result = GetIndexersCore(instanceType).ToArray();
+        _context.MemberCache[key] = result;
 
         return result;
     }
@@ -2599,7 +2543,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         expression = null;
 
-        foreach (var import in _staticImports!.Values)
+        foreach (var import in _context.StaticImports!.Values)
         {
             var methods = GetMethods(import, methodName, BindingFlags.Static);
             if (methods.Count == 0)
@@ -2620,19 +2564,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
     {
-        if (_memberCache == null)
+        if (_context.MemberCache == null)
             return GetMethodsCore(instanceType, name, additionalFlags, _nameComparison);
 
         var key = (MemberLookupKind.Methods, instanceType, name, additionalFlags);
 
-        lock (_memberCache)
-            if (_memberCache.TryGetValue(key, out var cached))
-                return cached;
+        if (_context.MemberCache.TryGetValue(key, out var cached))
+            return cached;
 
         var result = GetMethodsCore(instanceType, name, additionalFlags, _nameComparison);
-
-        lock (_memberCache)
-            _memberCache[key] = result;
+        _context.MemberCache[key] = result;
 
         return result;
     }
@@ -2676,27 +2617,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private IList<MethodInfo> GetExtensionMethods(Type instanceType, string name)
     {
-        if (_memberCache == null)
-            return GetExtensionMethodsCore(instanceType, name, _includedTypes, _nameComparison) ?? [];
+        if (_context.MemberCache == null)
+            return GetExtensionMethodsCore(instanceType, name, _context.IncludedTypes, _nameComparison) ?? [];
 
         var key = (MemberLookupKind.ExtensionMethods, instanceType, name, default(BindingFlags));
 
-        lock (_memberCache)
-            if (_memberCache.TryGetValue(key, out var cached))
-                return cached;
+        if (_context.MemberCache.TryGetValue(key, out var cached))
+            return cached;
 
-        _options.IncludedTypesMap.IsReadOnly = true;
-        _options.StaticImportsMap?.IsReadOnly = true;
-
-        var result = GetExtensionMethodsCore(instanceType, name, _includedTypes, _nameComparison)?.ToArray() ?? [];
-
-        lock (_memberCache)
-            _memberCache[key] = result;
+        var result = GetExtensionMethodsCore(instanceType, name, _context.IncludedTypes, _nameComparison)?.ToArray() ?? [];
+        _context.MemberCache[key] = result;
 
         return result;
     }
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(Enumerable))]
-    private static IList<MethodInfo>? GetExtensionMethodsCore(Type instanceType, string name, TypeCollection includedTypes, StringComparison comparison)
+    private static IList<MethodInfo>? GetExtensionMethodsCore(Type instanceType, string name, TypeCollection? includedTypes, StringComparison comparison)
     {
         List<MethodInfo>? members = null;
 
@@ -2705,7 +2640,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             FindMembers(typeof(Enumerable));
 
         // From included types
-        if (includedTypes.Count > 0)
+        if (includedTypes?.Count > 0)
             foreach (var type in includedTypes.Values)
                 if (type.IsAbstract && type.IsSealed && type != typeof(Enumerable))
                     FindMembers(type);
@@ -2755,7 +2690,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private MemberInfo? GetAssignMember(Type type, string name)
     {
-        var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | _caseInsensitiveFlag;
+        var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | _context.CaseInsensitiveFlag;
 
         for (; type != null!; type = type.BaseType!)
         {
@@ -3387,7 +3322,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             ? code is TypeCode.Byte or TypeCode.UInt16 or TypeCode.UInt32 or TypeCode.UInt64
             : null;
     }
-    private static Type GetGlobalMemberType(string name, (Type? Type, object? Value) member)
+    internal static Type GetGlobalMemberType(string name, (Type? Type, object? Value) member)
     {
         if (member is { Type: not null, Value: not null } && !member.Type.IsAssignableFrom(member.Value.GetType()))
             throw new ArgumentException($"Member value is not type of member type. Member '{name}'.");
@@ -3528,7 +3463,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _memberFullPath = null;
         }
 
-        public ParameterExpression GetParameter(string name) => visitor._parameters.First(x => x.Name == name);
+        public ParameterExpression GetParameter(string name) => visitor._context.Parameters.First(x => x.Name == name);
         public Expression IncludeTypeInfo(Expression expression, object typeInfo) => WrapWithTypeInfo(expression, typeInfo);
     }
 
@@ -3613,4 +3548,5 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         public T GetValue<T>(int index) => (T)_values[index];
         public void SetValue(int index, object value) => _values[index] = value;
     }
+
 }
