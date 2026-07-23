@@ -42,6 +42,15 @@ main.container {
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
     border-radius: 999px;
     line-height: 1.35;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chip.more {
+    font-family: inherit;
+    font-weight: 600;
 }
 
 textarea#expr {
@@ -78,6 +87,55 @@ textarea#expr {
     border-left: 3px solid #e5534b;
     color: #e5534b;
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.variables {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--pico-muted-border-color);
+    font-size: .9rem;
+}
+
+.variables h2 {
+    font-size: 1.1rem;
+    margin-bottom: .5rem;
+}
+
+.variables dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: .35rem .9rem;
+    margin: .75rem 0;
+    align-items: baseline;
+}
+
+.variables dt {
+    margin: 0;
+    font-weight: 600;
+}
+
+.variables dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.variables dt code,
+.variables .vtype {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.variables .vtype {
+    color: var(--pico-primary);
+}
+
+.variables .vval {
+    opacity: .7;
+}
+
+.variables .note {
+    opacity: .75;
+    font-size: .85rem;
 }
 
 #blazor-error-ui {

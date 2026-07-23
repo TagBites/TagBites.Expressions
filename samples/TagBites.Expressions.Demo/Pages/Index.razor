@@ -10,18 +10,31 @@
         </div>
         <p>
             Type a C# expression and it is evaluated as you type - parsed by Roslyn, compiled to a delegate and run,
-            all client-side. Reflection is disabled and only common built-in types are available.
+            all client-side. Reflection is enabled and only common built-in types are available.
         </p>
     </header>
 
     <div class="examples">
-        @foreach (var example in Examples)
+        @foreach (var example in VisibleExamples)
         {
             <button type="button" class="chip outline secondary" @onclick="() => Run(example)">@example</button>
         }
+        @if (_showAllExamples)
+        {
+            @foreach (var example in HiddenExamples)
+            {
+                <button type="button" class="chip outline secondary" @onclick="() => Run(example)">@example</button>
+            }
+        }
+        @if (HiddenExamples.Length > 0)
+        {
+            <button type="button" class="chip more" @onclick="OnToggleExamples">
+                @(_showAllExamples ? "Show less" : $"+{HiddenExamples.Length} more")
+            </button>
+        }
     </div>
 
-    <textarea id="expr" value="@_expression" @oninput="OnInput" rows="3" spellcheck="false" autocomplete="off" autofocus></textarea>
+    <textarea id="expr" value="@_expression" @oninput="OnInput" rows="4" spellcheck="false" autocomplete="off" autofocus></textarea>
 
     @if (_error is not null)
     {
@@ -34,34 +47,131 @@
             <div class="type">@_resultType</div>
         </div>
     }
+
+    <footer class="variables">
+        <h2>Available variables</h2>
+        <p>These values are exposed as global members and can be used in any expression:</p>
+        <dl>
+            @foreach (var v in Variables)
+            {
+                <dt><code>@v.Name</code></dt>
+                <dd><span class="vtype">@v.Type</span> = <span class="vval">@v.Value</span></dd>
+            }
+        </dl>
+        <p>Types:</p>
+        <dl> 
+            <dd><code>class Person { string Name; int Age; }</code></dd>
+        </dl>
+        <p class="note">
+            See the
+            <a href="https://github.com/TagBites/TagBites.Expressions#usage" target="_blank" rel="noopener">README</a> for details.
+        </p>
+    </footer>
 </main>
 
 @code {
-    private string _expression = "Math.Pow(2, 10) + 5";
+    private const int VisibleCount = 5;
+
+    private string? _expression;
     private string? _error;
     private string? _result;
     private string? _resultType;
     private bool _hasResult;
-
-    private static readonly string[] Examples =
+    private bool _showAllExamples;
+    
+    private static readonly Person[] People =
     [
+        new() { Name = "Alice", Age = 30 },
+        new() { Name = "Bob", Age = 17 },
+        new() { Name = "Carol", Age = 25 },
+        new() { Name = "Dave", Age = 12 },
+        new() { Name = "Eve", Age = 45 }
+    ];
+    private static readonly int[] Numbers = [5, 3, 8, 1, 9, 2, 7];
+
+    private static readonly ExpressionParserOptions Options = new()
+    {
+        // ResultCastType = object gives a uniform Func<object> regardless of the expression's real type.
+        ResultCastType = typeof(object),
+        GlobalMembers =
+        {
+            { "people", (typeof(IList<Person>), People) },
+            { "numbers", (typeof(int[]), Numbers) },
+            { "name", (typeof(string), "Ada") },
+            { "age", (typeof(int), 30) }
+        },
+        AllowReflection = true
+    };
+
+    private static readonly VariableInfo[] Variables =
+    [
+        new("people", "IList<Person>", "[Alice (30), Bob (17), Carol (25), Dave (12), Eve (45)]"),
+        new("numbers", "int[]", "[5, 3, 8, 1, 9, 2, 7]"),
+        new("name", "string", "\"Ada\""),
+        new("age", "int", "30")
+    ];
+
+    private static readonly string[] AllExamples =
+    [
+        // Visible by default
+        """
+        people
+            .GroupBy(p => p.Age - p.Age % 10)
+            .OrderBy(g => g.Key)
+            .Select(g => $"{g.Key} - {g.Key + 10}: {g.Count()}")
+        """,
+        "string.Join(\", \", people.Select(p => p.Name))",
+        "5 switch { > 3 => \"big\", _ => \"small\" }",
+        "(1, 2) is (int a, int b) && a < b",
+        "new[] { 1, 2, 3 } is [1, .., 3]",
+
+        // The rest (collapsed)
         "1 + 2 * 3",
+        "$\"{name} is {age:00}\"",
         "Math.Pow(2, 10)",
         "new [] { 3, 1, 2 }.OrderBy(x => x)",
         "\"hello world\"[^1]",
         "(1, 2).Item2",
-        "5 switch { > 3 => \"big\", _ => \"small\" }",
         "$\"{1.0 / 3.0:0.000}\"",
         "Enumerable.Range(1, 5).Sum()",
-        "5 is var a and > 0 ? a * 2 : 0"
+        "5 is var a and > 0 ? a * 2 : 0",
+        "5 is > 0 and < 10",
+        "\"ab\" is { Length: 2 }",
+        "\"\"\"hello world\"\"\".Length",
+        "1_000_000",
+        "new[] { 1, 2, 3 }[^1]",
+        "\"a\"!.Length",
+        "unchecked(2147483647 + 1)",
+        "new[] { 1, 2, 3 }.OfType<int>().Count()",
+        "DateTime.Now + TimeSpan.FromDays(1) > DateTime.Now",
+        "(1, 2) == (1, 2)",
+        "(Name: \"Bob\", Age: 30).Name",
+        "Math.Round(digits: 2, value: 2.567)",
+        "numbers.Where(x => x % 2 == 0).Sum()",
+        "numbers.OrderBy(x => x).ToArray()",
+        "people.Count(p => p.Age < 18)",
+        "people.Where(p => p.Age >= 18).Select(p => p.Name)",
+        "people.OrderByDescending(p => p.Age).First().Name",
+        "people.Average(p => p.Age)",
+        "people.Sum(p => p.Age) / people.Count",
+        "Math.Max(default, 5)",
+        "people.First().GetType().FullName",
+        """
+        new[] { 1, 2, 3 }
+            .Select(n => new { N = n, Stats = (Sum: n + n, Label: $"#{n}") })
+            .Where(x => x.Stats.Sum >= 4)
+            .Select(x => Math.Round(digits: 0, value: (double)x.Stats.Sum) + x.Stats.Label.Length)
+            .Sum()
+        """,
     ];
 
+    private static IEnumerable<string> VisibleExamples => AllExamples.Take(VisibleCount);
+    private static string[] HiddenExamples => AllExamples.Skip(VisibleCount).ToArray();
 
-    protected override void OnInitialized() => Evaluate();
 
-    private void OnInput(ChangeEventArgs e)
+    protected override void OnInitialized()
     {
-        _expression = e.Value?.ToString() ?? string.Empty;
+        _expression = AllExamples[0];
         Evaluate();
     }
 
@@ -70,7 +180,6 @@
         _expression = example;
         Evaluate();
     }
-
     private void Evaluate()
     {
         _error = null;
@@ -81,10 +190,7 @@
         if (string.IsNullOrWhiteSpace(_expression))
             return;
 
-        // ResultCastType = object gives a uniform Func<object> regardless of the expression's real type.
-        var options = new ExpressionParserOptions { ResultCastType = typeof(object) };
-
-        if (!ExpressionParser.TryParse(_expression, options, out var lambda, out var error))
+        if (!ExpressionParser.TryParse(_expression, Options, out var lambda, out var error))
         {
             _error = error;
             return;
@@ -103,6 +209,13 @@
         }
     }
 
+    private void OnToggleExamples() => _showAllExamples = !_showAllExamples;
+    private void OnInput(ChangeEventArgs e)
+    {
+        _expression = e.Value?.ToString() ?? string.Empty;
+        Evaluate();
+    }
+
     private static string Format(object? value)
     {
         if (value is null)
@@ -116,4 +229,6 @@
 
         return value.ToString() ?? "null";
     }
+
+    private record VariableInfo(string Name, string Type, string Value);
 }
