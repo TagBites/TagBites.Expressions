@@ -15,12 +15,6 @@ main.container {
     z-index: 10;
     overflow-y: auto;
     background: var(--pico-background-color);
-    transition: opacity .4s ease;
-}
-
-html.wasm-ready #app-loading {
-    opacity: 0;
-    pointer-events: none;
 }
 
 .loading-status {
@@ -104,7 +98,6 @@ html.wasm-ready #app-loading {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #app-loading { transition: none; }
     .spinner { animation: none; }
 }
 

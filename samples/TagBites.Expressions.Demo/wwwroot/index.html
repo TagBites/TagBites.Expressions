@@ -103,11 +103,22 @@
     <script>
         Blazor.start().then(function () {
             var loading = document.getElementById('app-loading');
+            var app = document.getElementById('app');
             if (!loading)
                 return;
 
-            document.documentElement.classList.add('wasm-ready');
-            loading.remove();
+            if (app && app.childElementCount > 0) {
+                loading.remove();
+                return;
+            }
+
+            var obs = new MutationObserver(function () {
+                if (app.childElementCount > 0) {
+                    obs.disconnect();
+                    loading.remove();
+                }
+            });
+            obs.observe(app, { childList: true });
         });
     </script>
 </body>
