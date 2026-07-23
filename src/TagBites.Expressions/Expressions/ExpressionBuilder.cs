@@ -1856,6 +1856,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             case QualifiedNameSyntax { Right: IdentifierNameSyntax id } name:
                 {
+                    if (_options.TypeResolver?.Invoke(name.ToString()) is { } resolved)
+                        return resolved;
+
                     var t = ResolveType(name, id.Identifier.Text);
                     if (t != null && t.Namespace != name.Left.ToString())
                         return ToTypeError(type, null);
@@ -1889,6 +1892,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (string.Equals(parameter.Type.Name, typeName, _nameComparison))
                 return parameter.Type;
 
+        if (!_options.IgnoreBuiltInTypes && ResolveBuiltInType(typeName) is { } builtInType)
+            return builtInType;
+
+        if (_options.TypeResolver?.Invoke(typeName) is { } resolvedType)
+            return resolvedType;
+
+        return ToTypeError(relatedNode, typeName);
+    }
+    private static Type? ResolveBuiltInType(string typeName)
+    {
         return typeName switch
         {
             // Time
@@ -1930,9 +1943,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             // Other
             "Convert" => typeof(Convert),
 
-            _ => ToTypeError(relatedNode, typeName)
+            _ => null
         };
     }
+
     private Expression? ResolveMember(SyntaxNode node, Expression expression, string name, bool setErrorWhenNotFound = true)
     {
         var staticType = (expression as ConstantExpression)?.Value as Type;

@@ -4,7 +4,11 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.1] - 2026-07-24
+
+### Added
+- `IgnoreBuiltInTypes` option (default `false`): hides the fixed set of common framework types otherwise available by short name regardless of `IncludedTypes` (`DateTime`, `TimeSpan`, `Guid`, `Math`, `Convert`, `Enumerable`, `List<>`, `Dictionary<,>`, the common collection interfaces, and others - see the README). Set it to `true` to accept only explicitly allowed types; the C# primitive keywords (`int`, `string`, `bool`, ...) remain always available.
+- `TypeResolver` option (`Func<string, Type?>`): a fallback consulted after `ResultType`, `Parameters`, `IncludedTypes` and the built-in types, letting you resolve a type from its name. The name may be namespace-qualified (for example `System.Text.StringBuilder`) or a short name; generic type names carry an apostrophe + arity suffix (`List'1`, `Dictionary'2`) and expect the open generic definition. Return `null` when the name is not recognized.
 
 ### Performance
 - Faster parsing: option state prepared once and reused across parses, cached reflection lookups, fewer hot-path allocations.

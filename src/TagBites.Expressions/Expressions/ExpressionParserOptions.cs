@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using MemberCacheKey = (TagBites.Expressions.MemberLookupKind Kind, System.Type Type, string Name, System.Reflection.BindingFlags Flags);
@@ -166,10 +167,48 @@ public class ExpressionParserOptions
     }
 
     /// <summary>
+    /// True to disable the fixed set of common framework types that are otherwise available by their short name regardless of <see cref="IncludedTypes"/>.
+    /// Default: <c>false</c>.
+    /// </summary>
+    /// <remarks>
+    /// The built-in types are for example:
+    /// <see cref="TimeSpan"/>, <see cref="DateTime"/>, <see cref="DateTimeOffset"/>, <see cref="DateTimeKind"/>, <see cref="DayOfWeek"/>,
+    /// <see cref="StringComparison"/>, <see cref="CultureInfo"/>, <see cref="MidpointRounding"/>, <see cref="Math"/>,
+    /// <see cref="Enumerable"/>, <see cref="List{T}"/>, <see cref="Dictionary{TKey,TValue}"/>, <see cref="HashSet{T}"/>,
+    /// and <see cref="Convert"/> and more typically used in an expressions.<br/>
+    /// The C# primitive keywords (<c>int</c>, <c>string</c>, <c>bool</c>, etc.) are always available and are not affected by this option.
+    /// </remarks>
+    public bool IgnoreBuiltInTypes
+    {
+        get;
+        set
+        {
+            CheckReadOnly();
+            field = value;
+        }
+    }
+    /// <summary>
     /// Collection of types that can be used in expressions.
     /// </summary>
     public ICollection<Type> IncludedTypes => IncludedTypesMap ??= new TypeCollection { IsReadOnly = _prepared != null };
     internal TypeCollection? IncludedTypesMap { get; private set; }
+    /// <summary>
+    /// Function that resolves a type from its name, invoked when a type cannot be found among
+    /// <see cref="ResultType"/>, <see cref="Parameters"/>, <see cref="IncludedTypes"/> or the built-in types.
+    /// The name may be namespace-qualified (e.g. <c>System.Text.StringBuilder</c>) when that form is used in expression.
+    /// A generic type name is suffixed with an apostrophe and the number of type arguments (e.g. <c>List'1</c>, <c>Dictionary'2</c>),
+    /// and the returned type must be the corresponding open generic definition (e.g. <c>typeof(List&lt;&gt;)</c>).
+    /// Return <c>null</c> to indicate the name is not recognized.
+    /// </summary>
+    public Func<string, Type?>? TypeResolver
+    {
+        get;
+        set
+        {
+            CheckReadOnly();
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Collection of types imported statically, as if <c>using static</c> was applied.
@@ -225,6 +264,8 @@ public class ExpressionParserOptions
         IgnoreCase = other.IgnoreCase;
         AllowRuntimeCast = other.AllowRuntimeCast;
         AllowStringRelationalOperators = other.AllowStringRelationalOperators;
+        IgnoreBuiltInTypes = other.IgnoreBuiltInTypes;
+        TypeResolver = other.TypeResolver;
         CustomPropertyResolver = other.CustomPropertyResolver;
         UseMemberCache = other.UseMemberCache;
 

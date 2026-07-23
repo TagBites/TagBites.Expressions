@@ -225,6 +225,8 @@ new[] { 1, 2, 3 }
 | `UseFirstParameterAsThis` | Use the first parameter as `this` so its members need no prefix. |
 | `GlobalMembers` | Named values and delegates usable by name; a member named `this` is implicit. |
 | `IncludedTypes` | Types (and static classes) an expression may reference by name. |
+| `IgnoreBuiltInTypes` | Disable the fixed set of common framework types otherwise available by short name, independent of `IncludedTypes`. (default: `false`) |
+| `TypeResolver` | Fallback `Func<string, Type?>` that resolves a type from its name (optionally namespace-qualified) when it is not found elsewhere. |
 | `StaticImports` | Imported static classes, as if `using static` was applied (e.g. `Sqrt(x)`, `PI`). Parameters and global members take precedence. |
 | `CustomPropertyResolver` | Resolve members at runtime, e.g. against types defined only at runtime. |
 | `ResultType` | Require the result to be this type. An implicit conversion is applied if needed, otherwise parsing fails. |
@@ -239,6 +241,33 @@ It is only called for `instance.Member`, it needs an instance to work on. That c
 `ResultCastType` forces the return type with an explicit cast, so unrelated expressions can share one delegate signature. It also allows casts that are not implicit, such as `double` -> `int`.
 
 The two combine: to run many rules through a single `Func<object>` while still requiring each to be boolean, set `ResultType = typeof(bool)` (reject anything non-boolean) together with `ResultCastType = typeof(object)`.
+
+**Type resolution:**  
+When an expression references a type by name (e.g. `DateTime.Now`, `new List<int>()`, `(TimeSpan)x`), the parser resolves it in this order: `ResultType`, `Parameters`, `IncludedTypes`, the built-in types, then `TypeResolver`.
+
+By default a fixed set of common framework types is always available by short name, regardless of `IncludedTypes`:  
+- Time: `TimeSpan`, `DateTime`, `DateTimeOffset`, `DateTimeKind`, `DayOfWeek`
+- Text: `StringComparison`, `StringSplitOptions`
+- Math: `Math`, `MidpointRounding`
+- Common: `Guid`, `KeyValuePair<,>`
+- Collections: `Enumerable`, `List<>`, `Dictionary<,>`, `HashSet<>`, `IList<>`, `IEnumerable<>`, `ICollection<>`, `IReadOnlyList<>`, `IReadOnlyCollection<>`, `IDictionary<,>`, `IReadOnlyDictionary<,>`, `ISet<>`
+- Other: `Convert`, `CultureInfo`
+
+Set `IgnoreBuiltInTypes = true` to make the parser accept only the types you explicitly allow. The C# primitive keywords (`int`, `string`, `bool`, `object`, ...) are **language keywords and are always available**, independent of this option.
+
+`TypeResolver` is a `Func<string, Type?>` fallback consulted last. It receives the type name, which may be namespace-qualified (for example `System.Text.StringBuilder`) or a short name, and returns the matching `Type` or `null` if it does not recognize the name. A generic type name is suffixed with an apostrophe and its type-argument count (for example `List'1`, `Dictionary'2`), and the resolver must return the open generic definition (`typeof(List<>)`); the parser closes it with the supplied type arguments.
+
+```csharp
+var options = new ExpressionParserOptions
+{
+    TypeResolver = name => name switch
+    {
+        "StringBuilder" or "System.Text.StringBuilder" => typeof(StringBuilder),
+        "ImmutableArray'1" => typeof(ImmutableArray<>),
+        _ => null
+    }
+};
+```
 
 **Reuse and immutability**:  
 Like `JsonSerializerOptions`, an `ExpressionParserOptions` instance becomes read-only after it is first used for parsing, enabling fast concurrent use.
