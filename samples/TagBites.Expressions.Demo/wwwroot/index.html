@@ -3,18 +3,94 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TagBites.Expressions playground</title>
-    <meta name="description" content="Evaluate C# expressions in the browser - parsed by Roslyn, compiled to a delegate." />
+
+    <title>TagBites.Expressions - Interactive C# Expression Parser Demo</title>
+    <meta name="description" content="Interactive demo of TagBites.Expressions, an open-source Roslyn-based C# expression parser and evaluator library for .NET. Try operators, LINQ, lambdas, pattern matching, tuples and string interpolation directly in the browser." />
+    <link rel="canonical" href="https://tagbites.github.io/TagBites.Expressions/" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TagBites.Expressions" />
+    <meta property="og:title" content="TagBites.Expressions - Interactive C# Expression Parser Demo" />
+    <meta property="og:description" content="Try TagBites.Expressions, an open-source Roslyn-based C# expression parser and evaluator library for .NET: LINQ, lambdas, pattern matching, tuples, string interpolation." />
+    <meta property="og:url" content="https://tagbites.github.io/TagBites.Expressions/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="TagBites.Expressions - Interactive C# Expression Parser Demo" />
+    <meta name="twitter:description" content="Open-source Roslyn-based C# expression parser and evaluator library for .NET - try LINQ, lambdas, pattern matching and tuples in this interactive demo." />
+
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="favicon.ico" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <link href="css/app.css" rel="stylesheet" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "TagBites.Expressions",
+          "description": "An open-source, Roslyn-based C# expression parser and evaluator library for .NET. Compiles runtime string expressions into strongly typed delegates or expression trees, without generating a new assembly.",
+          "codeRepository": "https://github.com/TagBites/TagBites.Expressions",
+          "programmingLanguage": "C#",
+          "license": "https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE",
+          "downloadUrl": "https://www.nuget.org/packages/TagBites.Expressions/",
+          "workExample": {
+            "@type": "WebApplication",
+            "name": "TagBites.Expressions interactive demo",
+            "url": "https://tagbites.github.io/TagBites.Expressions/",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Any (web browser)",
+            "description": "Interactive, in-browser demo of TagBites.Expressions. Type a C# expression and it is parsed by Roslyn, compiled to a delegate and evaluated on the spot, entirely client-side.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is TagBites.Expressions?",
+              "acceptedAnswer": { "@type": "Answer", "text": "An open-source, Roslyn-based C# expression parser and evaluator library for .NET, available on NuGet. This page is an interactive demo you can try in the browser." }
+            },
+            {
+              "@type": "Question",
+              "name": "Does the demo run on a server?",
+              "acceptedAnswer": { "@type": "Answer", "text": "No. The demo runs fully client-side as a Blazor WebAssembly app. Nothing is sent to a server; reflection is disabled and only common built-in types are available." }
+            },
+            {
+              "@type": "Question",
+              "name": "What C# syntax does the library support?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Operators and precedence, LINQ and lambdas, pattern matching (is/switch, relational, list, tuple patterns), tuples and named tuples, anonymous objects, string interpolation with alignment and format specifiers, generics, named arguments, index-from-end and more." }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
 </head>
 <body>
-<div id="app">
-    <div class="app-loading">
-        <span>Loading...</span>
-    </div>
+<div id="app"></div>
+
+<div id="app-loading">
+    <main class="container loading-screen">
+        <header>
+            <div class="titlebar">
+                <h1>TagBites.Expressions</h1>
+                <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
+            </div>
+            <p>
+                A C# expression is evaluated as you type.
+                It's parsed using Roslyn, converted to an expression tree and then compiled, all client-side.
+                Reflection is enabled, but only common built-in types are available.
+            </p>
+        </header>
+
+        <div class="loading-status" role="status" aria-live="polite">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Loading the interactive playground&hellip;</span>
+        </div>
+    </main>
 </div>
 
     <div id="blazor-error-ui">
@@ -22,6 +98,17 @@
         <a href="" class="reload">Reload</a>
         <a class="dismiss">🗙</a>
     </div>
-    <script src="_framework/blazor.webassembly.js"></script>
+
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
+    <script>
+        Blazor.start().then(function () {
+            var loading = document.getElementById('app-loading');
+            if (!loading)
+                return;
+
+            document.documentElement.classList.add('wasm-ready');
+            loading.remove();
+        });
+    </script>
 </body>
 </html>
