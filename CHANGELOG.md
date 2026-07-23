@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Performance
+- Faster parsing: option state prepared once and reused across parses, cached reflection lookups, fewer hot-path allocations.
+- Allocation-free candidate handling.
+- Early lambda-arity rejection.
+- Element-type-info propagation skipped when no `CustomPropertyResolver` is set.
+- Lock-free member cache reads (`ConcurrentDictionary`).
+
 ## [1.3.0] - 2026-07-23
 
 ### Added
