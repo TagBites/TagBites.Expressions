@@ -24,8 +24,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static readonly MethodInfo s_lvcSetValue = typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.SetValue))!;
     private static readonly PropertyInfo s_anonymousObjectIndexer = typeof(IDictionary<string, object>).GetProperty("Item")!;
 
-    private readonly ExpressionParserOptions _options;
-    private readonly ParserContext _context;
+    private readonly ExpressionBuilderOptions _options;
+    private readonly ExpressionBuilderContext _context;
+    private readonly Type? _resultType;
+    private readonly Type? _resultCastType;
     private readonly StringComparison _nameComparison;
     private Expression? _tmp;
     private Expression? _extensionInstance;
@@ -43,12 +45,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     public string? FirstError { get; private set; }
     public bool HasReflectionCall { get; private set; }
 
-    public ExpressionBuilder(ExpressionParserOptions options)
+    public ExpressionBuilder(ExpressionBuilderOptions options, ExpressionBuilderContext context, Type? resultType, Type? resultCastType)
     {
         _options = options;
-        _context = options.PrepareContext();
+        _context = context;
         _nameComparison = _context.NameComparison;
-        _targetType = options.ResultType;
+        _targetType = resultType;
+        _resultType = resultType;
+        _resultCastType = resultCastType;
     }
 
 
@@ -60,33 +64,33 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         if (expression is DelayDefaultExpression)
         {
-            if (_options.ResultType == null)
+            if (_resultType == null)
             {
                 ToError(node, "Cannot infer the type of 'default' because the result type is not set.");
                 return null;
             }
 
-            expression = Expression.Default(_options.ResultType);
+            expression = Expression.Default(_resultType);
         }
 
-        if (_options.ResultType != null && expression.Type != _options.ResultType)
+        if (_resultType != null && expression.Type != _resultType)
         {
-            var isNullableResult = !_options.ResultType.IsValueType || IsNullableType(_options.ResultType);
+            var isNullableResult = !_resultType.IsValueType || IsNullableType(_resultType);
             var converted = IsNullableType(expression.Type) && !isNullableResult
                 ? null
-                : TryConvertExpression(expression, _options.ResultType);
+                : TryConvertExpression(expression, _resultType);
 
             if (converted == null)
             {
-                ToError(node, $"Result type is expected to be '{_options.ResultType.GetFriendlyTypeName()}', but type '{expression.Type.GetFriendlyTypeName()}' is returned.");
+                ToError(node, $"Result type is expected to be '{_resultType.GetFriendlyTypeName()}', but type '{expression.Type.GetFriendlyTypeName()}' is returned.");
                 return null;
             }
 
             expression = converted;
         }
 
-        if (_options.ResultCastType != null && _options.ResultCastType != expression.Type)
-            expression = Expression.Convert(expression, _options.ResultCastType);
+        if (_resultCastType != null && _resultCastType != expression.Type)
+            expression = Expression.Convert(expression, _resultCastType);
 
         if (_variableContextParameter != null)
         {
@@ -1899,7 +1903,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (genericArguments > 0)
             typeName += "'" + genericArguments;
 
-        if (_options.ResultType is { } resultType && resultType != typeof(object))
+        if (_resultType is { } resultType && resultType != typeof(object))
         {
             resultType = Nullable.GetUnderlyingType(resultType) ?? resultType;
             if (string.Equals(resultType.Name, typeName, _nameComparison))

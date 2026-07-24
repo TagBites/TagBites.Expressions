@@ -8,8 +8,9 @@ namespace TagBites.Expressions;
 
 /// <summary>
 /// Reusable lookup structures prepared once from an <see cref="ExpressionParserOptions"/> instance and shared across parses.
+/// The shared settings come from <see cref="CommonExpressionParserOptions"/>; only the parameters and 'this' handling are per instance.
 /// </summary>
-internal readonly struct ParserContext
+internal readonly struct ExpressionBuilderContext
 {
     public readonly ParameterExpression[] Parameters;
     public readonly Expression? ThisParameter;
@@ -20,21 +21,20 @@ internal readonly struct ParserContext
     public readonly BindingFlags CaseInsensitiveFlag;
     public readonly ConcurrentDictionary<MemberCacheKey, MethodInfo[]>? MemberCache;
 
-    internal ParserContext(ExpressionParserOptions options)
+    internal ExpressionBuilderContext(ExpressionParserOptions options)
     {
-        // Case
-        NameComparison = options.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        CaseInsensitiveFlag = options.IgnoreCase ? BindingFlags.IgnoreCase : default;
+        var common = options.Common;
 
-        // Parameters
-        Parameters = options.ParametersInternal?.ToFastArray(x => Expression.Parameter(x.Type, x.Name)) ?? [];
+        // Case
+        NameComparison = common.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        CaseInsensitiveFlag = common.IgnoreCase ? BindingFlags.IgnoreCase : default;
 
         // Collections
-        var globalMembers = options.GlobalMembersInternal;
-        var includedTypes = options.IncludedTypesMap;
-        var staticImports = options.StaticImportsMap;
+        var globalMembers = common.GlobalMembersMap;
+        var includedTypes = common.IncludedTypesMap;
+        var staticImports = common.StaticImportsMap;
 
-        if (options.IgnoreCase)
+        if (common.IgnoreCase)
         {
             if (globalMembers?.Count > 0)
             {
@@ -71,6 +71,12 @@ internal readonly struct ParserContext
         IncludedTypes = includedTypes;
         StaticImports = staticImports;
 
+        // Cache
+        MemberCache = common.UseMemberCache ? common.GetOrCreateMemberCache() : null;
+
+        // Parameters
+        Parameters = options.ParametersInternal?.ToFastArray(x => Expression.Parameter(x.Type, x.Name)) ?? [];
+
         // This
         if (options.UseFirstParameterAsThis)
         {
@@ -79,10 +85,33 @@ internal readonly struct ParserContext
         }
         else if (globalMembers?.TryGetValue("this", out var item) == true && item.Value != null)
             ThisParameter = Expression.Constant(item.Value, ExpressionBuilder.GetGlobalMemberType("this", item));
+    }
+    internal ExpressionBuilderContext(ExpressionBuilderContext other, IList<(Type Type, string Name)>? parameters, bool useFirstParameterAsThis)
+    {
+        NameComparison = other.NameComparison;
+        CaseInsensitiveFlag = other.CaseInsensitiveFlag;
 
-        // Cache
-        MemberCache = options.UseMemberCache
-            ? options.MemberCache ??= new ConcurrentDictionary<MemberCacheKey, MethodInfo[]>()
-            : null;
+        GlobalMembers = other.GlobalMembers;
+        IncludedTypes = other.IncludedTypes;
+        StaticImports = other.StaticImports;
+
+        MemberCache = other.MemberCache;
+
+        // Parameters
+        Parameters = parameters != null
+            ? parameters.ToFastArray(x => Expression.Parameter(x.Type, x.Name))
+            : other.Parameters;
+
+        // This
+        if (useFirstParameterAsThis)
+        {
+            if (Parameters.Length > 0)
+                ThisParameter = Parameters[0];
+        }
+        else
+        {
+            if (GlobalMembers?.TryGetValue("this", out var item) == true && item.Value != null)
+                ThisParameter = Expression.Constant(item.Value, ExpressionBuilder.GetGlobalMemberType("this", item));
+        }
     }
 }

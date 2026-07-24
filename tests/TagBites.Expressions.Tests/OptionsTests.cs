@@ -95,4 +95,72 @@ public class OptionsTests
         Assert.True(copy.IgnoreBuiltInTypes);
         Assert.Same(resolver, copy.TypeResolver);
     }
+
+    [Fact]
+    public void Fork_OverridesParameters_AndInheritsSharedTypes()
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(Math) } };
+        ExpressionParser.Parse("Math.Abs(-1)", options);
+
+        var fork = options.Fork(parameters: new List<(Type, string)> { (typeof(int), "n") });
+
+        var f = (Func<int, int>)ExpressionParser.Parse("n + (int)Math.Abs(-2)", fork).Compile();
+        Assert.Equal(5, f(3));
+    }
+
+    [Fact]
+    public void Fork_InheritsParametersWhenNotOverridden()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+
+        var fork = options.Fork(resultType: typeof(long));
+
+        var f = (Func<int, long>)ExpressionParser.Parse("n + 1", fork).Compile();
+        Assert.Equal(4L, f(3));
+    }
+
+    [Fact]
+    public void Fork_InheritsSharedSettings()
+    {
+        var options = new ExpressionParserOptions { IgnoreCase = true, IncludedTypes = { typeof(Math) } };
+
+        var fork = options.Fork(resultType: typeof(double));
+
+        Assert.True(fork.IgnoreCase);
+        Assert.Equal(2d, ExpressionParser.Invoke<double>("math.sqrt(4)", fork));
+    }
+
+    [Fact]
+    public void Fork_IsReadOnly()
+    {
+        var options = new ExpressionParserOptions();
+
+        var fork = options.Fork(resultType: typeof(int));
+
+        Assert.Throws<InvalidOperationException>(() => fork.ResultType = typeof(long));
+        Assert.Throws<InvalidOperationException>(() => fork.IgnoreCase = true);
+        Assert.Throws<InvalidOperationException>(() => fork.Parameters = new List<(Type, string)>());
+    }
+
+    [Fact]
+    public void Fork_WithoutOverrides_ReturnsSameInstance()
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+
+        Assert.Same(options, options.Fork());
+        Assert.Throws<InvalidOperationException>(() => options.ResultType = typeof(int));
+    }
+
+    [Fact]
+    public void Fork_DoesNotMutateSource()
+    {
+        var options = new ExpressionParserOptions { ResultType = typeof(int), Parameters = { (typeof(int), "n") } };
+
+        var fork = options.Fork(resultType: typeof(long), parameters: new List<(Type, string)> { (typeof(string), "s") });
+
+        Assert.Equal(typeof(int), options.ResultType);
+        Assert.Single(options.Parameters);
+        Assert.Equal((typeof(int), "n"), options.Parameters[0]);
+        Assert.Equal(typeof(long), fork.ResultType);
+    }
 }

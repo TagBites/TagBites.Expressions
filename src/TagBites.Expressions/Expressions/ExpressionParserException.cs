@@ -1,8 +1,6 @@
 namespace TagBites.Expressions;
 
-public sealed class ExpressionParserException : Exception
-{
-    public ExpressionParserException(string message)
-        : base(message)
-    { }
-}
+/// <summary>
+/// The exception that is thrown when an expression cannot be parsed or bound.
+/// </summary>
+public sealed class ExpressionParserException(string message) : Exception(message);

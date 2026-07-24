@@ -8,8 +8,8 @@ internal class IdentifierDetector : ExpressionBuilder
     public IList<string> Identifiers { get; } = new List<string>();
     public IList<string> UnknownIdentifiers { get; } = new List<string>();
 
-    public IdentifierDetector(ExpressionParserOptions options)
-        : base(options)
+    public IdentifierDetector(CommonExpressionParserOptions options, ExpressionBuilderContext context, Type? resultType, Type? resultCastType)
+        : base(options, context, resultType, resultCastType)
     { }
 
 

@@ -272,6 +272,19 @@ var options = new ExpressionParserOptions
 **Reuse and immutability**:  
 Like `JsonSerializerOptions`, an `ExpressionParserOptions` instance becomes read-only after it is first used for parsing, enabling fast concurrent use.
 
+**Fork**:  
+`Fork` reuses the prepared, shared settings of an instance - global members, included types, static imports, the reflection member cache and the resolution flags - and overrides only the result type, parameters or `this` handling. Use it when one set of options is shared but different delegates must be produced from it, so the shared lookups are prepared once instead of per delegate.
+
+```csharp
+var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+
+var asLong = ExpressionParser.Compile<Func<int, long>>("n * 2", options.Fork(typeof(long)));
+var asObject = ExpressionParser.Compile<Func<int, object>>("n * 2", options.Fork(typeof(object)));
+
+asLong(10);    // 20L
+asObject(10);  // 20 (boxed int)
+```
+
 ### Non-standard options
 These opt-in options (all default to `false`) make the parser accept syntax or semantics that real C# does not:
 
