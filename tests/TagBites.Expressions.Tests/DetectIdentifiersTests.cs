@@ -14,4 +14,37 @@ public class DetectIdentifiersTests : ExpressionTestBase
         Assert.DoesNotContain("c", identifiers);
         Assert.Contains("c", unknown);
     }
+
+    [Theory]
+    [InlineData("System.Math.PI")]
+    [InlineData("System.DateTime.Now")]
+    [InlineData("System.TimeSpan.FromMinutes(2)")]
+    public void NamespaceQualifiedType_NotReportedAsUnknown(string script)
+    {
+        var (_, unknown) = ExpressionParser.DetectIdentifiers(script);
+
+        Assert.DoesNotContain("System", unknown);
+        Assert.Empty(unknown);
+    }
+
+    [Theory]
+    [InlineData("System.TimeSpan.FromMinutes(a)", "a")]
+    public void NamespaceQualifiedCall_DetectsArgumentIdentifier(string script, string expected)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(double), "a") } };
+
+        var (identifiers, unknown) = ExpressionParser.DetectIdentifiers(script, options);
+
+        Assert.Contains(expected, identifiers);
+        Assert.Empty(unknown);
+    }
+
+    [Fact]
+    public void MultipleUnknowns_AreAllCollected()
+    {
+        var (_, unknown) = ExpressionParser.DetectIdentifiers("c + d");
+
+        Assert.Contains("c", unknown);
+        Assert.Contains("d", unknown);
+    }
 }

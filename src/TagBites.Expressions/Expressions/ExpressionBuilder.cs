@@ -1921,7 +1921,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return null;
     }
-    private Type? TryResolveNamespaceQualifiedType(ExpressionSyntax node)
+    protected Type? TryResolveNamespaceQualifiedType(ExpressionSyntax node)
     {
         if (TryGetDottedName(node, out var fullName, out var simpleName))
         {
