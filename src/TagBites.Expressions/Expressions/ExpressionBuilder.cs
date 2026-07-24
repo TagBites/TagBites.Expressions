@@ -519,7 +519,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         var instance = Visit(node.Expression);
         if (instance == null)
+        {
+            // The prefix is not a value, try to interpret as a namespace-qualified type
+            if (TryResolveNamespaceQualifiedType(node) is { } qualifiedType)
+            {
+                FirstError = null;
+                return Expression.Constant(qualifiedType);
+            }
+
             return null;
+        }
 
         var name = node.Name.Identifier.Text;
         return ResolveCustomMember(instance, name)
@@ -1856,14 +1865,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             case QualifiedNameSyntax { Right: IdentifierNameSyntax id } name:
                 {
+                    Type? ret;
                     if (_options.TypeResolver?.Invoke(name.ToString()) is { } resolved)
-                        return resolved;
+                        ret = resolved;
+                    else
+                    {
+                        if (TryResolveTypeByName(id.Identifier.Text) is { } type1 && type1.Namespace == name.Left.ToString())
+                            ret = type1;
+                        else
+                        {
+                            ret = null;
+                        }
+                    }
 
-                    var t = ResolveType(name, id.Identifier.Text);
-                    if (t != null && t.Namespace != name.Left.ToString())
-                        return ToTypeError(type, null);
-
-                    return t;
+                    return ret
+                           ?? ToTypeError(type, null);
                 }
 
             case IdentifierNameSyntax name:
@@ -1874,6 +1890,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
     }
     private Type? ResolveType(SyntaxNode relatedNode, string typeName, int genericArguments = 0)
+    {
+        return TryResolveTypeByName(typeName, genericArguments)
+               ?? ToTypeError(relatedNode, typeName);
+    }
+    private Type? TryResolveTypeByName(string typeName, int genericArguments = 0)
     {
         if (genericArguments > 0)
             typeName += "'" + genericArguments;
@@ -1898,7 +1919,41 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (_options.TypeResolver?.Invoke(typeName) is { } resolvedType)
             return resolvedType;
 
-        return ToTypeError(relatedNode, typeName);
+        return null;
+    }
+    private Type? TryResolveNamespaceQualifiedType(ExpressionSyntax node)
+    {
+        if (TryGetDottedName(node, out var fullName, out var simpleName))
+        {
+            var namespacePrefix = fullName.Substring(0, fullName.Length - simpleName.Length - 1);
+            if (_options.TypeResolver?.Invoke(fullName) is { } resolved)
+                return resolved;
+
+            if (TryResolveTypeByName(simpleName) is { } type && type.Namespace == namespacePrefix)
+                return type;
+        }
+
+        return null;
+
+        static bool TryGetDottedName(ExpressionSyntax node, out string fullName, out string simpleName)
+        {
+            switch (node)
+            {
+                case IdentifierNameSyntax id:
+                    fullName = simpleName = id.Identifier.Text;
+                    return true;
+
+                case MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression, Name: IdentifierNameSyntax name } ma
+                    when TryGetDottedName(ma.Expression, out var prefix, out _):
+                    simpleName = name.Identifier.Text;
+                    fullName = prefix + "." + simpleName;
+                    return true;
+
+                default:
+                    fullName = simpleName = string.Empty;
+                    return false;
+            }
+        }
     }
     private static Type? ResolveBuiltInType(string typeName)
     {

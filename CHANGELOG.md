@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-07-24
+
+### Fixed
+- Namespace-qualified types now resolve inside expression bodies, not only in `new`/cast/`typeof` positions. Static access such as `System.Math.Pow(2, 3)`, `System.Math.PI` and `System.TimeSpan.FromMinutes(2)` previously failed with an unknown-identifier error. The `TypeResolver` fallback is consulted with the full dotted name (for example `System.Math`) for these accesses, and a qualifier that does not match a resolved type's actual namespace (for example `System.Text.Math`) is rejected.
+
 ## [1.3.1] - 2026-07-24
 
 ### Added
