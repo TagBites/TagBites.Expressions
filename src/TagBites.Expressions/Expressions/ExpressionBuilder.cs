@@ -1658,7 +1658,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Static import
         if (_context.StaticImports?.Count > 0)
             foreach (var import in _context.StaticImports.Values)
-                if (ResolveMember(node, Expression.Constant(import, typeof(Type)), name, setErrorWhenNotFound: false) is { } importedMember)
+                if (ResolveMember(node, Expression.Constant(import), name, setErrorWhenNotFound: false) is { } importedMember)
                     return importedMember;
 
         // Unknown
@@ -2008,7 +2008,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private Expression? ResolveMember(SyntaxNode node, Expression expression, string name, bool setErrorWhenNotFound = true)
     {
-        var staticType = (expression as ConstantExpression)?.Value as Type;
+        var staticType = expression.Type != typeof(Type)
+            ? (expression as ConstantExpression)?.Value as Type
+            : null;
         var expressionType = staticType ?? expression.Type;
 
         // Named tuple element

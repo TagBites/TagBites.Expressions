@@ -11,6 +11,12 @@ public class ReflectionTests : ExpressionTestBase
     [InlineData(@"""a"".GetType().GetProperties().Length > 0", null, false)]
     [InlineData("2.GetType().FullName", "System.Int32", true)]
     [InlineData(@"""a"".GetType().GetProperties().Length > 0", true, true)]
+    [InlineData("typeof(int).Name", "Int32", false)]
+    [InlineData("typeof(int).IsValueType", true, false)]
+    [InlineData("typeof(List<int>).IsGenericType", null, false)]
+    [InlineData("typeof(List<int>).IsGenericType", true, true)]
+    [InlineData("typeof(int).FullName", null, false)]
+    [InlineData("typeof(int).FullName", "System.Int32", true)]
     public void ReflectionCall(string script, object? expectedResult, bool allowReflection)
     {
         var options = new ExpressionParserOptions { AllowReflection = allowReflection };
