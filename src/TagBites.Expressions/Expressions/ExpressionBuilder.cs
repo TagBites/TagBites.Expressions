@@ -3227,7 +3227,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                             if (genericArguments[j] != null)
                                 continue;
 
-                            var typeName = genericParameters![i].Name;
+                            var typeName = genericParameters![j].Name;
                             var fullType = argumentTypes.FastFirstOrDefault(y => y.Item1 == typeName).Item2;
                             genericArguments[j] = fullType;
                         }
