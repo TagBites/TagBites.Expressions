@@ -10,7 +10,7 @@ namespace TagBites.Expressions;
 /// </summary>
 internal sealed class CommonExpressionParserOptions : ExpressionBuilderOptions
 {
-    private ConcurrentDictionary<MemberCacheKey, MethodInfo[]>? _memberCache;
+    private ConcurrentDictionary<MemberCacheKey, MemberInfo[]>? _memberCache;
 
     public bool IgnoreCase;
     public bool UseMemberCache;
@@ -52,5 +52,5 @@ internal sealed class CommonExpressionParserOptions : ExpressionBuilderOptions
     }
 
 
-    public ConcurrentDictionary<MemberCacheKey, MethodInfo[]> GetOrCreateMemberCache() => _memberCache ??= new ConcurrentDictionary<MemberCacheKey, MethodInfo[]>();
+    public ConcurrentDictionary<MemberCacheKey, MemberInfo[]> GetOrCreateMemberCache() => _memberCache ??= new ConcurrentDictionary<MemberCacheKey, MemberInfo[]>();
 }

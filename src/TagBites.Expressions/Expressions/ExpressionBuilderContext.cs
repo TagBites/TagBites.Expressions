@@ -19,7 +19,7 @@ internal readonly struct ExpressionBuilderContext
     public readonly TypeCollection? StaticImports;
     public readonly StringComparison NameComparison;
     public readonly BindingFlags CaseInsensitiveFlag;
-    public readonly ConcurrentDictionary<MemberCacheKey, MethodInfo[]>? MemberCache;
+    public readonly ConcurrentDictionary<MemberCacheKey, MemberInfo[]>? MemberCache;
 
     internal ExpressionBuilderContext(ExpressionParserOptions options)
     {

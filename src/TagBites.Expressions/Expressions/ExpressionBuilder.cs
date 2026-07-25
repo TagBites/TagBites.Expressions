@@ -1839,9 +1839,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                             return ToError(indexer, "Indexer not found for this arguments.");
                         }
 
-                        var indexerProperty = getterCall.Method.DeclaringType!
-                            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                            .FirstOrDefault(x => x.GetMethod == getterCall.Method);
+                        var indexerProperty = Array.Find(GetIndexerProperties(getterCall.Method.DeclaringType!), x => x.GetMethod == getterCall.Method);
                         if (indexerProperty is not { SetMethod.IsPublic: true })
                             return ToError(item, "Indexer has no accessible setter.");
 
@@ -2808,7 +2806,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var key = (MemberLookupKind.Indexers, instanceType, "", default(BindingFlags));
 
         if (_context.MemberCache.TryGetValue(key, out var cached))
-            return cached;
+            return (MethodInfo[])cached;
 
         var result = GetIndexersCore(instanceType).ToArray();
         _context.MemberCache[key] = result;
@@ -2884,12 +2882,31 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var key = (MemberLookupKind.Methods, instanceType, name, additionalFlags);
 
         if (_context.MemberCache.TryGetValue(key, out var cached))
-            return cached;
+            return (MethodInfo[])cached;
 
         var result = GetMethodsCore(instanceType, name, additionalFlags, _nameComparison);
         _context.MemberCache[key] = result;
 
         return result;
+    }
+    private PropertyInfo[] GetIndexerProperties(Type instanceType)
+    {
+        if (_context.MemberCache == null)
+            return GetIndexerPropertiesCore(instanceType);
+
+        var key = (MemberLookupKind.Properties, instanceType, "", default(BindingFlags));
+
+        if (_context.MemberCache.TryGetValue(key, out var cached))
+            return (PropertyInfo[])cached;
+
+        var result = GetIndexerPropertiesCore(instanceType);
+        _context.MemberCache[key] = result;
+
+        return result;
+    }
+    private static PropertyInfo[] GetIndexerPropertiesCore(Type instanceType)
+    {
+        return Array.FindAll(instanceType.GetProperties(BindingFlags.Public | BindingFlags.Instance), x => x.GetIndexParameters().Length > 0);
     }
     private static MethodInfo[] GetMethodsCore(Type instanceType, string name, BindingFlags additionalFlags, StringComparison comparison)
     {
@@ -2937,7 +2954,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var key = (MemberLookupKind.ExtensionMethods, instanceType, name, default(BindingFlags));
 
         if (_context.MemberCache.TryGetValue(key, out var cached))
-            return cached;
+            return (MethodInfo[])cached;
 
         var result = GetExtensionMethodsCore(instanceType, name, _context.IncludedTypes, _nameComparison)?.ToArray() ?? [];
         _context.MemberCache[key] = result;
