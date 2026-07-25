@@ -3351,7 +3351,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // More specific open signature: at a given position a concrete type beats a type parameter.
         // This separates Enumerable.Max<TSource>(..., Func<TSource, int>)
         // from the fully generic Enumerable.Max<TSource, TResult>(..., Func<TSource, TResult>) once their closed parameters match.
-        if (CompareOpenSpecificity(method1.Method, method2.Method) is var specificityDiff && specificityDiff != 0)
+        // Only relevant when a generic method is involved; two non-generic candidates never differ in specificity.
+        if ((method1.Method.IsGenericMethod || method2.Method.IsGenericMethod)
+            && CompareOpenSpecificity(method1.Method, method2.Method) is var specificityDiff && specificityDiff != 0)
             return specificityDiff < 0 ? method1 : method2;
 
         if (method1.HasParams.CompareTo(method2.HasParams) is var paramsDiff && paramsDiff != 0)
