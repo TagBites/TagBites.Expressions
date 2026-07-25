@@ -28,6 +28,11 @@ public class CollectionTests : ExpressionTestBase
     [InlineData("(new int[3, 3, 3])[1, 1, 1]", 0)]
     [InlineData("new int[,,] { { { 1 } }, { { 2 } } }[1, 0, 0]", 2)]
     [InlineData("new long[,] { { 1, 2 }, { 3, 4 } }[1, 1]", 4L)]
+    [InlineData("new[] { 1, 2, 3 }[2]", 3)]
+    [InlineData("new[,] { { 1, 2 }, { 3, 4 } }[1, 0]", 3)]
+    [InlineData("new[,] { { 1, 2, 3 }, { 4, 5, 6 } }[1, 2]", 6)]
+    [InlineData("new[,] { { 1L, 2L }, { 3L, 4L } }[0, 1]", 2L)]
+    [InlineData("new[,,] { { { 1 } }, { { 2 } } }[1, 0, 0]", 2)]
     public void MultiDimensionalArray(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]

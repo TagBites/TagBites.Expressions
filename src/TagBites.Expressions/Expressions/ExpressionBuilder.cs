@@ -1007,31 +1007,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (!CollectMultiDimElements(node.Initializer, 0, dimensions, elements))
                 return null;
 
-            var arrayType = elementType.MakeArrayType(rank);
-            var arrayVariable = Expression.Variable(arrayType, "array");
-
-            var statements = new List<Expression>(elements.Count + 2)
-            {
-                Expression.Assign(arrayVariable, Expression.NewArrayBounds(elementType, dimensions.ToFastArray(x => (Expression)Expression.Constant(x))))
-            };
-
-            // Convert the flat indexes i into a per-dimension indexes (row-major order)
-            for (var i = 0; i < elements.Count; i++)
-            {
-                var indices = new Expression[rank];
-                var remainder = i;
-                for (var d = rank - 1; d >= 0; d--)
-                {
-                    indices[d] = Expression.Constant(remainder % dimensions[d]);
-                    remainder /= dimensions[d];
-                }
-
-                statements.Add(Expression.Assign(Expression.ArrayAccess(arrayVariable, indices), elements[i]));
-            }
-
-            statements.Add(arrayVariable);
-
-            return Expression.Block([arrayVariable], statements);
+            return CreateMultiDimArray(elementType, rank, dimensions, elements);
         }
 
         // Without initializer: every dimension needs an explicit size
@@ -1103,24 +1079,71 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitImplicitArrayCreationExpression(ImplicitArrayCreationExpressionSyntax node)
     {
-        var expressions = new List<Expression>();
-        Type? type = null;
+        // new[] { ... } is rank 1, new[,] { ... } rank 2, etc.
+        var rank = node.Commas.Count + 1;
+        var elements = new List<Expression>();
+        var dimensions = new List<int>();
+        Type? elementType = null;
 
-        foreach (var expression in node.Initializer.Expressions)
+        if (!CollectImplicitElements(node.Initializer, 0))
+            return null;
+
+        if (elementType == null)
+            return ToError(node, "Type not found for implicit array creation.");
+
+        return rank == 1
+            ? Expression.NewArrayInit(elementType, elements)
+            : CreateMultiDimArray(elementType, rank, dimensions, elements);
+
+        bool CollectImplicitElements(InitializerExpressionSyntax initializer, int depth)
         {
-            var exp = Visit(expression);
-            if (exp == null)
-                return null;
+            var count = initializer.Expressions.Count;
 
-            expressions.Add(exp);
+            // All sub-initializers at the same depth must have the same length (rectangular).
+            if (dimensions.Count <= depth)
+                dimensions.Add(count);
+            else if (dimensions[depth] != count)
+            {
+                ToError(initializer, "Array initializer has inconsistent dimensions.");
+                return false;
+            }
 
-            if (type == null)
-                type = exp.Type;
-            else if (type != exp.Type)
-                return ToError(node, "Type not found for implicit array creation.");
+            if (depth == rank - 1)
+            {
+                foreach (var expression in initializer.Expressions)
+                {
+                    var exp = Visit(expression);
+                    if (exp == null)
+                        return false;
+
+                    if (elementType == null)
+                        elementType = exp.Type;
+                    else if (elementType != exp.Type)
+                    {
+                        ToError(node, "Type not found for implicit array creation.");
+                        return false;
+                    }
+
+                    elements.Add(exp);
+                }
+            }
+            else
+            {
+                foreach (var expression in initializer.Expressions)
+                {
+                    if (expression is not InitializerExpressionSyntax nested)
+                    {
+                        ToError(expression, "Array initializer has inconsistent dimensions.");
+                        return false;
+                    }
+
+                    if (!CollectImplicitElements(nested, depth + 1))
+                        return false;
+                }
+            }
+
+            return true;
         }
-
-        return Expression.NewArrayInit(type!, expressions);
     }
 
     public override Expression? VisitIsPatternExpression(IsPatternExpressionSyntax node)
@@ -1811,6 +1834,34 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         statements.Add(instanceVariable);
 
         return Expression.Block([instanceVariable], statements);
+    }
+    private static Expression CreateMultiDimArray(Type elementType, int rank, IList<int> dimensions, IList<Expression> elements)
+    {
+        var arrayType = elementType.MakeArrayType(rank);
+        var arrayVariable = Expression.Variable(arrayType, "array");
+
+        var statements = new List<Expression>(elements.Count + 2)
+        {
+            Expression.Assign(arrayVariable, Expression.NewArrayBounds(elementType, dimensions.ToFastArray(x => (Expression)Expression.Constant(x))))
+        };
+
+        // Convert the flat indexes i into a per-dimension indexes (row-major order)
+        for (var i = 0; i < elements.Count; i++)
+        {
+            var indices = new Expression[rank];
+            var remainder = i;
+            for (var d = rank - 1; d >= 0; d--)
+            {
+                indices[d] = Expression.Constant(remainder % dimensions[d]);
+                remainder /= dimensions[d];
+            }
+
+            statements.Add(Expression.Assign(Expression.ArrayAccess(arrayVariable, indices), elements[i]));
+        }
+
+        statements.Add(arrayVariable);
+
+        return Expression.Block([arrayVariable], statements);
     }
 
     private Type? ResolveType(TypeSyntax type)
