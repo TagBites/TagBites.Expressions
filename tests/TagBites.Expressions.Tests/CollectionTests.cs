@@ -31,6 +31,16 @@ public class CollectionTests : ExpressionTestBase
     public void MultiDimensionalArray(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new int[][] { new[] { 1 }, new[] { 2, 3 } }[1][1]", 3)]
+    [InlineData("new int[][] { new[] { 1, 2 }, new[] { 3 } }[0][1]", 2)]
+    [InlineData("new int[][] { new[] { 1 }, new[] { 2, 3 } }.Length", 2)]
+    [InlineData("new int[2][].Length", 2)]
+    [InlineData("new int[3][][].Length", 3)]
+    [InlineData("new string[][] { new[] { \"a\", \"b\" } }[0][1]", "b")]
+    [InlineData("new int[][][] { new[] { new[] { 5 } } }[0][0][0]", 5)]
+    public void JaggedArray(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
     [InlineData("new int[3][1]")]
     public void InvalidArrayCreation(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));

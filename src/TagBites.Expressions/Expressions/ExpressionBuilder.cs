@@ -957,9 +957,20 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (elementType == null)
             return null;
 
-        // Jagged array creation (int[][]) - not supported
-        if (node.Type.RankSpecifiers.Count != 1)
-            return ToError(node.Type, "Jagged array creation is not supported.");
+        // Jagged array (int[][], int[2][], ...)
+        for (var i = node.Type.RankSpecifiers.Count - 1; i >= 1; i--)
+        {
+            var innerSpecifier = node.Type.RankSpecifiers[i];
+
+            // ReSharper disable once LoopCanBeConvertedToQuery
+            // ReSharper disable once ForCanBeConvertedToForeach
+            for (var j = 0; j < innerSpecifier.Sizes.Count; j++)
+                if (innerSpecifier.Sizes[j] is not OmittedArraySizeExpressionSyntax)
+                    return ToError(innerSpecifier, "Only the outermost dimension of a jagged array can have a size.");
+
+            var innerRank = innerSpecifier.Rank;
+            elementType = innerRank == 1 ? elementType.MakeArrayType() : elementType.MakeArrayType(innerRank);
+        }
 
         var rankSpecifier = node.Type.RankSpecifiers[0];
         var rank = rankSpecifier.Rank;
