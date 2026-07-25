@@ -56,10 +56,18 @@ public class ConversionTests : ExpressionTestBase
     }
 
     [Theory]
-    [InlineData("1 + (uint)2")]
     [InlineData("1d + 2m")]
     [InlineData("new DateTime(2021, 8, 14) + 2")]
     public void InvalidCastOperator(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
+    [InlineData("1u + 1", 2L)]
+    [InlineData("2u - 1", 1L)]
+    [InlineData("(uint)5 + (int)3", 8L)]
+    [InlineData("uint.MaxValue + 1", 4294967296L)]
+    [InlineData("(short)1 + 2u", 3L)]
+    [InlineData("5u + 3u", 8u)]
+    public void UIntWithSignedPromotesToLong(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
     [InlineData("Math.Min(2, 2)", 2)]

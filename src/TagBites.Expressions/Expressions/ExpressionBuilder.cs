@@ -2512,6 +2512,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return true;
         }
 
+        // uint mixed with a signed sbyte/short/int promotes both operands to long
+        if ((t1 == typeof(uint) && (t2 == typeof(int) || t2 == typeof(short) || t2 == typeof(sbyte)))
+            || (t2 == typeof(uint) && (t1 == typeof(int) || t1 == typeof(short) || t1 == typeof(sbyte))))
+        {
+            e1 = Expression.Convert(e1, typeof(long));
+            e2 = Expression.Convert(e2, typeof(long));
+            return true;
+        }
+
         // Two distinct numeric types with no implicit conversion between them (e.g. decimal vs double) can never be resolved.
         if (TypeUtils.IsNumericType(t1) && TypeUtils.IsNumericType(t2))
         {
