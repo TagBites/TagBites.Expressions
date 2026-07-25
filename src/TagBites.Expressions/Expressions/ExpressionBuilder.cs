@@ -265,6 +265,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (left == null)
             return null;
 
+        // Roslyn parses `x is Enum.Member` as the is-type operator with a qualified name; when it names a constant it is an equality test
+        if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.IsKeyword
+            && node.Right is QualifiedNameSyntax { Left: IdentifierNameSyntax constantType, Right: IdentifierNameSyntax constantMember }
+            && TryResolveTypeByName(constantType.Identifier.Text) is { } declaringType
+            && ResolveMember(node.Right, Expression.Constant(declaringType), constantMember.Identifier.Text, setErrorWhenNotFound: false) is { } constantValue)
+        {
+            if (!EnsureTheSameTypes(node, ref left, ref constantValue))
+                return null;
+
+            return Expression.MakeBinary(ExpressionType.Equal, left, constantValue);
+        }
+
         var right = Visit(node.Right);
         if (right == null)
             return null;
@@ -1296,6 +1308,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     return Expression.Block(declareExpression, Expression.Constant(true));
                 }
+
+            // is var (a, b)
+            case VarPatternSyntax { Designation: ParenthesizedVariableDesignationSyntax d }:
+                return TryResolveVarDesignation(expression, d);
 
             // is ... x
             case DeclarationPatternSyntax { Designation: SingleVariableDesignationSyntax v } p:
@@ -2650,6 +2666,55 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.Convert(Expression.Subtract(Expression.Convert(enumSide, underlyingType2), subtractOperand), enumType2);
 
         return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+    }
+    private Expression? TryResolveVarDesignation(Expression expression, ParenthesizedVariableDesignationSyntax designation)
+    {
+        var count = designation.Variables.Count;
+        var elements = GetTupleItemAccessors(expression, count);
+        Expression check = Expression.Constant(true);
+        var deconstructVariables = Array.Empty<ParameterExpression>();
+
+        if (elements == null)
+        {
+            var deconstruct = GetDeconstructMethod(expression.Type, count);
+            if (deconstruct == null)
+                return ToError(designation, $"No Deconstruct method for '{expression.Type.GetFriendlyTypeName()}' with {count} parameters.");
+
+            deconstructVariables = deconstruct.GetParameters().ToFastArray(x => Expression.Variable(x.ParameterType.GetElementType()!));
+            elements = deconstructVariables.ToFastArray(x => (Expression)x);
+            check = Expression.Block(Expression.Call(expression, deconstruct, elements), check);
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var bound = TryResolveDesignation(elements[i], designation.Variables[i]);
+            if (bound == null)
+                return null;
+
+            check = Expression.AndAlso(check, bound);
+        }
+
+        return deconstructVariables.Length > 0 ? Expression.Block(deconstructVariables, check) : check;
+    }
+    private Expression? TryResolveDesignation(Expression expression, VariableDesignationSyntax designation)
+    {
+        switch (designation)
+        {
+            case DiscardDesignationSyntax:
+                return Expression.Constant(true);
+
+            case SingleVariableDesignationSyntax single:
+                {
+                    var declareExpression = DeclareVariable(single, expression, single.Identifier.Text);
+                    return declareExpression == null ? null : Expression.Block(declareExpression, Expression.Constant(true));
+                }
+
+            case ParenthesizedVariableDesignationSyntax nested:
+                return TryResolveVarDesignation(expression, nested);
+
+            default:
+                return ToError(designation);
+        }
     }
 
     private void DetectReflection(Expression expression)

@@ -93,8 +93,19 @@ public class PatternMatchingTests : ExpressionTestBase
     [Theory]
     [InlineData("1 is 1", true)]
     [InlineData("1 is 0", false)]
+    [InlineData("1 is (0 or 1)", true)]
+    [InlineData("1 is not 0", true)]
+    [InlineData("2 is not (0 or 1)", true)]
     [InlineData("(int?)1 is 1", true)]
+    [InlineData("(int?)1 is 1 or 2", true)]
     [InlineData("(int?)1 is 0", false)]
+    [InlineData("DayOfWeek.Wednesday is DayOfWeek.Wednesday", true)]
+    [InlineData("DayOfWeek.Monday is DayOfWeek.Wednesday", false)]
+    [InlineData("(DayOfWeek)3 is DayOfWeek.Wednesday", true)]
+    [InlineData("(DayOfWeek)1 is DayOfWeek.Wednesday or DayOfWeek.Monday", true)]
+    [InlineData("(DayOfWeek)1 is (DayOfWeek.Wednesday or DayOfWeek.Monday)", true)]
+    [InlineData("(DayOfWeek)1 is not DayOfWeek.Wednesday", true)]
+    [InlineData("(DayOfWeek)2 is not (DayOfWeek.Wednesday or DayOfWeek.Monday)", true)]
     public void PatternConstCheck(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
@@ -189,6 +200,10 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("(1, 2, 3) is (1, 2, 3)", true)]
     [InlineData("(1, 2, 3) is (1, _, 3)", true)]
     [InlineData("t is (int a, string b) && a == 5 && b == \"x\"", true)]
+    [InlineData("(1, 2) is var (a, b) && a < b", true)]
+    [InlineData("(1, 2) is var (a, b) && a > b", false)]
+    [InlineData("(10, (20, 30)) is var (a, (b, c)) && a + b + c == 60", true)]
+    [InlineData("(1, 2) is var (a, _) && a == 1", true)]
     public void PatternTuple(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions { Parameters = { (typeof((int, string)), "t") } };
