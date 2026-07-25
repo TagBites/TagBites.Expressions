@@ -112,6 +112,13 @@ public class TupleTests : ExpressionTestBase
     }
 
     [Theory]
+    [InlineData("new[] { (Name: \"x\", Val: 1), (Name: \"y\", Val: 2) }.Sum(t => t.Val)", 3)]
+    [InlineData("new[] { (Name: \"x\", Val: 1), (Name: \"y\", Val: 3) }.Max(t => t.Val)", 3)]
+    [InlineData("new[] { (Name: \"a\", Val: 5), (Name: \"b\", Val: 2) }.Where(t => t.Val > 3).Select(t => t.Name).First()", "a")]
+    [InlineData("new[] { (Name: \"x\", Val: 1), (Name: \"y\", Val: 3) }.OrderByDescending(t => t.Val).First().Name", "y")]
+    public void NamedTupleArrayFlow(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(A: new { X = 1 }, B: 2).A.X", 1)]
     [InlineData("(A: new { X = 1 }, B: 2).B", 2)]
     [InlineData("new { T = (A: 1, B: 2) }.T.A", 1)]

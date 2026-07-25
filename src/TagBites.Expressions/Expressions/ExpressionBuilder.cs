@@ -1004,7 +1004,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     expressions[i] = exp;
                 }
 
-                return Expression.NewArrayInit(elementType, expressions);
+                var array = Expression.NewArrayInit(elementType, expressions);
+                if (expressions.Length > 0)
+                    SetSequenceElementShape(array, GetTupleShape(expressions[0]));
+
+                return array;
             }
 
             // Multidimensional array (e.g. new int[,] { { 1, 2 }, { 3, 4 } }) 
@@ -1098,9 +1102,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (elementType == null)
             return ToError(node, "Type not found for implicit array creation.");
 
-        return rank == 1
-            ? Expression.NewArrayInit(elementType, elements)
-            : CreateMultiDimArray(elementType, rank, dimensions, elements);
+        if (rank != 1)
+            return CreateMultiDimArray(elementType, rank, dimensions, elements);
+
+        var array = Expression.NewArrayInit(elementType, elements);
+        if (elements.Count > 0)
+            SetSequenceElementShape(array, GetTupleShape(elements[0]));
+
+        return array;
 
         bool CollectImplicitElements(InitializerExpressionSyntax initializer, int depth)
         {
@@ -3740,6 +3749,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         _tupleShapes ??= new Dictionary<Expression, ValueTupleShape>();
         _tupleShapes[expression] = shape;
+    }
+    private void SetSequenceElementShape(Expression sequence, ValueTupleShape? elementShape)
+    {
+        // A sequence carries its element shape nested under Args[0] (IEnumerable<T> -> [T]),
+        // the same layout ComputeCallResultShape produces for LINQ results.
+        if (elementShape != null)
+            SetTupleShape(sequence, new ValueTupleShape { Args = [elementShape] });
     }
 
     private class MethodCallInfo
