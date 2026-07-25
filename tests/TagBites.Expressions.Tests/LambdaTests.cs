@@ -56,4 +56,10 @@ public class LambdaTests : ExpressionTestBase
     [InlineData("\"hello\".Where(c => c == 'l').Count()", 2)]
     [InlineData("\"hello\".Select(c => (int)c).Sum()", 532)]
     public void LinqOverString(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("new[] { DayOfWeek.Monday, DayOfWeek.Friday }.Max()", DayOfWeek.Friday)]
+    [InlineData("new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }.Min()", DayOfWeek.Sunday)]
+    [InlineData("new[] { DayOfWeek.Monday, DayOfWeek.Friday }.Max() == DayOfWeek.Friday", true)]
+    public void EnumSequenceAggregatesKeepEnumType(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }

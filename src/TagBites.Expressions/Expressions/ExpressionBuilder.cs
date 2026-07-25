@@ -3916,7 +3916,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static bool IsMatchingParameterType(Type parameterType, Type argumentType)
     {
         if (parameterType.IsAssignableFrom(argumentType))
-            return true;
+        {
+            // C# does not allow enum-array covariance, e.g. DayOfWeek[] -> IEnumerable<int>,
+            // reject it so overload resolution keeps the enum element type (DayOfWeek[].Max() -> DayOfWeek).
+            return !argumentType.IsArray
+                   || argumentType.GetElementType() is not { IsEnum: true } enumElement
+                   || GetSequenceElementType(parameterType) is not { } target
+                   || target == enumElement
+                   || target != Enum.GetUnderlyingType(enumElement);
+        }
 
         // Numeric mismatch
         if (TypeUtils.IsNumericType(argumentType) && TypeUtils.IsNumericType(parameterType))
@@ -3928,6 +3936,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         // Generic
         return TryExtractGenericArguments(parameterType, argumentType, null);
+    }
+    private static Type? GetSequenceElementType(Type type)
+    {
+        return type.IsArray
+            ? type.GetElementType()
+            : type.IsGenericType && type.GetGenericArguments().Length == 1 ? type.GetGenericArguments()[0] : null;
     }
     private static bool? IsUnsignedType(Type type)
     {
