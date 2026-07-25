@@ -4,19 +4,31 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - 2026-07-25
+## [Unreleased]
 
 ### Added
 - `ExpressionParserOptions.Fork(resultType, resultCastType, parameters, useFirstParameterAsThis)`: creates a read-only variant that reuses the prepared, shared settings of the source instance (global members, included types, static imports, the reflection member cache and the resolution flags) while overriding the result type, result cast type, parameters or `this` handling. The shared lookups are prepared once and reused by every fork; only the parameters and `this` handling rebuild the parameter-specific part of the context. Pass `null` for any argument to inherit the source value.
 - Jagged array creation (`new int[][] { ... }`, `new int[2][]`, and deeper forms such as `int[][][]`): previously rejected with an error. Every rank specifier after the first becomes part of the element type, so `int[][]` creates an array whose elements are `int[]`. Only the outermost dimension may carry a size, so `new int[3][1]` is still rejected. Example: `new int[][] { new[] { 1 }, new[] { 2, 3 } }[1][1]` returns `3`.
 - Implicitly typed multidimensional arrays (`new[,] { { 1, 2 }, { 3, 4 } }`, `new[,,] { ... }`): only the explicitly typed form (`new int[,] { ... }`) worked before. The element type is inferred from the leaf elements, which must all have the same type. Example: `new[,] { { 1, 2 }, { 3, 4 } }[1, 0]` returns `3`.
 - Index initializers in object initializers (`new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }`): each entry assigns through the indexer setter. Works with any type that has an accessible indexer setter, and can be mixed with member assignments. The collection form (`{ { "a", 1 } }`) still works. Example: `new Dictionary<string, int> { ["a"] = 1 }["a"]` returns `1`.
+- Unbound generic types in `typeof` (`typeof(List<>)`, `typeof(Dictionary<,>)`).
 
 ### Fixed
 - `Enumerable.Max` and `Enumerable.Min` with a selector lambda (for example `items.Max(x => x.Value)`) threw an internal `Extension node must override the property Expression.Type` error during overload resolution. The not-yet-bound lambda argument is now skipped when ranking overloads, and a more-specific-signature tie-break selects the correct member (a concrete `Func<TSource, int>` result over the fully generic `Func<TSource, TResult>`). `Sum` and `Average` were not affected.
 - Overload resolution now prefers a generic `IEnumerable<T>` overload over a `params object[]` one. `string.Join(",", new[] { 3, 1, 2 })` bound the array to `params object[]` and returned `"System.Int32[]"`; it now binds the generic `Join<T>(string, IEnumerable<T>)` overload and returns `"3,1,2"`. The betterness comparison previously read the open generic parameters (`IEnumerable<T>`) instead of the closed ones (`IEnumerable<int>`).
 - LINQ and other `IEnumerable<T>` extension methods now resolve on `string`, which is `IEnumerable<char>`. `"racecar".Count()`, `"abc".Reverse()` and similar calls previously failed with a method-not-found error, because generic-argument inference did not look through the interfaces of a non-generic type.
 - Members of a `typeof(...)` value now resolve against `System.Type`. `typeof(int).Name` previously failed with `Unknown member Name` because the value was treated as a static type reference (the mechanism behind `int.MaxValue`). `Name` and `IsValueType` work without reflection; other `Type` members require `AllowReflection`.
+- `Enumerable.Aggregate` with a result selector (the three-argument overload) no longer throws an index-out-of-range error during generic inference.
+- `Enumerable.GroupJoin` and similar calls now infer generic arguments nested in a lambda parameter type (for example `Func<T, IEnumerable<TInner>, TResult>`).
+- Switch-arm pattern variables are scoped to their own arm, so the same name can appear in several arms.
+- Named-tuple element names flow from an array literal into LINQ lambdas (for example `new[] { (Name: "x", Val: 1) }.Sum(t => t.Val)`).
+- A numeric operand is promoted to a user-defined operator's parameter type (for example `TimeSpan.FromHours(1) * 2`).
+- The bare `null` literal binds to reference and nullable parameters (for example `string.IsNullOrEmpty(null)`).
+- Enum constant patterns (`x is DayOfWeek.Monday`) and `var` deconstruction patterns (`(1, 2) is var (a, b)`) in `is` expressions.
+- Namespace-qualified closed generic types (for example `new System.Collections.Generic.List<int>()`).
+
+### Performance
+- Indexer property lookups are cached in the shared member cache.
 
 ## [1.3.2] - 2026-07-24
 
