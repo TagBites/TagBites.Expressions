@@ -2058,6 +2058,29 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     return genericType?.MakeGenericType(elements.ToArray());
                 }
 
+            case QualifiedNameSyntax { Right: GenericNameSyntax gen } name:
+                {
+                    var arguments = gen.TypeArgumentList.Arguments;
+
+                    if (TryResolveTypeByName(gen.Identifier.Text, arguments.Count) is not { } open || open.Namespace != name.Left.ToString())
+                        return ToTypeError(type, null);
+
+                    if (arguments[0] is OmittedTypeArgumentSyntax)
+                        return open;
+
+                    var elements = new Type[arguments.Count];
+                    for (var i = 0; i < arguments.Count; i++)
+                    {
+                        var elementType = ResolveType(arguments[i]);
+                        if (elementType == null)
+                            return null;
+
+                        elements[i] = elementType;
+                    }
+
+                    return open.MakeGenericType(elements);
+                }
+
             case QualifiedNameSyntax { Right: IdentifierNameSyntax id } name:
                 {
                     Type? ret;

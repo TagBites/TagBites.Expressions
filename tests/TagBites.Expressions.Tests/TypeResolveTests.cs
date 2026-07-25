@@ -50,6 +50,9 @@ public class TypeResolveTests : ExpressionTestBase
     [InlineData("System.Math.Max(1.0, System.Math.Min(2.0, 3.0))", 2.0)]
     [InlineData("System.Math.PI > 3.0", true)]
     [InlineData("typeof(System.Guid) == typeof(Guid)", true)]
+    [InlineData("new System.Collections.Generic.List<int> { 5 }[0]", 5)]
+    [InlineData("new System.Collections.Generic.Dictionary<string, int> { [\"a\"] = 1 }[\"a\"]", 1)]
+    [InlineData("typeof(System.Collections.Generic.List<int>) == typeof(List<int>)", true)]
     public void NamespaceQualified(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
