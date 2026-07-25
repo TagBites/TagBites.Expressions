@@ -3163,6 +3163,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 methodArguments.Add(Expression.Constant(defaultValue, parameterType));
             }
 
+            // Publish the final, closed parameters.
+            // Overload betterness reads info.Parameters, so it must see the closed types - otherwise a generic IEnumerable<T> overload loses to a params object[] one.
+            info.Parameters = methodParameters;
+
             return info;
         }
     }

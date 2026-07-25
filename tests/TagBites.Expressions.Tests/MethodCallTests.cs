@@ -35,6 +35,9 @@ public class MethodCallTests : ExpressionTestBase
     [InlineData(@"string.Format(""{0}"", 1)", "1")]
     [InlineData(@"string.Format(""{0} {1} {2}"", 1, 2, ""a"")", "1 2 a")]
     [InlineData(@"string.Concat(""a"", ""b"", 1 + 2, ""d"")", "ab3d")]
+    [InlineData(@"string.Join("","", new[] { 3, 1, 2 })", "3,1,2")]
+    [InlineData(@"string.Join(""-"", new[] { 3, 1, 2 }.OrderBy(x => x))", "1-2-3")]
+    [InlineData(@"string.Join("","", new List<int> { 1, 2, 3 })", "1,2,3")]
     public void ParamsBclMethods(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
