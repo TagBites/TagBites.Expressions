@@ -45,4 +45,11 @@ public class LambdaTests : ExpressionTestBase
         };
         ExecuteAndTest(script, options, expectedResult, args);
     }
+
+    [Theory]
+    [InlineData("\"hello\".Count()", 5)]
+    [InlineData("\"hello\".Reverse().Count()", 5)]
+    [InlineData("\"hello\".Where(c => c == 'l').Count()", 2)]
+    [InlineData("\"hello\".Select(c => (int)c).Sum()", 532)]
+    public void LinqOverString(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }

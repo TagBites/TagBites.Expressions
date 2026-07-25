@@ -2809,7 +2809,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 ? parameterWithGeneric
                 : parameterWithGeneric.GetGenericTypeDefinition();
 
-            if (argumentType != definition && (argumentType.IsGenericType && argumentType.GetGenericTypeDefinition() != definition || argumentType.IsArray))
+            var argumentIsDefinition = argumentType.IsGenericType && argumentType.GetGenericTypeDefinition() == definition;
+            if (argumentType != definition && !argumentIsDefinition)
             {
                 var interfaceType = argumentType.GetInterfaces().FirstOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == definition);
                 if (interfaceType == null)
