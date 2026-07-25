@@ -2038,8 +2038,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             case GenericNameSyntax genericName:
                 {
+                    var arguments = genericName.TypeArgumentList.Arguments;
+
+                    // Unbound generic (typeof(List<>), typeof(Dictionary<,>)): return the open definition.
+                    if (arguments[0] is OmittedTypeArgumentSyntax)
+                        return ResolveType(type, genericName.Identifier.Text, arguments.Count);
+
                     var elements = new List<Type>();
-                    foreach (var item in genericName.TypeArgumentList.Arguments)
+                    foreach (var item in arguments)
                     {
                         var elementType = ResolveType(item);
                         if (elementType == null)

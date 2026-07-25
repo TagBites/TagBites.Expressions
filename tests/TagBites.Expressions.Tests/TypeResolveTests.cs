@@ -31,6 +31,8 @@ public class TypeResolveTests : ExpressionTestBase
     [InlineData("typeof(IDictionary<int, string>)", typeof(IDictionary<int, string>))]
     [InlineData("typeof(IReadOnlyDictionary<int, string>)", typeof(IReadOnlyDictionary<int, string>))]
     [InlineData("typeof(ISet<int>)", typeof(ISet<int>))]
+    [InlineData("typeof(List<>)", typeof(List<>))]
+    [InlineData("typeof(Dictionary<,>)", typeof(Dictionary<,>))]
     public void BuiltInType(string script, Type expectedType)
     {
         // Exists
