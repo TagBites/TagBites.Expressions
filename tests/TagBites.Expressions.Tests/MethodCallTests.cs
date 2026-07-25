@@ -41,6 +41,13 @@ public class MethodCallTests : ExpressionTestBase
     public void ParamsBclMethods(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("string.IsNullOrEmpty(null)", true)]
+    [InlineData(@"string.Concat(null, ""a"")", "a")]
+    [InlineData("string.Equals(null, null)", true)]
+    [InlineData(@"string.Compare(null, ""a"") < 0", true)]
+    public void NullLiteralArgument(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("p.Sum(1, 2, 3)", 6)]
     [InlineData("p.Sum(1)", 1)]
     [InlineData("p.Sum()", 0)]

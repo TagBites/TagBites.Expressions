@@ -2496,6 +2496,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (sourceType == targetType)
             return expression;
 
+        // The null literal converts to any reference or nullable type
+        if (IsNullLiteral(expression) && (!targetType.IsValueType || IsNullableType(targetType)))
+            return Expression.Constant(null, targetType);
+
         if (targetType.IsAssignableFrom(sourceType))
             return ToCast(expression, targetType);
 
@@ -3407,17 +3411,31 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         for (var i = 0; i < args.Count; i++)
         {
-            // A 'default' matches any parameter type, and a not-yet-bound lambda has no source type
+            // A 'default' matches any parameter type and a not-yet-bound lambda has no source type - neither can drive betterness
             if (args[i] is DelayDefaultExpression or DelayLambdaExpression)
                 continue;
 
-            var argType = args[i].Type;
             var p1 = method1.ArgumentMap?[i] ?? (method1.HasParams ? Math.Min(i, method1.Parameters.Length - 1) : i);
             var p2 = method2.ArgumentMap?[i] ?? (method2.HasParams ? Math.Min(i, method2.Parameters.Length - 1) : i);
             var t1 = method1.Parameters[p1].ParameterType;
             var t2 = method2.Parameters[p2].ParameterType;
 
-            if (GetBestMatchingType(argType, t1, t2) is { } best)
+            // The null literal has no source type, but still prefers the more specific (more derived) parameter type
+            if (IsNullLiteral(args[i]))
+            {
+                if (t1 != t2)
+                {
+                    if (t2.IsAssignableFrom(t1))
+                        return method1;
+
+                    if (t1.IsAssignableFrom(t2))
+                        return method2;
+                }
+
+                continue;
+            }
+
+            if (GetBestMatchingType(args[i].Type, t1, t2) is { } best)
                 return best == t1 ? method1 : method2;
         }
 
@@ -3708,6 +3726,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
 
     private static bool IsNullableType(Type type) => Nullable.GetUnderlyingType(type) != null;
+    private static bool IsNullLiteral(Expression expression) => expression is ConstantExpression { Value: null } && expression.Type == typeof(object);
     private static bool HasMatchingParameters(IList<ParameterInfo> parameters, IList<Expression> arguments)
     {
         if (parameters.Count < arguments.Count)
@@ -3715,10 +3734,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         for (var i = 0; i < arguments.Count; i++)
         {
-            var ept = arguments[i].Type;
             var mpt = parameters[i].ParameterType;
 
-            if (!IsMatchingParameterType(mpt, ept))
+            // The null literal binds to any reference or nullable parameter, but not to a non-nullable value type.
+            if (IsNullLiteral(arguments[i]))
+            {
+                if (mpt.IsValueType && !IsNullableType(mpt))
+                    return false;
+
+                continue;
+            }
+
+            if (!IsMatchingParameterType(mpt, arguments[i].Type))
                 return false;
         }
 
