@@ -16,6 +16,8 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("5 switch { 5 when 1 > 2 => 1, 5 => 2, _ => 0 }", 2)]
     [InlineData("n switch { int a => a + 1 }", 2)]
     [InlineData("1 switch { 1 => 1, _ => 2L }", 1L)]
+    [InlineData("n switch { int a when a > 5 => a, int a => a * 10 }", 10)]
+    [InlineData("n switch { 1 => 1, int a when a > 0 => a, int a => -a }", 1)]
     public void Switch(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions

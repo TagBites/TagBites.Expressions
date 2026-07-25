@@ -173,6 +173,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var arm = node.Arms[i];
             Expression? condition = null;
 
+            // Pattern variables are scoped to their own arm, so each arm starts from the same variable set
+            var variablesBefore = _variables?.Count ?? 0;
+
             switch (arm.Pattern)
             {
                 case DiscardPatternSyntax when i + 1 != node.Arms.Count || switchExpression != null:
@@ -223,6 +226,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 switchExpression = expression;
             else
                 paths.Add((condition, expression));
+
+            // Drop this arm's pattern variables so a later arm can declare the same names
+            if (_variables != null && _variables.Count > variablesBefore)
+                _variables.RemoveRange(variablesBefore, _variables.Count - variablesBefore);
         }
 
         // No discard arm, a fallback arm throwing when nothing matches
