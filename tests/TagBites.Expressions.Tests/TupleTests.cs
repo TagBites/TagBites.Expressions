@@ -119,6 +119,21 @@ public class TupleTests : ExpressionTestBase
     public void NamedTupleArrayFlow(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("(Name: \"x\", (Inner: 5, 6)).Item2.Inner", 5)]
+    [InlineData("((A: 1, B: 2), 3).Item1.B", 2)]
+    [InlineData("(1, (2, (Deep: 9, 0))).Item2.Item2.Deep", 9)]
+    public void NestedTupleNamesThroughItemAccess(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item9", 9)]
+    [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item1", 1)]
+    [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item8", 8)]
+    [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Rest.Item2", 9)]
+    [InlineData("(a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, i: 9).i", 9)]
+    [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).Item15", 15)]
+    public void LargeTuples(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(A: new { X = 1 }, B: 2).A.X", 1)]
     [InlineData("(A: new { X = 1 }, B: 2).B", 2)]
     [InlineData("new { T = (A: 1, B: 2) }.T.A", 1)]

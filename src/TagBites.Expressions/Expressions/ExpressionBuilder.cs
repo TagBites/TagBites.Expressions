@@ -1614,13 +1614,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (args == null)
             return null;
 
-        var initMethod = typeof(ValueTuple)
-            .GetMethods()
-            .SingleOrDefault(x => x.Name == nameof(ValueTuple.Create) && x.GetParameters().Length == args.Count);
-        if (initMethod == null)
+        var result = BuildValueTuple(args);
+        if (result == null)
             return ToError(node);
-
-        var result = Expression.Call(null, initMethod.MakeGenericMethod(args.ToFastArray(x => x!.Type)), args);
 
         // ValueTuple with defined or inferred element names
         string?[]? names = null;
@@ -2230,16 +2226,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             : null;
         var expressionType = staticType ?? expression.Type;
 
-        // Named tuple element
-        if (staticType == null
-            && GetTupleShape(expression) is { } tupleShape
-            && tupleShape.GetRealField(name, _nameComparison) is ({ } tupleFieldName, var index)
-            && expressionType.GetField(tupleFieldName) is { } tupleField)
+        // ValueTuple
+        if (staticType == null && IsValueTupleType(expressionType))
         {
-            var access = Expression.MakeMemberAccess(expression, tupleField);
-            var shape = tupleShape.Args?.Length > index ? tupleShape.Args[index] : null;
-            SetTupleShape(access, shape);
-            return access;
+            var tupleShape = GetTupleShape(expression);
+            var index = tupleShape?.GetRealField(name, _nameComparison) is ({ } _, var aliasIndex)
+                ? aliasIndex
+                : TryGetTupleItemIndex(name) ?? -1;
+
+            if (index >= 0 && BuildTupleElementAccess(expression, index) is { } access)
+            {
+                SetTupleShape(access, tupleShape?.Args?.Length > index ? tupleShape.Args[index] : null);
+                return access;
+            }
         }
 
         // From instance
@@ -3937,6 +3936,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Generic
         return TryExtractGenericArguments(parameterType, argumentType, null);
     }
+
     private static Type? GetSequenceElementType(Type type)
     {
         return type.IsArray
@@ -4019,6 +4019,72 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // the same layout ComputeCallResultShape produces for LINQ results.
         if (elementShape != null)
             SetTupleShape(sequence, new ValueTupleShape { Args = [elementShape] });
+    }
+    private static bool IsValueTupleType(Type type)
+    {
+        return type is { IsGenericType: true, Namespace: "System" }
+               && type.Name.StartsWith("ValueTuple`", StringComparison.Ordinal);
+    }
+    private static int? TryGetTupleItemIndex(string name)
+    {
+        return name.Length > 4 && name.StartsWith("Item", StringComparison.Ordinal) && int.TryParse(name.Substring(4), out var n) && n > 0
+            ? n - 1
+            : null;
+    }
+    private static Expression? BuildValueTuple(IList<Expression> elements)
+    {
+        var count = elements.Count;
+        if (count == 0)
+            return null;
+
+        if (count <= 7)
+        {
+            var create = typeof(ValueTuple).GetMethods()
+                .FirstOrDefault(x => x.Name == nameof(ValueTuple.Create) && x.GetParameters().Length == count);
+            if (create == null)
+                return null;
+
+            var types = new Type[count];
+            for (var i = 0; i < count; i++)
+                types[i] = elements[i].Type;
+
+            return Expression.Call(null, create.MakeGenericMethod(types), elements);
+        }
+
+        // ValueTuple<T1..T7, TRest> with the remaining elements nested in Rest
+        var rest = BuildValueTuple(elements.Skip(7).ToList());
+        if (rest == null)
+            return null;
+
+        var typeArguments = new Type[8];
+        var constructorArguments = new Expression[8];
+
+        for (var i = 0; i < 7; i++)
+        {
+            typeArguments[i] = elements[i].Type;
+            constructorArguments[i] = elements[i];
+        }
+
+        typeArguments[7] = rest.Type;
+        constructorArguments[7] = rest;
+
+        var tupleType = typeof(ValueTuple<,,,,,,,>).MakeGenericType(typeArguments);
+        return Expression.New(tupleType.GetConstructors()[0], constructorArguments);
+    }
+    private static Expression? BuildTupleElementAccess(Expression tuple, int index)
+    {
+        while (index >= 7)
+        {
+            var rest = tuple.Type.GetField("Rest");
+            if (rest == null)
+                return null;
+
+            tuple = Expression.Field(tuple, rest);
+            index -= 7;
+        }
+
+        var field = tuple.Type.GetField($"Item{index + 1}");
+        return field == null ? null : Expression.Field(tuple, field);
     }
 
     private class MethodCallInfo
