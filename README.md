@@ -132,7 +132,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Literals: all numeric types, `char`, `string`, verbatim, raw and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
 - Named arguments (`Method(digits: 2, value: 1)`), including reordering, mixing positional and named arguments, and skipping optional parameters.
-- `new`: constructors, object and collection initializers, arrays (jagged, multidimensional and sized), target-typed `new()`.
+- `new`: constructors, object initializers (including index initializers `["key"] = value`), collection initializers, arrays (jagged, multidimensional including implicitly typed `new[,]`, and sized), target-typed `new()`.
 - Anonymous objects (`new { X = 1, Y = 2 }` - see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including named elements (`(Name: "Bob", Age: 30).Name`) and element-wise equality.
@@ -172,6 +172,15 @@ new[] { 1, 2, 3 } is [1, .., 3]
 
 // Target-typed new() in nested collection initializers
 new List<List<int>> { new() { 1, 2 }, new() { 3, 4 } }[1][0]
+
+// Jagged array
+new int[][] { new[] { 1 }, new[] { 2, 3 } }[1][1] // 3
+
+// Implicitly typed multidimensional array
+new[,] { { 1, 2 }, { 3, 4 } }[1, 0] // 3
+
+// Dictionary index initializer
+new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }["b"] // 2
 
 // Raw string literal
 """hello world""".Length
