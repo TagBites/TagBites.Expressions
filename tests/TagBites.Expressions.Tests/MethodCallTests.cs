@@ -145,4 +145,13 @@ public class MethodCallTests : ExpressionTestBase
     [InlineData("Math.Min(2d, 2m)")]
     [InlineData("Math.Min(2m, 2d)")]
     public void AmbiguousMethodCall(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, null));
+
+    [Theory]
+    [InlineData(@"new Dictionary<string, int> { [""a""] = 1 }.GetValueOrDefault(""z"", -1)", -1)]
+    [InlineData(@"new Dictionary<string, int> { [""a""] = 1 }.GetValueOrDefault(""a"")", 1)]
+    public void IncludedExtensionMethods(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(CollectionExtensions) } };
+        ExecuteAndTest(script, options, expectedResult);
+    }
 }
