@@ -1747,6 +1747,20 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (initializer.IsKind(SyntaxKind.CollectionInitializerExpression))
                 return CreateCollectionInitializer(instance, type, initializer);
 
+            // An indexer element initializer (["k"] = v) cannot be expressed with MemberInit, so fall back to a block when any is present.
+            // Plain member assignments keep the simpler MemberInit form.
+            var hasIndexerInitializer = false;
+
+            foreach (var item in initializer.Expressions)
+                if (item is AssignmentExpressionSyntax { Left: ImplicitElementAccessSyntax })
+                {
+                    hasIndexerInitializer = true;
+                    break;
+                }
+
+            if (hasIndexerInitializer)
+                return CreateObjectInitializerBlock(instance, type, initializer, previousTargetType);
+
             var bindings = new List<MemberBinding>();
 
             foreach (var item in initializer.Expressions)
@@ -1772,6 +1786,81 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return instance;
+    }
+    private Expression? CreateObjectInitializerBlock(NewExpression instance, Type type, InitializerExpressionSyntax initializer, Type? previousTargetType)
+    {
+        var instanceVariable = Expression.Variable(type, "obj");
+        var statements = new List<Expression> { Expression.Assign(instanceVariable, instance) };
+
+        foreach (var item in initializer.Expressions)
+        {
+            if (item is not AssignmentExpressionSyntax ae)
+                return ToError(item);
+
+            Expression target;
+            Type memberType;
+
+            switch (ae.Left)
+            {
+                case ImplicitElementAccessSyntax indexer:
+                    {
+                        _targetType = null;
+                        var indexArguments = ResolveParameters(indexer.ArgumentList.Arguments);
+                        _targetType = previousTargetType;
+
+                        if (indexArguments == null)
+                            return null;
+
+                        var indexers = GetIndexers(type);
+                        if (indexers.Count == 0
+                            || !TryResolveMethodCall(indexer, instanceVariable, indexArguments, indexers, out var getCall, GetArgumentNames(indexer.ArgumentList.Arguments))
+                            || getCall is not MethodCallExpression getterCall)
+                        {
+                            return ToError(indexer, "Indexer not found for this arguments.");
+                        }
+
+                        var indexerProperty = getterCall.Method.DeclaringType!
+                            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                            .FirstOrDefault(x => x.GetMethod == getterCall.Method);
+                        if (indexerProperty is not { SetMethod.IsPublic: true })
+                            return ToError(item, "Indexer has no accessible setter.");
+
+                        target = Expression.Property(instanceVariable, indexerProperty, getterCall.Arguments.ToArray());
+                        memberType = indexerProperty.PropertyType;
+                        break;
+                    }
+
+                case IdentifierNameSyntax identifier:
+                    {
+                        var member = GetAssignMember(type, identifier.Identifier.Text);
+                        if (member == null)
+                            return ToError(item, "Member not found.");
+
+                        target = Expression.MakeMemberAccess(instanceVariable, member);
+                        memberType = member is PropertyInfo pi ? pi.PropertyType : ((FieldInfo)member).FieldType;
+                        break;
+                    }
+
+                default:
+                    return ToError(item);
+            }
+
+            _targetType = memberType;
+            var value = Visit(ae.Right);
+            _targetType = previousTargetType;
+
+            if (value == null)
+                return null;
+
+            if (!EnsureArgumentType(memberType, ref value))
+                return ToError(ae.Right, $"Cannot convert initializer value to '{memberType.GetFriendlyTypeName()}'.");
+
+            statements.Add(Expression.Assign(target, value));
+        }
+
+        statements.Add(instanceVariable);
+
+        return Expression.Block([instanceVariable], statements);
     }
     private Expression? CreateCollectionInitializer(Expression instance, Type type, InitializerExpressionSyntax initializer)
     {

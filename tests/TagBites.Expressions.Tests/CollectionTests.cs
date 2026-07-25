@@ -126,4 +126,11 @@ public class CollectionTests : ExpressionTestBase
     [InlineData("new List<List<int>> { new() { 1, 2 }, new() { 3, 4 } }[1][0]", 3)]
     [InlineData(@"new Dictionary<string, int> { { ""a"", 1 }, { ""b"", 2 } }[""b""]", 2)]
     public void CollectionInitializer(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData(@"new Dictionary<string, int> { [""a""] = 1, [""b""] = 2 }[""b""]", 2)]
+    [InlineData(@"new Dictionary<string, int> { [""a""] = 1 }.Count", 1)]
+    [InlineData(@"new Dictionary<int, string> { [1] = ""one"", [2] = ""two"" }[2]", "two")]
+    [InlineData(@"new Dictionary<string, int> { [""x""] = 1 + 2 }[""x""]", 3)]
+    public void IndexerInitializer(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }
