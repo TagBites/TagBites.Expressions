@@ -413,6 +413,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (!EnsureTheSameTypes(node, ref left, ref right))
             return null;
 
+        // Mixed-type user-defined operator (e.g. TimeSpan * int -> op_Multiply(TimeSpan, double))
+        if (left.Type != right.Type && TryResolveUserDefinedBinaryOperator(expressionType, left, right) is { } userOperator)
+            return userOperator;
+
         if (_checkedContext)
             expressionType = expressionType switch
             {
@@ -2532,6 +2536,62 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
     }
 
+    private Expression? TryResolveUserDefinedBinaryOperator(ExpressionType type, Expression left, Expression right)
+    {
+        var operatorName = type switch
+        {
+            ExpressionType.Add => "op_Addition",
+            ExpressionType.Subtract => "op_Subtraction",
+            ExpressionType.Multiply => "op_Multiply",
+            ExpressionType.Divide => "op_Division",
+            ExpressionType.Modulo => "op_Modulus",
+            _ => null
+        };
+        if (operatorName == null)
+            return null;
+
+        if (left.Type == right.Type)
+        {
+            if (MakeBinary(left.Type) is { } makeBinary)
+                return makeBinary;
+        }
+        else
+        {
+            if (MakeBinary(left.Type) is { } makeBinary)
+                return makeBinary;
+
+            if (MakeBinary(right.Type) is { } makeBinary2)
+                return makeBinary2;
+        }
+
+        return null;
+
+        Expression? MakeBinary(Type declaringType)
+        {
+            if (declaringType.IsPrimitive)
+                return null;
+
+            var methods = GetMethods(declaringType, operatorName, BindingFlags.Static);
+
+            // ReSharper disable once ForCanBeConvertedToForeach
+            for (var i = 0; i < methods.Count; i++)
+            {
+                var method = methods[i];
+
+                var parameters = method.GetParameters();
+                if (parameters.Length != 2)
+                    continue;
+
+                if (TryConvertExpression(left, parameters[0].ParameterType) is { } convertedLeft
+                    && TryConvertExpression(right, parameters[1].ParameterType) is { } convertedRight)
+                {
+                    return Expression.MakeBinary(type, convertedLeft, convertedRight, false, method);
+                }
+            }
+
+            return null;
+        }
+    }
     private Expression? TryBuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
         var leftIsEnum = left.Type.IsEnum;

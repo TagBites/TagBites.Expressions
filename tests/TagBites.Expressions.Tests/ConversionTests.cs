@@ -49,6 +49,10 @@ public class ConversionTests : ExpressionTestBase
     {
         ExecuteAndTest("new DateTime(2021, 8, 14) - TimeSpan.FromDays(1)", new DateTime(2021, 8, 13));
         ExecuteAndTest("new DateTime(2021, 8, 14) + TimeSpan.FromDays(1)", new DateTime(2021, 8, 15));
+
+        ExecuteAndTest("TimeSpan.FromHours(1) * 2", TimeSpan.FromHours(2));
+        ExecuteAndTest("TimeSpan.FromHours(1) * 2.5", TimeSpan.FromMinutes(150));
+        ExecuteAndTest("TimeSpan.FromHours(3) / 2", TimeSpan.FromMinutes(90));
     }
 
     [Theory]
