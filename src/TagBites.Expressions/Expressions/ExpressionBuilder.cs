@@ -3173,8 +3173,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         for (var i = 0; i < args.Count; i++)
         {
-            // A 'default' matches any parameter type
-            if (args[i] is DelayDefaultExpression)
+            // A 'default' matches any parameter type, and a not-yet-bound lambda has no source type
+            if (args[i] is DelayDefaultExpression or DelayLambdaExpression)
                 continue;
 
             var argType = args[i].Type;
@@ -3189,6 +3189,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         if (method1.Method.IsGenericMethod.CompareTo(method2.Method.IsGenericMethod) is var genericDiff && genericDiff != 0)
             return genericDiff < 0 ? method1 : method2;
+
+        // More specific open signature: at a given position a concrete type beats a type parameter.
+        // This separates Enumerable.Max<TSource>(..., Func<TSource, int>)
+        // from the fully generic Enumerable.Max<TSource, TResult>(..., Func<TSource, TResult>) once their closed parameters match.
+        if (CompareOpenSpecificity(method1.Method, method2.Method) is var specificityDiff && specificityDiff != 0)
+            return specificityDiff < 0 ? method1 : method2;
 
         if (method1.HasParams.CompareTo(method2.HasParams) is var paramsDiff && paramsDiff != 0)
             return paramsDiff < 0 ? method1 : method2;
@@ -3234,6 +3240,83 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return type2;
 
         return null;
+    }
+    private static int CompareOpenSpecificity(MethodBase method1, MethodBase method2)
+    {
+        var p1 = GetOpenParameters(method1);
+        var p2 = GetOpenParameters(method2);
+        if (p1.Length != p2.Length)
+            return 0;
+
+        var result = 0;
+
+        for (var i = 0; i < p1.Length; i++)
+        {
+            var diff = CompareTypeSpecificity(p1[i].ParameterType, p2[i].ParameterType);
+            if (diff == 0)
+                continue;
+
+            if (result == 0)
+                result = diff;
+            else if (result != diff)
+            {
+                // Each is more specific somewhere, so neither wins.
+                return 0;
+            }
+        }
+
+        return result;
+
+        static ParameterInfo[] GetOpenParameters(MethodBase method)
+        {
+            return method is MethodInfo { IsGenericMethod: true } mi
+                ? mi.GetGenericMethodDefinition().GetParameters()
+                : method.GetParameters();
+        }
+    }
+    private static int CompareTypeSpecificity(Type type1, Type type2)
+    {
+        if (type1 == type2)
+            return 0;
+
+        // A type parameter is less specific than any concrete type.
+        if (type1.IsGenericParameter || type2.IsGenericParameter)
+        {
+            return type1.IsGenericParameter != type2.IsGenericParameter
+                ? type1.IsGenericParameter ? 1 : -1
+                : 0;
+        }
+
+        if (type1.IsArray && type2.IsArray)
+        {
+            // ReSharper disable once TailRecursiveCall
+            return CompareTypeSpecificity(type1.GetElementType()!, type2.GetElementType()!);
+        }
+
+        if (type1.IsGenericType && type2.IsGenericType)
+        {
+            var a1 = type1.GetGenericArguments();
+            var a2 = type2.GetGenericArguments();
+            if (a1.Length != a2.Length)
+                return 0;
+
+            var result = 0;
+            for (var i = 0; i < a1.Length; i++)
+            {
+                var diff = CompareTypeSpecificity(a1[i], a2[i]);
+                if (diff == 0)
+                    continue;
+
+                if (result == 0)
+                    result = diff;
+                else if (result != diff)
+                    return 0;
+            }
+
+            return result;
+        }
+
+        return 0;
     }
 
     private ParameterExpression? FindParameter(string name)

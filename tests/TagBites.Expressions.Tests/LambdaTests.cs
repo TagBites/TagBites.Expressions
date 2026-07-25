@@ -19,6 +19,9 @@ public class LambdaTests : ExpressionTestBase
     [InlineData("listOfLists.Select(x => x.Select(y => y * 2).Max()).Sum()", 3 * 2 + 6 * 2)]
     [InlineData("listOfLists.Select(x => x.Select(y => y * 2).Select(x => x * 2).Max()).Sum()", 3 * 2 * 2 + 6 * 2 * 2)]
     [InlineData("list.Sum(x => x + n)", 9)]
+    [InlineData("list.Max(x => x * 2)", 6)]
+    [InlineData("list.Min(x => x * 2)", 2)]
+    [InlineData("models.Max(x => x.Value)", 100)]
     public void LambdaAndLinq(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
