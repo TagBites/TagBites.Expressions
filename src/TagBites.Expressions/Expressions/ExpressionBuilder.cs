@@ -3250,24 +3250,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     var lambdaParameters = lambdaType.GetGenericArguments();
 
-                    for (var j = 0; j < lambdaParameters.Length; j++)
-                    {
-                        var item = lambdaParameters[j];
-                        if (item.IsGenericParameter)
-                        {
-                            for (var k = 0; k < genericParameters!.Length; k++)
-                                if (genericParameters[k].Name == item.Name)
-                                {
-                                    if (genericArguments![k] != null)
-                                        lambdaParameters[j] = genericArguments[k]!;
-                                    break;
-                                }
-                        }
-                    }
+                    // Substitute already-known type arguments, including those nested inside a constructed type
+                    // such as Func<TOuter, IEnumerable<TInner>, TResult> where TInner is known from an earlier argument.
+                    if (genericParameters != null)
+                        for (var j = 0; j < lambdaParameters.Length; j++)
+                            lambdaParameters[j] = SubstituteGenericArguments(lambdaParameters[j], genericParameters, genericArguments!);
 
                     // var invokeMethod = lambdaType.GetMethod("Invoke")!;
                     if (lambdaType.Name.StartsWith("Func`"))
                         lambdaParameters = lambdaParameters.Take(lambdaParameters.Length - 1).ToArray();
+
+                    // A lambda parameter type that still carries an unbound type argument cannot be used to build the lambda.
+                    // ReSharper disable once LoopCanBeConvertedToQuery
+                    foreach (var lambdaParameter in lambdaParameters)
+                        if (lambdaParameter.ContainsGenericParameters)
+                            return null;
 
                     // Shapes for the lambda parameters, read from the bindings by matching the open delegate's generic arguments
                     // (e.g. Func<TSource, bool> -> TSource) against this method's bindings.
@@ -3571,6 +3568,48 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return 0;
+    }
+    private static Type SubstituteGenericArguments(Type type, Type[] genericParameters, Type?[] genericArguments)
+    {
+        if (type.IsGenericParameter)
+        {
+            for (var i = 0; i < genericParameters.Length; i++)
+                if (genericParameters[i].Name == type.Name)
+                    return genericArguments[i] ?? type;
+
+            return type;
+        }
+
+        if (type.IsArray)
+        {
+            var element = SubstituteGenericArguments(type.GetElementType()!, genericParameters, genericArguments);
+            if (element == type.GetElementType())
+                return type;
+
+            var rank = type.GetArrayRank();
+            return rank == 1 ? element.MakeArrayType() : element.MakeArrayType(rank);
+        }
+
+        if (type is { IsGenericType: true, ContainsGenericParameters: true })
+        {
+            var args = type.GetGenericArguments();
+            var changed = false;
+
+            for (var i = 0; i < args.Length; i++)
+            {
+                var substituted = SubstituteGenericArguments(args[i], genericParameters, genericArguments);
+                if (substituted != args[i])
+                {
+                    args[i] = substituted;
+                    changed = true;
+                }
+            }
+
+            if (changed && !args.Any(x => x.IsGenericParameter))
+                return type.GetGenericTypeDefinition().MakeGenericType(args);
+        }
+
+        return type;
     }
 
     private ParameterExpression? FindParameter(string name)

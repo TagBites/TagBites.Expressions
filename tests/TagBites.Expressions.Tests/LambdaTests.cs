@@ -24,6 +24,8 @@ public class LambdaTests : ExpressionTestBase
     [InlineData("models.Max(x => x.Value)", 100)]
     [InlineData("list.Aggregate(0, (a, b) => a + b, r => r * 2)", 12)]
     [InlineData("list.Aggregate(1, (a, b) => a * b, r => r + 100)", 106)]
+    [InlineData("list.GroupJoin(array, x => x, y => y, (x, g) => g.Count()).Sum()", 3)]
+    [InlineData("list.GroupJoin(new[] { 2, 2, 3 }, o => o, i => i, (o, g) => o * 10 + g.Count()).Sum()", 63)]
     public void LambdaAndLinq(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
