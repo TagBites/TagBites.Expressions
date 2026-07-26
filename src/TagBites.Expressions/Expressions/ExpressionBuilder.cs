@@ -1564,7 +1564,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression VisitLiteralExpression(LiteralExpressionSyntax node)
     {
-        if (Equals(node.Token.Value, "default"))
+        if (node.IsKind(SyntaxKind.DefaultLiteralExpression))
             return new DelayDefaultExpression();
 
         return Expression.Constant(node.Token.Value);

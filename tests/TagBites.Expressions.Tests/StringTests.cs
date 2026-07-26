@@ -15,6 +15,10 @@ public class StringTests : ExpressionTestBase
     [InlineData(@"(1 == 1 ? 1 : null) + ""a""", "1a")]
     [InlineData("$\"{\"a\"}.{\"b\"}\"", "a.b")]
     [InlineData("$\"{1.23:0}x{2.34:00}\"", "1x02")]
+    [InlineData(@"""default""", "default")]
+    [InlineData(@"""default"".Length", 7)]
+    [InlineData(@"""default"" == ""default""", true)]
+    [InlineData(@"((string)null) ?? ""default""", "default")]
     public void StringOperators(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
