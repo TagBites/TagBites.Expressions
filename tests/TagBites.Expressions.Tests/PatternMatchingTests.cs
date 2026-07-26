@@ -119,6 +119,10 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("1 is >= 0", true)]
     [InlineData("1 is < 0", false)]
     [InlineData("1 is <= 0", false)]
+    [InlineData("DayOfWeek.Wednesday is >= DayOfWeek.Monday", true)]
+    [InlineData("DayOfWeek.Sunday is < DayOfWeek.Monday", true)]
+    [InlineData("DayOfWeek.Wednesday is >= DayOfWeek.Monday and <= DayOfWeek.Friday", true)]
+    [InlineData("DayOfWeek.Saturday switch { >= DayOfWeek.Monday and <= DayOfWeek.Friday => \"weekday\", _ => \"weekend\" }", "weekend")]
     public void PatternRelation(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]

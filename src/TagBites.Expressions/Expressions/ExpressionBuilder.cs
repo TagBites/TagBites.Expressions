@@ -1274,7 +1274,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (!opr.HasValue)
                         return ToError(pattern);
 
-                    return Expression.MakeBinary(opr.Value, expression, right);
+                    // Enums have no relational operator of their own
+                    return expression.Type.IsEnum || right.Type.IsEnum
+                        ? TryBuildEnumBinaryOperation(pattern, opr.Value, expression, right)
+                        : Expression.MakeBinary(opr.Value, expression, right);
                 }
 
             // not
