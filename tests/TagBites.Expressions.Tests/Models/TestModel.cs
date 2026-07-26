@@ -30,6 +30,10 @@ internal class TestModel(int value = 1) : ITestModel
     public string Overloaded(int a) => "int";
     public string Overloaded(string a) => "string";
 
+    public int TakeProperty1(TestModel other) => other?.Property1 ?? -1;
+    public string Pick(object o) => "object";
+    public string Pick(TestModel m) => "model";
+
     public string Widen(int a, int b) => "int";
     public string Widen(long a, long b) => "long";
 

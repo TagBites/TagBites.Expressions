@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TagBites.Expressions.Extensions;
 using TagBites.Utils;
 
 namespace TagBites.Expressions;
@@ -71,6 +72,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             }
 
             expression = Expression.Default(_resultType);
+        }
+
+        if (expression is DelayNewExpression)
+        {
+            ToError(node, "Cannot infer type for 'new()' here.");
+            return null;
         }
 
         if (_resultType != null && expression.Type != _resultType)
@@ -333,6 +340,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             // operator ??
             if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.QuestionQuestionToken)
             {
+                if (left is DelayNewExpression)
+                    return ToError(node, "Cannot infer type for 'new()' here.");
+
                 var condition = left;
 
                 if (IsNullableType(left.Type))
@@ -347,6 +357,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             // Unknown
             return ToError(node, $"Unsupported binary operator '{node.OperatorToken.ValueText}'.");
         }
+
+        // Target-typed new() has no type of its own for a value operator
+        if (left is DelayNewExpression || right is DelayNewExpression)
+            return ToError(node, "Cannot infer type for 'new()' here.");
 
         // is operator
         if (expressionType == ExpressionType.TypeIs)
@@ -480,6 +494,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // (T)default -> default(T)
         if (expression is DelayDefaultExpression)
             return Expression.Default(type);
+
+        // (T)new() -> new T(...)
+        if (expression is DelayNewExpression delayNew)
+            return ResolveDelayNew(delayNew, type);
 
         return _checkedContext
             ? Expression.ConvertChecked(expression, type)
@@ -903,10 +921,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     public override Expression? VisitImplicitObjectCreationExpression(ImplicitObjectCreationExpressionSyntax node)
     {
-        if (_targetType == null)
-            return ToError(node, "Cannot infer type for 'new()' here.");
-
-        return CreateObject(node, _targetType, node.ArgumentList, node.Initializer);
+        return _targetType != null
+            ? CreateObject(node, _targetType, node.ArgumentList, node.Initializer)
+            : new DelayNewExpression(node);
     }
     public override Expression? VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node)
     {
@@ -1985,6 +2002,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return Expression.Block([arrayVariable], statements);
     }
+    private Expression? ResolveDelayNew(DelayNewExpression delayNew, Type targetType)
+    {
+        return CreateObject(delayNew.Node, targetType, delayNew.Node.ArgumentList, delayNew.Node.Initializer);
+    }
 
     private Type? ResolveType(TypeSyntax type)
     {
@@ -2442,6 +2463,31 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
     {
+        // new() operand
+        if (e1 is DelayNewExpression || e2 is DelayNewExpression)
+        {
+            if (e1 is DelayNewExpression && e2 is DelayNewExpression)
+            {
+                ToError(node, "Cannot infer type for 'new()' here.");
+                return false;
+            }
+
+            if (e1 is DelayNewExpression dn1)
+            {
+                if (ResolveDelayNew(dn1, e2.Type) is not { } created1)
+                    return false;
+                e1 = created1;
+            }
+            else if (e2 is DelayNewExpression dn2)
+            {
+                if (ResolveDelayNew(dn2, e1.Type) is not { } created2)
+                    return false;
+                e2 = created2;
+            }
+
+            return true;
+        }
+
         // Default
         if (e1 is DelayDefaultExpression || e2 is DelayDefaultExpression)
         {
@@ -2828,7 +2874,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return null;
     }
 
-    private static Expression ToIsNotNull(Expression expression)
+    internal static Expression ToIsNotNull(Expression expression)
     {
         if (Nullable.GetUnderlyingType(expression.Type) is { })
             return Expression.MakeMemberAccess(expression, expression.Type.GetProperty("HasValue")!);
@@ -3312,7 +3358,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 var argumentTypes = new List<(string, Type)>();
 
                 for (var i = 0; i < methodArguments.Count; i++)
-                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression)
+                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression and not DelayNewExpression)
                         TryExtractGenericArguments(methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType, methodArguments[i].Type, argumentTypes);
 
                 for (var i = 0; i < genericParameters.Length; i++)
@@ -3345,7 +3391,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 var anyShape = false;
                 for (var i = 0; i < count; i++)
-                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression && GetTupleShape(methodArguments[i]) != null)
+                    if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression and not DelayNewExpression && GetTupleShape(methodArguments[i]) != null)
                     {
                         anyShape = true;
                         break;
@@ -3356,7 +3402,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     lambdaBindings = new Dictionary<Type, ValueTupleShape?>();
                     var bound = new HashSet<Type>();
                     for (var i = 0; i < count; i++)
-                        if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression)
+                        if (methodArguments[i] is not DelayLambdaExpression and not DelayDefaultExpression and not DelayNewExpression)
                             ValueTupleShape.BindShape(openParameters[i].ParameterType, GetTupleShape(methodArguments[i]), lambdaBindings, bound, !typeof(Delegate).IsAssignableFrom(methodArguments[i].Type), _nameComparison, 0);
                 }
             }
@@ -3454,6 +3500,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     methodArguments[i] = Expression.Default(targetType);
                 }
 
+            // Resolve target-typed new() against the now-known parameter type
+            for (var i = 0; i < methodArguments.Count; i++)
+                if (methodArguments[i] is DelayNewExpression dn)
+                {
+                    var targetType = info.HasParams && i >= methodParameters.Length - 1 && methodArguments.Count != methodParameters.Length
+                        ? methodParameters[methodParameters.Length - 1].ParameterType.GetElementType()!
+                        : methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType;
+
+                    var created = ResolveDelayNew(dn, targetType);
+                    if (created == null)
+                        return null;
+
+                    methodArguments[i] = created;
+                }
+
             // Params array: pass a matching array directly (normal form) or collect the trailing arguments into a new array,
             // converting each to the element type (expanded form).
             if (info.HasParams)
@@ -3539,8 +3600,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var t1 = method1.Parameters[p1].ParameterType;
             var t2 = method2.Parameters[p2].ParameterType;
 
-            // The null literal has no source type, but still prefers the more specific (more derived) parameter type
-            if (IsNullLiteral(args[i]))
+            // The null literal and target-typed new() have no source type, but still prefer the more specific (more derived) parameter type
+            if (IsNullLiteral(args[i]) || args[i] is DelayNewExpression)
             {
                 if (t1 != t2)
                 {
@@ -4170,80 +4231,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         public ParameterExpression GetParameter(string name) => visitor._context.Parameters.First(x => x.Name == name);
         public Expression IncludeTypeInfo(Expression expression, object typeInfo) => WrapWithTypeInfo(expression, typeInfo);
     }
-
-    private class DelayLambdaExpression(LambdaExpressionSyntax node) : Expression
-    {
-        public LambdaExpressionSyntax Node { get; } = node;
-    }
-    private class DelayDefaultExpression : Expression;
-
-    private class ConditionalAccessExpression : Expression
-    {
-        private readonly Type _type;
-
-        private Expression Instance { get; }
-        private Expression Member { get; }
-
-        public override Type Type => _type;
-        public override bool CanReduce => true;
-        public override ExpressionType NodeType => ExpressionType.Extension;
-
-        public ConditionalAccessExpression(Expression instance, Expression member)
-        {
-            Instance = instance;
-            Member = member;
-
-            _type = member.Type;
-
-            if (_type.IsValueType && Nullable.GetUnderlyingType(_type) == null && _type != typeof(void))
-                _type = typeof(Nullable<>).MakeGenericType(_type);
-        }
-
-
-        public override Expression Reduce()
-        {
-            var instanceVariable = Variable(Instance.Type, "instance");
-            var member = new ReplaceExpressionVisitor(Instance, instanceVariable).Visit(Member)!;
-
-            if (_type != member.Type)
-                member = Convert(member, _type);
-
-            Expression nullResult = _type == typeof(void)
-                ? Empty()
-                : Constant(null, _type);
-
-            return Block(
-                [instanceVariable],
-                Assign(instanceVariable, Instance),
-                Condition(
-                    ToIsNotNull(instanceVariable),
-                    member,
-                    nullResult));
-        }
-        public override string ToString()
-        {
-            var instance = Instance.ToString();
-            var member = Member.ToString();
-
-            if (member.StartsWith(instance + "."))
-                return $"{instance}?{member.Substring(instance.Length)}";
-
-            return $"({instance != null} ? {member} : default)";
-        }
-    }
-    private sealed class ReplaceExpressionVisitor(Expression source, Expression replacement) : ExpressionVisitor
-    {
-        public override Expression? Visit(Expression? node)
-        {
-            if (node == null)
-                return null;
-
-            return ReferenceEquals(node, source)
-                ? replacement
-                : base.Visit(node)!;
-        }
-    }
-
     private class LambdaVariableContext(int count)
     {
         private readonly object[] _values = new object[count];
@@ -4252,5 +4239,4 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         public T GetValue<T>(int index) => (T)_values[index];
         public void SetValue(int index, object value) => _values[index] = value;
     }
-
 }
