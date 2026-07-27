@@ -73,4 +73,12 @@ public class LambdaTests : ExpressionTestBase
     [InlineData("new List<int> { 1, 2, 3, 4 }.RemoveAll(x => x % 2 == 0)", 2)]
     [InlineData("new List<int> { 1, 2, 3 }.FindAll(x => x > 1).Count", 2)]
     public void LambdaBindsToNonFuncDelegates(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("\"ab\".Sum(c => c)", 195)]
+    [InlineData("new byte[] { 1, 2, 3 }.Sum(b => b)", 6)]
+    [InlineData("new short[] { 1, 2 }.Sum(s => s)", 3)]
+    [InlineData("new byte[] { 1, 2 }.Average(b => b)", 1.5)]
+    [InlineData("new[] { 1, 2 }.Sum(x => x * 1.5)", 4.5)]
+    public void LambdaReturnImplicitConversion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }

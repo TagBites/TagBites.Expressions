@@ -2516,7 +2516,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return null;
 
         var invokeParameters = invoke.GetParameters();
-        if (invokeParameters.Length != lambda.Parameters.Count || invoke.ReturnType != lambda.Body.Type)
+        if (invokeParameters.Length != lambda.Parameters.Count)
             return null;
 
         // ReSharper disable once LoopCanBeConvertedToQuery
@@ -2524,7 +2524,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (invokeParameters[i].ParameterType != lambda.Parameters[i].Type)
                 return null;
 
-        return Expression.Lambda(delegateType, lambda.Body, lambda.Parameters);
+        // The body implicitly converts to the delegate's return type
+        var body = lambda.Body;
+        if (invoke.ReturnType != body.Type)
+        {
+            if (invoke.ReturnType == typeof(void)
+                || IsNullableType(body.Type) && !IsNullableType(invoke.ReturnType)
+                || TryConvertExpression(body, invoke.ReturnType) is not { } converted)
+                return null;
+
+            body = converted;
+        }
+
+        return Expression.Lambda(delegateType, body, lambda.Parameters);
     }
 
     private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
@@ -3752,14 +3764,38 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         for (var i = 0; i < args.Count; i++)
         {
-            // A 'default' matches any parameter type and a not-yet-bound lambda has no source type - neither can drive betterness
-            if (args[i] is DelayDefaultExpression or DelayLambdaExpression)
+            // A 'default' matches any parameter type
+            if (args[i] is DelayDefaultExpression)
                 continue;
 
             var p1 = method1.ArgumentMap?[i] ?? (method1.HasParams ? Math.Min(i, method1.Parameters.Length - 1) : i);
             var p2 = method2.ArgumentMap?[i] ?? (method2.HasParams ? Math.Min(i, method2.Parameters.Length - 1) : i);
             var t1 = method1.Parameters[p1].ParameterType;
             var t2 = method2.Parameters[p2].ParameterType;
+
+            // A lambda prefers the candidate with the narrower delegate return, e.g. Sum's Func<T, int> over Func<T, long>
+            if (args[i] is DelayLambdaExpression)
+            {
+                if (t1 != t2 && t1.GetMethod("Invoke")?.ReturnType is { } r1 && t2.GetMethod("Invoke")?.ReturnType is { } r2 && r1 != r2)
+                {
+                    if (Nullable.GetUnderlyingType(r2) == r1)
+                        return method1;
+
+                    if (Nullable.GetUnderlyingType(r1) == r2)
+                        return method2;
+
+                    var m1 = IsMatchingParameterType(r2, r1);
+                    var m2 = IsMatchingParameterType(r1, r2);
+
+                    if (m1 && !m2)
+                        return method1;
+
+                    if (m2 && !m1)
+                        return method2;
+                }
+
+                continue;
+            }
 
             // The null literal and target-typed new() have no source type, but still prefer the more specific (more derived) parameter type
             if (IsNullLiteral(args[i]) || args[i] is DelayNewExpression)
@@ -4129,8 +4165,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 continue;
             }
 
-            if (!IsMatchingParameterType(mpt, arguments[i].Type) && TryConvertConstant(arguments[i], mpt) == null)
-                return false;
+            if (IsMatchingParameterType(mpt, arguments[i].Type))
+                continue;
+
+            if (TryConvertConstant(arguments[i], mpt) != null)
+                continue;
+
+            if (arguments[i] is LambdaExpression lambdaArgument && RebindLambdaToDelegate(lambdaArgument, mpt) != null)
+                continue;
+
+            return false;
         }
 
         return true;
