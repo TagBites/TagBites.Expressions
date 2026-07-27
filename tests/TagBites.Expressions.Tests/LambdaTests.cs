@@ -62,4 +62,15 @@ public class LambdaTests : ExpressionTestBase
     [InlineData("new[] { DayOfWeek.Tuesday, DayOfWeek.Sunday }.Min()", DayOfWeek.Sunday)]
     [InlineData("new[] { DayOfWeek.Monday, DayOfWeek.Friday }.Max() == DayOfWeek.Friday", true)]
     public void EnumSequenceAggregatesKeepEnumType(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("new List<int> { 1, 2, 3 }.Find(x => x > 1)", 2)]
+    [InlineData("new List<int> { 1, 2, 3 }.FindIndex(x => x == 2)", 1)]
+    [InlineData("new List<int> { 1, 2, 3 }.Exists(x => x == 2)", true)]
+    [InlineData("new List<int> { 1, 2, 3 }.TrueForAll(x => x > 0)", true)]
+    [InlineData("new List<int> { 3, 1, 2 }.ConvertAll(x => x * 2).Sum()", 12)]
+    [InlineData("new List<int> { 1, 2, 3 }.ConvertAll(x => x.ToString())[0]", "1")]
+    [InlineData("new List<int> { 1, 2, 3, 4 }.RemoveAll(x => x % 2 == 0)", 2)]
+    [InlineData("new List<int> { 1, 2, 3 }.FindAll(x => x > 1).Count", 2)]
+    public void LambdaBindsToNonFuncDelegates(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }

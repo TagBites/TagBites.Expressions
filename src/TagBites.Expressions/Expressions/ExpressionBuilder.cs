@@ -2338,7 +2338,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return next;
     }
 
-    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, ValueTupleShape?[]? parameterShapes = null)
+    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, ValueTupleShape?[]? parameterShapes = null, Type? delegateType = null)
     {
         var simple = node as SimpleLambdaExpressionSyntax;
         var parenthesized = node as ParenthesizedLambdaExpressionSyntax;
@@ -2382,8 +2382,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (body == null)
                 return null;
 
-            // Result
-            var lambda = Expression.Lambda(body, parameters);
+            // Build the exact delegate type when known, otherwise infer Func/Action
+            LambdaExpression lambda;
+            if (delegateType != null)
+            {
+                var returnType = delegateType.GetMethod("Invoke")!.ReturnType;
+                if (returnType != typeof(void) && body.Type != returnType && TryConvertExpression(body, returnType) is { } convertedBody)
+                    body = convertedBody;
+
+                lambda = Expression.Lambda(delegateType, body, parameters);
+            }
+            else
+                lambda = Expression.Lambda(body, parameters);
 
             // Save body's tuple shape as the delegate's return-type shape
             if (GetTupleShape(body) is { } bodyShape && lambda.Type.IsGenericType && lambda.Type.Name.StartsWith("Func`", StringComparison.Ordinal))
@@ -2459,6 +2469,22 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             _ => throw new ArgumentOutOfRangeException()
         };
         // ReSharper restore StringLiteralTypo
+    }
+    private static LambdaExpression? RebindLambdaToDelegate(LambdaExpression lambda, Type delegateType)
+    {
+        if (lambda.Type == delegateType || !typeof(Delegate).IsAssignableFrom(delegateType) || delegateType.GetMethod("Invoke") is not { } invoke)
+            return null;
+
+        var invokeParameters = invoke.GetParameters();
+        if (invokeParameters.Length != lambda.Parameters.Count || invoke.ReturnType != lambda.Body.Type)
+            return null;
+
+        // ReSharper disable once LoopCanBeConvertedToQuery
+        for (var i = 0; i < invokeParameters.Length; i++)
+            if (invokeParameters[i].ParameterType != lambda.Parameters[i].Type)
+                return null;
+
+        return Expression.Lambda(delegateType, lambda.Body, lambda.Parameters);
     }
 
     private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
@@ -3411,22 +3437,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             for (var i = 0; i < methodArguments.Count; i++)
                 if (methodArguments[i] is DelayLambdaExpression dl)
                 {
-                    // Resolve parameters
+                    // Close already-known generic arguments in the delegate type
                     var lambdaType = methodParameters[Math.Min(i, methodParameters.Length - 1)].ParameterType;
-                    if (!lambdaType.IsGenericType)
+                    if (genericParameters != null)
+                        lambdaType = SubstituteGenericArguments(lambdaType, genericParameters, genericArguments!);
+
+                    // Parameter types from the delegate's Invoke, so any delegate shape works
+                    if (lambdaType.GetMethod("Invoke") is not { } invoke)
                         return null;
 
-                    var lambdaParameters = lambdaType.GetGenericArguments();
-
-                    // Substitute already-known type arguments, including those nested inside a constructed type
-                    // such as Func<TOuter, IEnumerable<TInner>, TResult> where TInner is known from an earlier argument.
-                    if (genericParameters != null)
-                        for (var j = 0; j < lambdaParameters.Length; j++)
-                            lambdaParameters[j] = SubstituteGenericArguments(lambdaParameters[j], genericParameters, genericArguments!);
-
-                    // var invokeMethod = lambdaType.GetMethod("Invoke")!;
-                    if (lambdaType.Name.StartsWith("Func`"))
-                        lambdaParameters = lambdaParameters.Take(lambdaParameters.Length - 1).ToArray();
+                    var lambdaParameters = invoke.GetParameters().ToFastArray(p => p.ParameterType);
 
                     // A lambda parameter type that still carries an unbound type argument cannot be used to build the lambda.
                     // ReSharper disable once LoopCanBeConvertedToQuery
@@ -3454,18 +3474,31 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         }
                     }
 
-                    // Expression
-                    var expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes);
+                    // Build only non-Func/Action delegates explicitly; Func/Action stay inferred to keep the C# overload preference
+                    var buildAsDelegate = !lambdaType.ContainsGenericParameters
+                        && !lambdaType.Name.StartsWith("Func`", StringComparison.Ordinal)
+                        && !lambdaType.Name.StartsWith("Action`", StringComparison.Ordinal);
+
+                    var expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes, buildAsDelegate ? lambdaType : null);
                     if (expression == null)
                         return null;
 
                     methodArguments[i] = expression;
 
-                    // Extract generics
+                    // Infer generics by matching the delegate Invoke signatures, so a generic return works across delegate families
                     if (method.IsGenericMethodDefinition)
                     {
                         var argumentTypes = new List<(string, Type)>();
-                        TryExtractGenericArguments(methodParameters[i].ParameterType, methodArguments[i].Type, argumentTypes);
+                        if (methodParameters[i].ParameterType.GetMethod("Invoke") is { } openInvoke && methodArguments[i].Type.GetMethod("Invoke") is { } builtInvoke)
+                        {
+                            var openInvokeParameters = openInvoke.GetParameters();
+                            var builtInvokeParameters = builtInvoke.GetParameters();
+
+                            for (var k = 0; k < openInvokeParameters.Length && k < builtInvokeParameters.Length; k++)
+                                TryExtractGenericArguments(openInvokeParameters[k].ParameterType, builtInvokeParameters[k].ParameterType, argumentTypes);
+
+                            TryExtractGenericArguments(openInvoke.ReturnType, builtInvoke.ReturnType, argumentTypes);
+                        }
 
                         for (var j = 0; j < genericArguments!.Length; j++)
                         {
@@ -3554,6 +3587,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                 if (parameterType != argumentType)
                 {
+                    // Rebind a Func/Action lambda to a signature-compatible delegate parameter
+                    if (methodArguments[i] is LambdaExpression lambdaArgument && RebindLambdaToDelegate(lambdaArgument, parameterType) is { } rebound)
+                    {
+                        methodArguments[i] = rebound;
+                        continue;
+                    }
+
                     var argument = methodArguments[i];
                     if (!EnsureArgumentType(parameterType, ref argument))
                         return null;
@@ -3788,7 +3828,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 }
             }
 
-            if (changed && !args.Any(x => x.IsGenericParameter))
+            // Build the partially-closed type even if some arguments stay open
+            if (changed)
                 return type.GetGenericTypeDefinition().MakeGenericType(args);
         }
 
