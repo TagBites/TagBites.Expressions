@@ -46,8 +46,20 @@ public class CollectionTests : ExpressionTestBase
     public void JaggedArray(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new byte[] { 1, 2, 3 }.Length", 3)]
+    [InlineData("new byte[] { 5, 200 }.Max()", (byte)200)]
+    [InlineData("new sbyte[] { -5, 5 }.Length", 2)]
+    [InlineData("new short[] { -1000, 1000 }.Max()", (short)1000)]
+    [InlineData("new ushort[] { 1, 65535 }.Length", 2)]
+    [InlineData("new List<byte> { 1, 2 }.Count", 2)]
+    [InlineData("Convert.ToBase64String(new byte[] { 65, 66 })", "QUI=")]
+    public void SmallIntegerArrayFromConstants(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
     [InlineData("new int[3][1]")]
+    [InlineData("new byte[] { 256 }")]
+    [InlineData("new short[] { 40000 }")]
     public void InvalidArrayCreation(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Fact]

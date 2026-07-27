@@ -485,6 +485,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expressionType == ExpressionType.Throw)
             return ToError(node, $"Unsupported unary operator '{node.OperatorToken.ValueText}'.");
 
+        // Fold so a negative literal stays a constant (C# constant conversion, e.g. new sbyte[] { -5 })
+        if (expressionType == ExpressionType.Negate && operand is ConstantExpression { Value: int constant })
+            return Expression.Constant(-constant);
+
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int
         if (expressionType is ExpressionType.OnesComplement or ExpressionType.Negate or ExpressionType.UnaryPlus)
             operand = PromoteSmallInteger(operand);
@@ -2618,7 +2622,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private bool EnsureArgumentType(Type parameterType, ref Expression argument)
     {
-        if (TryConvertExpression(argument, parameterType) is not { } converted)
+        if ((TryConvertExpression(argument, parameterType) ?? TryConvertConstant(argument, parameterType)) is not { } converted)
             return false;
 
         // A conversion makes a new expression; carry the shape across so names keep flowing,
@@ -2649,6 +2653,27 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return method != null
             ? Expression.Convert(expression, targetType, method)
             : null;
+    }
+    private static Expression? TryConvertConstant(Expression expression, Type targetType)
+    {
+        if (expression is not ConstantExpression { Value: int value })
+            return null;
+
+        var target = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        var fits = Type.GetTypeCode(target) switch
+        {
+            TypeCode.SByte => value is >= sbyte.MinValue and <= sbyte.MaxValue,
+            TypeCode.Byte => value is >= byte.MinValue and <= byte.MaxValue,
+            TypeCode.Int16 => value is >= short.MinValue and <= short.MaxValue,
+            TypeCode.UInt16 => value is >= ushort.MinValue and <= ushort.MaxValue,
+            TypeCode.UInt32 or TypeCode.UInt64 => value >= 0,
+            _ => false
+        };
+        if (!fits)
+            return null;
+
+        var constant = Expression.Constant(Convert.ChangeType(value, target), target);
+        return target == targetType ? constant : Expression.Convert(constant, targetType);
     }
     private static MethodInfo? FindConversionOperator(Type sourceType, Type targetType, string operatorName)
     {
@@ -4051,7 +4076,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 continue;
             }
 
-            if (!IsMatchingParameterType(mpt, arguments[i].Type))
+            if (!IsMatchingParameterType(mpt, arguments[i].Type) && TryConvertConstant(arguments[i], mpt) == null)
                 return false;
         }
 
