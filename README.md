@@ -141,6 +141,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
   `var` patterns, `when` guards.
 
 Not currently supported:
+- LINQ query syntax (`from x in items where x > 1 select x`) - use the method syntax (`items.Where(x => x > 1)`).
 - The range operator (`1..2`, `arr[1..^1]`).
 - Method group conversion as an argument (`items.Select(int.Parse)`) - use a lambda (`items.Select(x => int.Parse(x))`).
 - Tuple types in a type position (`default((int, int))`, `new (int A, int B)[] { ... }`) - name the elements through values instead.
