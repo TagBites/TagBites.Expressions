@@ -1463,15 +1463,33 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     {
                         foreach (var property in p.PropertyPatternClause.Subpatterns)
                         {
-                            var propertyName = property.NameColon!.Name.Identifier.Text;
-                            var propertyValueExpression = ResolveCustomMember(expression, propertyName)
-                                                          ?? ResolveMember(property, expression, propertyName);
-                            if (propertyValueExpression == null)
-                                return null;
+                            // Extended property pattern (A.B.C:) walks the member path with null checks on the intermediate steps
+                            Expression? guard = null;
+                            var propertyValueExpression = expression;
+
+                            foreach (var propertyName in GetPropertyPatternPath(property.ExpressionColon?.Expression))
+                            {
+                                if (propertyName == null)
+                                    return ToError(property);
+
+                                if (!ReferenceEquals(propertyValueExpression, expression) && (!propertyValueExpression.Type.IsValueType || IsNullableType(propertyValueExpression.Type)))
+                                {
+                                    var notNull = ToIsNotNull(propertyValueExpression);
+                                    guard = guard == null ? notNull : Expression.AndAlso(guard, notNull);
+                                }
+
+                                propertyValueExpression = ResolveCustomMember(propertyValueExpression, propertyName)
+                                                          ?? ResolveMember(property, propertyValueExpression, propertyName);
+                                if (propertyValueExpression == null)
+                                    return null;
+                            }
 
                             var condition = ResolvePattern(propertyValueExpression, property.Pattern);
                             if (condition == null)
                                 return null;
+
+                            if (guard != null)
+                                condition = Expression.AndAlso(guard, condition);
 
                             checkExpression = Expression.AndAlso(checkExpression, condition);
                         }
@@ -3387,6 +3405,27 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     break;
 
         return property?.PropertyType == typeof(int) && property.GetMethod is { IsPublic: true } ? property : null;
+    }
+    private static IEnumerable<string?> GetPropertyPatternPath(ExpressionSyntax? path)
+    {
+        switch (path)
+        {
+            case IdentifierNameSyntax id:
+                yield return id.Identifier.Text;
+                break;
+
+            case MemberAccessExpressionSyntax { Name: IdentifierNameSyntax name } ma:
+                {
+                    foreach (var item in GetPropertyPatternPath(ma.Expression))
+                        yield return item;
+                    yield return name.Identifier.Text;
+                    break;
+                }
+
+            default:
+                yield return null;
+                break;
+        }
     }
     private static bool TryExtractGenericArguments(Type parameterWithGeneric, Type argumentType, IList<(string, Type)>? argumentTypes)
     {

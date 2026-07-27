@@ -187,6 +187,10 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("m is { ChildNull: null, ChildTimesTen: { } }", true)]
     [InlineData("m is { ChildNull: null, ChildTimesTen: not { } }", false)]
     [InlineData("m is TestModel { ChildNull: null, ChildTimesTen: { } } a && a.ChildTimesTen.Value == 10", true)]
+    [InlineData("m is { ChildTimesTen.Value: 10 }", true)]
+    [InlineData("m is { ChildTimesTen.Value: 11 }", false)]
+    [InlineData("m is { ChildNull.Value: 1 }", false)]
+    [InlineData("s is { X: 1, Y: 2 } && \"ab\" is { Length: 2 }", true)]
     public void PatternProperty(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
