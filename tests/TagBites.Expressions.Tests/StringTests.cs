@@ -50,5 +50,10 @@ public class StringTests : ExpressionTestBase
     [InlineData("$\"{{literal {1 + 1}}}\"", "{literal 2}")]
     [InlineData("$\"{new DateTime(2021, 8, 14):yyyy-MM-dd}\"", "2021-08-14")]
     [InlineData("$\"{new DateTime(2021, 8, 14),12:yyyy-MM-dd}\"", "  2021-08-14")]
+    [InlineData("$\"{TimeSpan.FromMinutes(90):hh\\\\:mm}\"", "01:30")]
+    [InlineData("$\"a\\tb{1}\"", "a\tb1")]
+    [InlineData("$\"x\\ny\"", "x\ny")]
+    [InlineData("$\"\\u0041{1}\"", "A1")]
+    [InlineData("$@\"{1}\\n\"", "1\\n")]
     public void StringInterpolation(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 }

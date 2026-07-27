@@ -1656,7 +1656,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             switch (content)
             {
                 case InterpolatedStringTextSyntax item:
-                    format.Append(item.TextToken.Text);
+                    format.Append(item.TextToken.ValueText);
                     break;
 
                 case InterpolationSyntax item:
@@ -1664,7 +1664,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (expression == null)
                         return null;
 
-                    format.Append($"{{{args.Count}{item.AlignmentClause?.ToString()}{item.FormatClause?.ToString()}}}");
+                    var formatText = item.FormatClause != null
+                        ? ":" + item.FormatClause.FormatStringToken.ValueText
+                        : null;
+                    format.Append($"{{{args.Count}{item.AlignmentClause?.ToString()}{formatText}}}");
                     args.Add(ToCast(expression, typeof(object)));
                     break;
 
