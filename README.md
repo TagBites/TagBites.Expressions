@@ -132,7 +132,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Literals: all numeric types, `char`, `string`, verbatim, raw and interpolated strings, hex, digit separators.
 - Members and calls: properties, fields, indexers (including index-from-end `x[^1]`), generic and extension methods, `params`.
 - Named arguments (`Method(digits: 2, value: 1)`), including reordering, mixing positional and named arguments, and skipping optional parameters.
-- `new`: constructors, object initializers (including index initializers `["key"] = value`), collection initializers, arrays (jagged, multidimensional including implicitly typed `new[,]`, and sized), target-typed `new()`.
+- `new`: constructors, object initializers (including index initializers `["key"] = value`), collection initializers, arrays (jagged, multidimensional including implicitly typed `new[,]`, and sized), target-typed `new()` (including as a method or constructor argument).
 - Anonymous objects (`new { X = 1, Y = 2 }` - see Usage above).
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including named elements (`(Name: "Bob", Age: 30).Name`) and element-wise equality.
@@ -142,7 +142,9 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 
 Not currently supported:
 - The range operator (`1..2`, `arr[1..^1]`).
-- Target-typed `new()` as a method call argument (`obj.Method(new())`) - use an explicit type there for now.
+- Method group conversion as an argument (`items.Select(int.Parse)`) - use a lambda (`items.Select(x => int.Parse(x))`).
+- Tuple types in a type position (`default((int, int))`, `new (int A, int B)[] { ... }`) - name the elements through values instead.
+- The unsigned right-shift operator `>>>` - depends on the `Microsoft.CodeAnalysis.CSharp` version the parser is built against.
 
 Not supported:
  - Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.

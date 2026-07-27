@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Implicitly typed multidimensional arrays (`new[,] { { 1, 2 }, { 3, 4 } }`, `new[,,] { ... }`): only the explicitly typed form (`new int[,] { ... }`) worked before. The element type is inferred from the leaf elements, which must all have the same type. Example: `new[,] { { 1, 2 }, { 3, 4 } }[1, 0]` returns `3`.
 - Index initializers in object initializers (`new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }`): each entry assigns through the indexer setter. Works with any type that has an accessible indexer setter, and can be mixed with member assignments. The collection form (`{ { "a", 1 } }`) still works. Example: `new Dictionary<string, int> { ["a"] = 1 }["a"]` returns `1`.
 - Unbound generic types in `typeof` (`typeof(List<>)`, `typeof(Dictionary<,>)`).
+- Tuples with more than seven elements (`(1, 2, 3, 4, 5, 6, 7, 8, 9)`): built with a nested `Rest` and accessible by `.ItemN` or element name.
+- Target-typed `new()` as a method, constructor or indexer argument (`obj.Method(new())`, `obj.Method(new() { X = 1 })`): the type comes from the resolved parameter.
 
 ### Fixed
 - `Enumerable.Max` and `Enumerable.Min` with a selector lambda (for example `items.Max(x => x.Value)`) threw an internal `Extension node must override the property Expression.Type` error during overload resolution. The not-yet-bound lambda argument is now skipped when ranking overloads, and a more-specific-signature tie-break selects the correct member (a concrete `Func<TSource, int>` result over the fully generic `Func<TSource, TResult>`). `Sum` and `Average` were not affected.
@@ -26,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The bare `null` literal binds to reference and nullable parameters (for example `string.IsNullOrEmpty(null)`).
 - Enum constant patterns (`x is DayOfWeek.Monday`) and `var` deconstruction patterns (`(1, 2) is var (a, b)`) in `is` expressions.
 - Namespace-qualified closed generic types (for example `new System.Collections.Generic.List<int>()`).
+- Nested tuple element names now flow through direct `.ItemN` access (for example `(Name: "x", (Inner: 5, 6)).Item2.Inner`).
+- `Enumerable.Max`/`Min` over an enum array now returns the enum type instead of its underlying integer.
+- `uint` combined with a signed `sbyte`/`short`/`int` promotes both operands to `long` (for example `1u + 1` yields `2L`).
+- Relational patterns compare enum operands via the underlying type (for example `x is >= DayOfWeek.Monday`).
+- The string literal `"default"` is no longer parsed as the `default` keyword (`"default".Length` and `x ?? "default"` now work).
 
 ### Performance
 - Indexer property lookups are cached in the shared member cache.
