@@ -3490,8 +3490,11 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         var method0 = (MethodInfo)bestMethod.Method;
         expression = Expression.Call(instanceExpression, method0, bestMethod.Arguments);
-        if (_tupleShapes != null)
-            SetTupleShape(expression, ValueTupleShape.ComputeCallResultShape(method0, instanceExpression, bestMethod.Arguments, GetTupleShape, _nameComparison));
+
+        var resultShape = _tupleShapes != null
+            ? ValueTupleShape.ComputeCallResultShape(method0, instanceExpression, bestMethod.Arguments, GetTupleShape, _nameComparison)
+            : null;
+        SetTupleShape(expression, resultShape ?? ValueTupleShape.FromMethodReturn(method0));
         return true;
 
         MethodCallInfo? ToMatchingMethod(MethodBase x)

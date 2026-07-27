@@ -162,6 +162,43 @@ internal sealed class ValueTupleShape
     }
 
     /// <summary>
+    /// Shape declared by the method's return metadata (<c>TupleElementNamesAttribute</c>),
+    /// e.g. BCL methods returning named tuples like <c>Enumerable.Index</c>.
+    /// </summary>
+    public static ValueTupleShape? FromMethodReturn(MethodInfo method)
+    {
+        if (method.ReturnParameter?.GetCustomAttribute<System.Runtime.CompilerServices.TupleElementNamesAttribute>()?.TransformNames is not { Count: > 0 } names)
+            return null;
+
+        var index = 0;
+        return Build(method.ReturnType, names, ref index);
+
+        // Names are listed for each tuple type in a pre-order traversal of the return type
+        static ValueTupleShape? Build(Type type, IList<string?> names, ref int index)
+        {
+            string?[]? elementNames = null;
+            ValueTupleShape?[]? args = null;
+
+            if (type is { IsGenericType: true, Namespace: "System" } && type.Name.StartsWith("ValueTuple`", StringComparison.Ordinal))
+            {
+                var count = type.GetGenericArguments().Length;
+                for (var i = 0; i < count && index < names.Count; i++)
+                    if (names[index++] is { } name)
+                        (elementNames ??= new string?[count])[i] = name;
+            }
+
+            if (GetStructuralChildren(type) is { } children)
+                for (var i = 0; i < children.Length; i++)
+                    if (Build(children[i], names, ref index) is { } child)
+                        (args ??= new ValueTupleShape?[children.Length])[i] = child;
+
+            return elementNames != null || args != null
+                ? new ValueTupleShape { Names = elementNames, Args = args }
+                : null;
+        }
+    }
+
+    /// <summary>
     /// Result shape of a method call, propagating element names from the argument and instance shapes.
     /// </summary>
     public static ValueTupleShape? ComputeCallResultShape(MethodInfo method, Expression? instance, IList<Expression> arguments, Func<Expression, ValueTupleShape?> getShape, StringComparison nameComparison)

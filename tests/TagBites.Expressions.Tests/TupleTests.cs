@@ -136,6 +136,14 @@ public class TupleTests : ExpressionTestBase
     public void NestedTupleNamesThroughItemAccess(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new[] { 10, 20 }.Index().First().Index", 0)]
+    [InlineData("new[] { 10, 20 }.Index().Last().Item", 20)]
+    [InlineData("new[] { 10, 20 }.Index().Where(t => t.Index > 0).Sum(t => t.Item)", 20)]
+    [InlineData("new[] { 1 }.Zip(new[] { 2 }, new[] { 3 }).First().Second", 2)]
+    [InlineData("new[] { 1, 2 }.Zip(new[] { \"a\", \"b\" }).Last().Second", "b")]
+    public void TupleNamesFromMethodReturnMetadata(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("(true ? (a: 1, b: 2) : (a: 3, b: 4)).a", 1)]
     [InlineData("(false ? (a: 1, b: 2) : (a: 3, b: 4)).b", 4)]
     [InlineData("(true ? (a: 1, b: 2) : (a: 3, y: 4)).a", 1)]
