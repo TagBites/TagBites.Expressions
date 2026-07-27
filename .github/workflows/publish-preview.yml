@@ -15,6 +15,9 @@ jobs:
     - uses: TagBites/actions/dotnet-build@master
       with:
         solution: TagBites.Expressions.sln
+    - name: Drop symbol packages
+      run: find . -name "*.snupkg" -type f -delete
+      shell: bash
     - uses: TagBites/actions/nuget-publish@master
       with:
         nuget-source: "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
