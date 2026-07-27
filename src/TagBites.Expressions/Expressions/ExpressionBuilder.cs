@@ -1191,6 +1191,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (elementType == null)
             return ToError(node, "Type not found for implicit array creation.");
 
+        // Null literals take the inferred element type
+        for (var i = 0; i < elements.Count; i++)
+            if (IsNullLiteral(elements[i]))
+            {
+                var element = elements[i];
+                if (!EnsureArgumentType(elementType, ref element))
+                    return ToError(node, "Type not found for implicit array creation.");
+
+                elements[i] = element;
+            }
+
         if (rank != 1)
             return CreateMultiDimArray(elementType, rank, dimensions, elements);
 
@@ -1221,12 +1232,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (exp == null)
                         return false;
 
-                    if (elementType == null)
-                        elementType = exp.Type;
-                    else if (elementType != exp.Type)
+                    if (!IsNullLiteral(exp))
                     {
-                        ToError(node, "Type not found for implicit array creation.");
-                        return false;
+                        if (elementType == null)
+                            elementType = exp.Type;
+                        else if (elementType != exp.Type)
+                        {
+                            ToError(node, "Type not found for implicit array creation.");
+                            return false;
+                        }
                     }
 
                     elements.Add(exp);

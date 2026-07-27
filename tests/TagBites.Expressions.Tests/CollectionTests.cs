@@ -56,10 +56,19 @@ public class CollectionTests : ExpressionTestBase
     public void SmallIntegerArrayFromConstants(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new[] { \"a\", null }[1] == null", true)]
+    [InlineData("new[] { null, \"b\" }.Length", 2)]
+    [InlineData("new[] { \"a\", null, \"c\" }.Count(s => s == null)", 1)]
+    [InlineData("new[] { (int?)1, null }.Sum()", 1)]
+    public void ImplicitArrayWithNullElements(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
     [InlineData("new int[3][1]")]
     [InlineData("new byte[] { 256 }")]
     [InlineData("new short[] { 40000 }")]
+    [InlineData("new[] { 1, null }")]
+    [InlineData("new[] { null, null }")]
     public void InvalidArrayCreation(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Fact]
