@@ -163,7 +163,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (!EnsureTheSameTypes(node, ref whenTrue, ref whenFalse))
             return null;
 
-        return Expression.Condition(condition, whenTrue, whenFalse);
+        var result = Expression.Condition(condition, whenTrue, whenFalse);
+
+        // Tuple names survive only where both branches agree
+        if (_tupleShapes != null)
+            SetTupleShape(result, ValueTupleShape.MergeShapes(GetTupleShape(whenTrue), GetTupleShape(whenFalse), _nameComparison));
+
+        return result;
     }
     public override Expression? VisitSwitchExpression(SwitchExpressionSyntax node)
     {

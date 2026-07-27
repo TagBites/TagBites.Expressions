@@ -125,6 +125,19 @@ public class TupleTests : ExpressionTestBase
     public void NestedTupleNamesThroughItemAccess(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("(true ? (a: 1, b: 2) : (a: 3, b: 4)).a", 1)]
+    [InlineData("(false ? (a: 1, b: 2) : (a: 3, b: 4)).b", 4)]
+    [InlineData("(true ? (a: 1, b: 2) : (a: 3, y: 4)).a", 1)]
+    [InlineData("(true ? (a: 1, (i: 2, j: 3)) : (a: 4, (i: 5, j: 6))).Item2.i", 2)]
+    public void TupleNamesThroughConditional(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Fact]
+    public void TupleNamesThroughConditional_DroppedOnMismatch()
+    {
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("(true ? (a: 1, b: 2) : (x: 3, y: 4)).a"));
+    }
+
+    [Theory]
     [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item9", 9)]
     [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item1", 1)]
     [InlineData("(1, 2, 3, 4, 5, 6, 7, 8, 9).Item8", 8)]
