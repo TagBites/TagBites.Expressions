@@ -42,4 +42,40 @@ public class KeywordTests : ExpressionTestBase
     [InlineData("sizeof(double)", 8)]
     [InlineData("sizeof(decimal)", 16)]
     public void SizeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("true ? 1 : throw null", 1)]
+    [InlineData("\"x\" ?? throw null", "x")]
+    [InlineData("true ? 1 : throw new InvalidOperationException(\"boom\")", 1)]
+    public void ThrowExpression(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { AllowThrowExpressions = true, IncludedTypes = { typeof(InvalidOperationException) } };
+        ExecuteAndTest(script, options, expectedResult);
+    }
+
+    [Fact]
+    public void ThrowExpression_Throws()
+    {
+        var options = new ExpressionParserOptions { AllowThrowExpressions = true, IncludedTypes = { typeof(InvalidOperationException) } };
+        var func = ExpressionParser.Compile<Func<object>>("false ? 1 : throw new InvalidOperationException(\"boom\")", options.Fork(resultCastType: typeof(object)));
+
+        Assert.Throws<InvalidOperationException>(() => func());
+    }
+
+    [Theory]
+    [InlineData("true ? 1 : throw null")]
+    [InlineData("\"x\" ?? throw null")]
+    public void ThrowExpression_NotAllowedByDefault(string script)
+    {
+        Assert.Throws<ExpressionParserException>(() => ExpressionParser.Parse(script));
+    }
+
+    [Theory]
+    [InlineData("throw null")]
+    [InlineData("true ? 1 : throw 5")]
+    public void ThrowExpression_Invalid(string script)
+    {
+        var options = new ExpressionParserOptions { AllowThrowExpressions = true };
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, options));
+    }
 }

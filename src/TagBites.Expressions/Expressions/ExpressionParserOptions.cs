@@ -130,6 +130,19 @@ public class ExpressionParserOptions
         }
     }
     /// <summary>
+    /// True to allow <c>throw</c> expressions (for example <c>x > 0 ? x : throw new ArgumentException()</c>).
+    /// Default: <c>false</c>.
+    /// </summary>
+    public bool AllowThrowExpressions
+    {
+        get => Common.AllowThrowExpressions;
+        set
+        {
+            CheckReadOnly();
+            Common.AllowThrowExpressions = value;
+        }
+    }
+    /// <summary>
     /// True to allow <c>&lt;</c> / <c>&lt;=</c> / <c>&gt;</c> / <c>&gt;=</c> on strings, compared ordinally via <see cref="string.Compare(string, string)"/>.
     /// Not valid in real C#.
     /// Default: <c>false</c>.

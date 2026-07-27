@@ -7,6 +7,7 @@ internal class ExpressionBuilderOptions
     public bool AllowReflection;
     public bool AllowRuntimeCast;
     public bool AllowStringRelationalOperators;
+    public bool AllowThrowExpressions;
 
     public bool IgnoreBuiltInTypes;
     public Func<string, Type?>? TypeResolver;

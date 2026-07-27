@@ -26,6 +26,7 @@ internal sealed class CommonExpressionParserOptions : ExpressionBuilderOptions
         IgnoreCase = other.IgnoreCase;
         AllowRuntimeCast = other.AllowRuntimeCast;
         AllowStringRelationalOperators = other.AllowStringRelationalOperators;
+        AllowThrowExpressions = other.AllowThrowExpressions;
         IgnoreBuiltInTypes = other.IgnoreBuiltInTypes;
         TypeResolver = other.TypeResolver;
         CustomPropertyResolver = other.CustomPropertyResolver;

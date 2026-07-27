@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unbound generic types in `typeof` (`typeof(List<>)`, `typeof(Dictionary<,>)`).
 - Tuples with more than seven elements (`(1, 2, 3, 4, 5, 6, 7, 8, 9)`): built with a nested `Rest` and accessible by `.ItemN` or element name.
 - Target-typed `new()` as a method, constructor or indexer argument (`obj.Method(new())`, `obj.Method(new() { X = 1 })`): the type comes from the resolved parameter.
+- `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the new `AllowThrowExpressions` option (default `false`).
 
 ### Fixed
 - `Enumerable.Max` and `Enumerable.Min` with a selector lambda (for example `items.Max(x => x.Value)`) threw an internal `Extension node must override the property Expression.Type` error during overload resolution. The not-yet-bound lambda argument is now skipped when ranking overloads, and a more-specific-signature tie-break selects the correct member (a concrete `Func<TSource, int>` result over the fully generic `Func<TSource, TResult>`). `Sum` and `Average` were not affected.

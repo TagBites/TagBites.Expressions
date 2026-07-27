@@ -139,6 +139,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - `typeof`, `default(T)`, the bare `default` literal (target-typed), `nameof`, `sizeof`, `checked`, `unchecked`.
 - Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property, positional and
   `var` patterns, `when` guards.
+- `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the `AllowThrowExpressions` option.
 
 Not currently supported:
 - LINQ query syntax (`from x in items where x > 1 select x`) - use the method syntax (`items.Where(x => x > 1)`).
@@ -233,6 +234,7 @@ new[] { 1, 2, 3 }
 | Option | Purpose |
 |---|---|
 | `AllowReflection` | Allow reflection APIs. (default: `false`) |
+| `AllowThrowExpressions` | Allow `throw` expressions in `?:` and `??`. (default: `false`) |
 | `Parameters` | Typed parameters of the resulting lambda. |
 | `UseFirstParameterAsThis` | Use the first parameter as `this` so its members need no prefix. |
 | `GlobalMembers` | Named values and delegates usable by name; a member named `this` is implicit. |

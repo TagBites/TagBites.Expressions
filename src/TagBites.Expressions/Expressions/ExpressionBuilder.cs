@@ -74,9 +74,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             expression = Expression.Default(_resultType);
         }
 
-        if (expression is DelayNewExpression)
+        if (expression is DelayNewExpression or DelayThrowExpression)
         {
-            ToError(node, "Cannot infer type for 'new()' here.");
+            ToError(node, "Cannot infer the type of the expression here.");
             return null;
         }
 
@@ -359,8 +359,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             // operator ??
             if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.QuestionQuestionToken)
             {
-                if (left is DelayNewExpression)
-                    return ToError(node, "Cannot infer type for 'new()' here.");
+                if (left is DelayNewExpression or DelayThrowExpression)
+                    return ToError(node, "Cannot infer the type of the left operand here.");
 
                 var condition = left;
 
@@ -377,9 +377,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return ToError(node, $"Unsupported binary operator '{node.OperatorToken.ValueText}'.");
         }
 
-        // Target-typed new() has no type of its own for a value operator
-        if (left is DelayNewExpression || right is DelayNewExpression)
-            return ToError(node, "Cannot infer type for 'new()' here.");
+        // Target-typed new() and throw have no type of their own for a value operator
+        if (left is DelayNewExpression or DelayThrowExpression || right is DelayNewExpression or DelayThrowExpression)
+            return ToError(node, "Cannot infer type for the operand here.");
 
         // is operator
         if (expressionType == ExpressionType.TypeIs)
@@ -964,6 +964,22 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return _targetType != null
             ? CreateObject(node, _targetType, node.ArgumentList, node.Initializer)
             : new DelayNewExpression(node);
+    }
+    public override Expression? VisitThrowExpression(ThrowExpressionSyntax node)
+    {
+        if (!_options.AllowThrowExpressions)
+            return ToError(node, "Throw expressions are not allowed.");
+
+        var exception = Visit(node.Expression);
+        if (exception == null)
+            return null;
+
+        if (IsNullLiteral(exception))
+            exception = Expression.Constant(null, typeof(Exception));
+        else if (!typeof(Exception).IsAssignableFrom(exception.Type))
+            return ToError(node, "The thrown value must be an exception.");
+
+        return new DelayThrowExpression(exception);
     }
     public override Expression? VisitAnonymousObjectCreationExpression(AnonymousObjectCreationExpressionSyntax node)
     {
@@ -2541,6 +2557,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
     private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
     {
+        // throw operand takes the type of the other side, e.g. cond ? value : throw ex
+        if (e1 is DelayThrowExpression || e2 is DelayThrowExpression)
+        {
+            if (e1 is DelayThrowExpression && e2 is DelayThrowExpression)
+            {
+                ToError(node, "Cannot infer the type of 'throw' when both sides throw.");
+                return false;
+            }
+
+            if (e1 is DelayThrowExpression dt1)
+                e1 = Expression.Throw(dt1.Exception, e2.Type);
+            else if (e2 is DelayThrowExpression dt2)
+                e2 = Expression.Throw(dt2.Exception, e1.Type);
+
+            return true;
+        }
+
         // new() operand
         if (e1 is DelayNewExpression || e2 is DelayNewExpression)
         {
