@@ -55,6 +55,11 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("(int?)1 as int?", 1)]
     [InlineData("(int?)null as int?", null)]
     [InlineData("((ITestModel)m) as TestModel != null", true)]
+    [InlineData("new[] { 1, 2, 3 }.ToList() is List<int>", true)]
+    [InlineData("((object)\"x\") is List<int>", false)]
+    [InlineData("new[] { 1 } is int[]", true)]
+    [InlineData("((object)new List<int> { 1 }) as List<int> != null", true)]
+    [InlineData("((object)5) as List<int> == null", true)]
     public void IsAndAsOperators(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions

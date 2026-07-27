@@ -284,6 +284,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.MakeBinary(ExpressionType.Equal, left, constantValue);
         }
 
+        // is/as with a generic or array type (x is List<int>, x as int[]) - resolve the right side as a type
+        if ((SyntaxKind)node.OperatorToken.RawKind is SyntaxKind.IsKeyword or SyntaxKind.AsKeyword
+            && node.Right is GenericNameSyntax or ArrayTypeSyntax)
+        {
+            var type = ResolveType((TypeSyntax)node.Right);
+            if (type == null)
+                return null;
+
+            return (SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.IsKeyword
+                ? ToIsOperator(left, Expression.Constant(type))
+                : ToAsOperator(node, left, Expression.Constant(type));
+        }
+
         var right = Visit(node.Right);
         if (right == null)
             return null;
