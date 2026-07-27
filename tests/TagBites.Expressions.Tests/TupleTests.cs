@@ -84,7 +84,18 @@ public class TupleTests : ExpressionTestBase
     [InlineData("(1, 2) != (1, 3)", true)]
     [InlineData("""("a", 1) == ("a", 1)""", true)]
     [InlineData("(1, 2, 3) == (1, 2, 3)", true)]
+    [InlineData("(1, 2) == (1L, 2L)", true)]
+    [InlineData("(1L, 2L) == (1, 3)", false)]
+    [InlineData("(1, 2) != (1L, 3L)", true)]
+    [InlineData("(1, 2.0) == (1, 2)", true)]
+    [InlineData("""(1, "a") == (1L, "a")""", true)]
+    [InlineData("(1, (2, 3)) == (1L, (2L, 3L))", true)]
     public void TupleEquality(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("(1, 2) == (1, 2, 3)")]
+    [InlineData("""(1, "a") == (1, 2)""")]
+    public void TupleEquality_Invalid(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
     [InlineData("people.Select(x => (Age: x, AgeX2: x * 2)).First().Age", 7)]

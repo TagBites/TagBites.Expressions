@@ -428,11 +428,28 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         // Tuple has no == operator
         if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual
-            && left.Type == right.Type
-            && left.Type is { IsValueType: true, Namespace: "System" } && left.Type.Name.StartsWith("ValueTuple`"))
+            && IsValueTupleType(left.Type) && IsValueTupleType(right.Type))
         {
-            var equalsCall = Expression.Call(left, left.Type.GetMethod(nameof(Equals), [left.Type])!, right);
-            return expressionType == ExpressionType.Equal ? equalsCall : Expression.Not(equalsCall);
+            if (left.Type == right.Type)
+            {
+                var equalsCall = Expression.Call(left, left.Type.GetMethod(nameof(Equals), [left.Type])!, right);
+                return expressionType == ExpressionType.Equal ? equalsCall : Expression.Not(equalsCall);
+            }
+
+            // Different element types compare element-wise with implicit conversions
+            var leftVariable = Expression.Variable(left.Type);
+            var rightVariable = Expression.Variable(right.Type);
+            var comparison = TryBuildTupleEquality(node, leftVariable, rightVariable);
+            if (comparison == null)
+                return null;
+
+            if (expressionType == ExpressionType.NotEqual)
+                comparison = Expression.Not(comparison);
+
+            return Expression.Block([leftVariable, rightVariable],
+                Expression.Assign(leftVariable, left),
+                Expression.Assign(rightVariable, right),
+                comparison);
         }
 
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int before applying the operator
@@ -2765,6 +2782,36 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
             return null;
         }
+    }
+    private Expression? TryBuildTupleEquality(SyntaxNode node, Expression left, Expression right)
+    {
+        var count = left.Type.GetGenericArguments().Length;
+        if (count != right.Type.GetGenericArguments().Length)
+            return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+
+        Expression? result = null;
+
+        for (var i = 0; i < count; i++)
+        {
+            var name = i == 7 ? "Rest" : $"Item{i + 1}";
+            Expression leftItem = Expression.Field(left, name);
+            Expression rightItem = Expression.Field(right, name);
+
+            Expression? comparison;
+            if (IsValueTupleType(leftItem.Type) && IsValueTupleType(rightItem.Type))
+                comparison = TryBuildTupleEquality(node, leftItem, rightItem);
+            else if (EnsureTheSameTypes(node, ref leftItem, ref rightItem) && leftItem.Type == rightItem.Type)
+                comparison = Expression.Equal(leftItem, rightItem);
+            else
+                return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+
+            if (comparison == null)
+                return null;
+
+            result = result == null ? comparison : Expression.AndAlso(result, comparison);
+        }
+
+        return result;
     }
     private Expression? TryBuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
