@@ -417,7 +417,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         // Enum arithmetic
-        if (left.Type.IsEnum || right.Type.IsEnum)
+        if ((Nullable.GetUnderlyingType(left.Type) ?? left.Type).IsEnum || (Nullable.GetUnderlyingType(right.Type) ?? right.Type).IsEnum)
             return TryBuildEnumBinaryOperation(node, expressionType, left, right);
 
         // Tuple has no == operator
@@ -2737,6 +2737,36 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private Expression? TryBuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
+        // Nullable enum operand
+        var leftType = Nullable.GetUnderlyingType(left.Type) ?? left.Type;
+        var rightType = Nullable.GetUnderlyingType(right.Type) ?? right.Type;
+
+        if ((leftType != left.Type && leftType.IsEnum) || (rightType != right.Type && rightType.IsEnum))
+        {
+            var enumType = leftType.IsEnum ? leftType : rightType;
+            var operandType = typeof(Nullable<>).MakeGenericType(Enum.GetUnderlyingType(enumType));
+
+            if ((leftType.IsEnum && rightType.IsEnum && leftType != rightType)
+                || Lift(left) is not { } l
+                || Lift(right) is not { } r)
+            {
+                return ToError(node, $"Operator cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
+            }
+
+            return expressionType switch
+            {
+                ExpressionType.Equal or ExpressionType.NotEqual or ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual or ExpressionType.Subtract
+                    => Expression.MakeBinary(expressionType, l, r),
+                ExpressionType.And or ExpressionType.Or or ExpressionType.ExclusiveOr
+                    => Expression.Convert(Expression.MakeBinary(expressionType, l, r), typeof(Nullable<>).MakeGenericType(enumType)),
+                _ => ToError(node, $"Operator is not defined for the enum type '{enumType.GetFriendlyTypeName()}'.")
+            };
+
+            Expression? Lift(Expression e) => (Nullable.GetUnderlyingType(e.Type) ?? e.Type).IsEnum
+                ? Expression.Convert(e, operandType)
+                : TryConvertExpression(e, operandType);
+        }
+
         var leftIsEnum = left.Type.IsEnum;
         var rightIsEnum = right.Type.IsEnum;
 
