@@ -513,6 +513,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expressionType == ExpressionType.Negate && operand is ConstantExpression { Value: int constant })
             return Expression.Constant(-constant);
 
+        // C# complements an enum on its underlying type and converts back
+        if (expressionType == ExpressionType.OnesComplement && (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) is { IsEnum: true } enumType)
+        {
+            var underlyingType = Enum.GetUnderlyingType(enumType);
+            var operandType = operand.Type != enumType ? typeof(Nullable<>).MakeGenericType(underlyingType) : underlyingType;
+            var complement = Expression.OnesComplement(PromoteSmallInteger(Expression.Convert(operand, operandType)));
+            return Expression.Convert(complement, operand.Type);
+        }
+
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int
         if (expressionType is ExpressionType.OnesComplement or ExpressionType.Negate or ExpressionType.UnaryPlus)
             operand = PromoteSmallInteger(operand);
