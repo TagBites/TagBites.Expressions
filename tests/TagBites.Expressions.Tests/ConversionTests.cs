@@ -69,6 +69,13 @@ public class ConversionTests : ExpressionTestBase
     public void InvalidCastOperator(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
+    [InlineData("(DayOfWeek)2.5m", DayOfWeek.Tuesday)]
+    [InlineData("(DayOfWeek)6.9m", DayOfWeek.Saturday)]
+    [InlineData("(decimal)DayOfWeek.Friday == 5m", true)]
+    [InlineData("(DayOfWeek?)(decimal?)2.5m", DayOfWeek.Tuesday)]
+    public void DecimalEnumCast(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("!5")]
     [InlineData("!5ul")]
     [InlineData("!(int?)4")]

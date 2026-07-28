@@ -170,6 +170,19 @@ public class PatternMatchingTests : ExpressionTestBase
     public void PatternConstantConversion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("((object)5) is > 3", true)]
+    [InlineData("((object)2) is > 3", false)]
+    [InlineData("((object)5L) is > 3", false)]
+    [InlineData("((object)2.5) is < 3.5", true)]
+    [InlineData("((object)5) is 5", true)]
+    [InlineData("((object)5L) is 5", false)]
+    [InlineData("((object)5) is 3 or > 4", true)]
+    [InlineData("((object)null) is null or > 3", true)]
+    [InlineData("((object)'c') is >= 'a'", true)]
+    [InlineData("((object)5) is not 5", false)]
+    public void PatternOnObjectInput(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("1 is (1)", true)]
     [InlineData("1 is (2 or 1)", true)]
     [InlineData("1 is (1 or 2)", true)]

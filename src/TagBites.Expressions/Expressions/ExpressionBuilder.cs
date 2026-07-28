@@ -601,6 +601,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return ToError(node, $"Cannot convert type '{expression.Type.GetFriendlyTypeName()}' to '{type.GetFriendlyTypeName()}'.");
         }
 
+        // Linq Convert has no double-enum conversion
+        if (sourceType == typeof(decimal) && targetType.IsEnum || sourceType.IsEnum && targetType == typeof(decimal))
+        {
+            var underlyingType = Enum.GetUnderlyingType(targetType.IsEnum ? targetType : sourceType);
+            if (IsNullableType(expression.Type))
+                underlyingType = typeof(Nullable<>).MakeGenericType(underlyingType);
+
+            expression = Expression.Convert(expression, underlyingType);
+        }
+
         return _checkedContext
             ? Expression.ConvertChecked(expression, type)
             : Expression.Convert(expression, type);
@@ -1372,6 +1382,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
+                    // A value-type constant against an object input tests the runtime type first, e.g. (object)5 is 5
+                    if (expressionType == typeof(object) && right.Type.IsValueType)
+                        return Expression.AndAlso(
+                            ToIsOperator(expression, Expression.Constant(right.Type)),
+                            Expression.MakeBinary(ExpressionType.Equal, Expression.Convert(expression, right.Type), right));
+
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
 
@@ -1428,9 +1444,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
-                    if (!EnsureTheSameTypes(pattern, ref expression, ref right))
-                        return null;
-
                     var opr = (SyntaxKind)p.OperatorToken.RawKind switch
                     {
                         SyntaxKind.GreaterThanToken => ExpressionType.GreaterThan,
@@ -1441,6 +1454,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     };
                     if (!opr.HasValue)
                         return ToError(pattern);
+
+                    // A value-type constant against an object input tests the runtime type first, e.g. (object)5 is > 3
+                    if (expressionType == typeof(object) && right.Type.IsValueType)
+                        return Expression.AndAlso(
+                            ToIsOperator(expression, Expression.Constant(right.Type)),
+                            Expression.MakeBinary(opr.Value, Expression.Convert(expression, right.Type), right));
+
+                    if (!EnsureTheSameTypes(pattern, ref expression, ref right))
+                        return null;
 
                     // Enums have no relational operator of their own
                     return expression.Type.IsEnum || right.Type.IsEnum
@@ -2330,6 +2352,22 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         {
                             ret = null;
                         }
+                    }
+
+                    // Nested type, e.g. List<int>.Enumerator
+                    if (ret == null)
+                    {
+                        var outerType = name.Left switch
+                        {
+                            GenericNameSyntax => ResolveType(name.Left),
+                            IdentifierNameSyntax leftId => TryResolveTypeByName(leftId.Identifier.Text),
+                            _ => null
+                        };
+
+                        ret = outerType?.GetNestedType(id.Identifier.Text, BindingFlags.Public);
+
+                        if (ret is { IsGenericTypeDefinition: true } && outerType is { IsGenericType: true, IsGenericTypeDefinition: false })
+                            ret = ret.MakeGenericType(outerType.GetGenericArguments());
                     }
 
                     return ret

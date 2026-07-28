@@ -40,6 +40,8 @@ public class TypeResolveTests : ExpressionTestBase
     [InlineData("typeof(Double)", typeof(double))]
     [InlineData("typeof(Decimal)", typeof(decimal))]
     [InlineData("typeof(Object)", typeof(object))]
+    [InlineData("typeof(List<int>.Enumerator)", typeof(List<int>.Enumerator))]
+    [InlineData("typeof(Dictionary<,>.Enumerator)", typeof(Dictionary<,>.Enumerator))]
     public void BuiltInType(string script, Type expectedType)
     {
         // Exists
