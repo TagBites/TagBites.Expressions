@@ -117,6 +117,18 @@ public class TypeResolveTests : ExpressionTestBase
     }
 
     [Fact]
+    public void GenericTypeStaticAccess()
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(Comparer<>), typeof(EqualityComparer<>) } };
+
+        ExecuteAndTest("Comparer<int>.Default.Compare(1, 2) < 0", options, true);
+        ExecuteAndTest("EqualityComparer<string>.Default.Equals(\"a\", \"a\")", options, true);
+        ExecuteAndTest("EqualityComparer<int?>.Default.Equals(null, null)", options, true);
+        ExecuteAndTest("new[] { 3, 1 }.OrderBy(x => x, Comparer<int>.Default).First()", options, 1);
+        ExecuteAndTest("Comparer<DayOfWeek>.Default.Compare(DayOfWeek.Monday, DayOfWeek.Friday) < 0", options, true);
+    }
+
+    [Fact]
     public void IncludedTypes_ResolvesByName()
     {
         var options = new ExpressionParserOptions { ResultType = typeof(int), IncludedTypes = { typeof(TestModel) } };

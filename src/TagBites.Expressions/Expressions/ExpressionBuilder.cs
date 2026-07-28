@@ -1880,6 +1880,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             ? ToError(node, "Missing identifier.")
             : ToError(node, $"Unknown identifier '{name}'.");
     }
+    public override Expression? VisitGenericName(GenericNameSyntax node)
+    {
+        var type = ResolveType(node);
+        return type != null
+            ? Expression.Constant(type)
+            : null;
+    }
     private Expression? DeclareVariable(SyntaxNode node, Expression expression, string name)
     {
         if (_variables?.Any(x => string.Equals(x.Name, name, _nameComparison)) == true
