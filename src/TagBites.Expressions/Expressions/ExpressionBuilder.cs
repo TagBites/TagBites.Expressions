@@ -3308,6 +3308,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private Expression? ToAsOperator(SyntaxNode node, Expression left, Expression right)
     {
+        // A value type other than the nullable's underlying type is always null, e.g. 200 as long? (C# warns CS0458)
+        var castType = (Type)((ConstantExpression)right).Value!;
+        if (left.Type.IsValueType && Nullable.GetUnderlyingType(castType) is { } underlying
+            && underlying != (Nullable.GetUnderlyingType(left.Type) ?? left.Type))
+        {
+            return Expression.Block(left, Expression.Constant(null, castType));
+        }
+
         var castOperation = ToCastOperator(node, left, right, true);
         if (castOperation == null)
             return null;
@@ -3327,7 +3335,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (castType.IsAssignableFrom(expressionType) || expressionType.IsAssignableFrom(castType))
             return Expression.Convert(left, castType);
 
-        return ToError(node, $"Cannot convert value type '{left.Type}' to '{right.Type}' using build-in conversion.");
+        return ToError(node, $"Cannot convert value type '{left.Type.GetFriendlyTypeName()}' to '{castType.GetFriendlyTypeName()}' using build-in conversion.");
     }
 
     private IList<MethodInfo> GetIndexers(Type instanceType)

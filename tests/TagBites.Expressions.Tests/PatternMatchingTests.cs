@@ -60,6 +60,13 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("new[] { 1 } is int[]", true)]
     [InlineData("((object)new List<int> { 1 }) as List<int> != null", true)]
     [InlineData("((object)5) as List<int> == null", true)]
+    [InlineData("5 as int?", 5)]
+    [InlineData("(200 as long?) == null", true)]
+    [InlineData("200 as long? ?? -1", -1L)]
+    [InlineData("(2.5 as decimal?) == null", true)]
+    [InlineData("((long)5 as int?) ?? -1", -1)]
+    [InlineData("((int?)5 as long?) == null", true)]
+    [InlineData("((object)5 as int?) ?? -1", 5)]
     public void IsAndAsOperators(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions
