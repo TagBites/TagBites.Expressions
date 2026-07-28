@@ -762,7 +762,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         switch (instanceExpression)
         {
-            case ConstantExpression { Value: Type type }:
+            // A typeof(...) value keeps Expression.Type == typeof(Type) and is a Type instance, not a static type reference
+            case ConstantExpression { Value: Type type } constant when constant.Type != typeof(Type):
                 instanceExpression = null;
                 instanceType = type;
                 break;

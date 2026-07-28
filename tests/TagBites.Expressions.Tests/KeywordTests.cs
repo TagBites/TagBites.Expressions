@@ -15,6 +15,17 @@ public class KeywordTests : ExpressionTestBase
     public void TypeOfExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("typeof(int[]).GetElementType() == typeof(int)", true)]
+    [InlineData("typeof(int[,]).GetArrayRank()", 2)]
+    [InlineData("typeof(Dictionary<int, string>).GetGenericArguments().Length", 2)]
+    [InlineData("typeof(List<int>).GetGenericTypeDefinition() == typeof(List<>)", true)]
+    public void TypeOfReflectionCall(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { AllowReflection = true };
+        ExecuteAndTest(script, options, expectedResult);
+    }
+
+    [Theory]
     [InlineData("nameof(System)", "System")]
     [InlineData("nameof(v)", "v")]
     [InlineData("nameof(m.ChildTimesTen)", "ChildTimesTen")]
