@@ -372,7 +372,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 if (IsNullableType(left.Type))
                     left = Expression.MakeMemberAccess(left, left.Type.GetProperty(nameof(Nullable<>.Value))!);
 
-                if (!EnsureTheSameTypes(node, ref left, ref right))
+                if (!EnsureTheSameTypes(node, ref left, ref right, bestCommonOnly: true))
                     return null;
 
                 return Expression.Condition(ToIsNotNull(condition), left, right);
@@ -415,16 +415,22 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return Expression.MakeBinary(expressionType, compareExpression, Expression.Constant(0));
         }
 
-        // Operator || && for bool only
+        // Operator || && for plain bool only - C# defines only & and | for bool?
         if (expressionType is ExpressionType.AndAlso or ExpressionType.OrElse)
         {
-            var leftType = Nullable.GetUnderlyingType(left.Type) ?? left.Type;
-            if (leftType != typeof(bool))
+            if (left.Type != typeof(bool))
                 return ToError(node.Left, "Expected boolean expression.");
 
-            var rightType = Nullable.GetUnderlyingType(right.Type) ?? right.Type;
-            if (rightType != typeof(bool))
+            if (right.Type != typeof(bool))
                 return ToError(node.Right, "Expected boolean expression.");
+        }
+
+        // C# reference equality does not box, so object compared to a value type is an error
+        if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual
+            && !IsNullLiteral(left) && !IsNullLiteral(right)
+            && (left.Type == typeof(object) && right.Type.IsValueType || right.Type == typeof(object) && left.Type.IsValueType))
+        {
+            return ToError(node, $"Operator '{node.OperatorToken.ValueText}' cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
         }
 
         // Enum arithmetic

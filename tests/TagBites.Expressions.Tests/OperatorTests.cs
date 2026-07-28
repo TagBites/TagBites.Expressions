@@ -61,6 +61,29 @@ public class OperatorTests : ExpressionTestBase
     public void TernaryOperator(string script, object? expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("(object)\"s\" == \"s\"", true)]
+    [InlineData("((object)1) == ((object)1)", false)]
+    [InlineData("(object)null == null", true)]
+    [InlineData("(int?)4 ?? 2.5", 4.0)]
+    [InlineData("(int?)null ?? 5L", 5L)]
+    [InlineData("(bool?)true & (bool?)true", true)]
+    [InlineData("(bool?)null | (bool?)true", true)]
+    public void ReferenceEqualityAndCoalescing(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("(object)5 == 5")]
+    [InlineData("(object)5 != (byte)3")]
+    [InlineData("5 == (object)5")]
+    [InlineData("(object)true == true")]
+    [InlineData("(object)5 == (int?)5")]
+    [InlineData("(bool?)true && true")]
+    [InlineData("true && (bool?)true")]
+    [InlineData("false || (bool?)null")]
+    [InlineData("(int?)4 ?? (uint?)3u")]
+    [InlineData("(uint?)7u ?? (int?)7")]
+    public void InvalidOperatorOperands_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
     [InlineData("true ? (int?)4 : 5L")]
     [InlineData("true ? 2.5 : (int?)4")]
     [InlineData("true ? 2.5m : (int?)4")]
