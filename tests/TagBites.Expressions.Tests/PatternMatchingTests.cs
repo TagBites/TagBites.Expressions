@@ -152,7 +152,22 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("'B' is 5")]
     [InlineData("'B' is 4 or 5")]
     [InlineData("'B' is > 0 and < 10")]
+    [InlineData("5 is > 3f")]
+    [InlineData("5L is < 3.5")]
+    [InlineData("(int?)4 is > 3f")]
+    [InlineData("5 is 5L")]
     public void CharPatternWithIntConstant_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
+    [InlineData("2.5 is > 3f", false)]
+    [InlineData("2.5m is > 3", false)]
+    [InlineData("2.5f is < 3", true)]
+    [InlineData("5L is > 3", true)]
+    [InlineData("(byte)5 is 5", true)]
+    [InlineData("5 is 'B'", false)]
+    [InlineData("66 is 'B'", true)]
+    [InlineData("5u is >= 'a'", false)]
+    public void PatternConstantConversion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
     [InlineData("1 is (1)", true)]

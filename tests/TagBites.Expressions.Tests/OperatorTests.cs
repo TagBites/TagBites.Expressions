@@ -66,9 +66,14 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("(object)null == null", true)]
     [InlineData("(int?)4 ?? 2.5", 4.0)]
     [InlineData("(int?)null ?? 5L", 5L)]
+    [InlineData("(long?)5L ?? (int?)7", 5L)]
+    [InlineData("(long?)null ?? (int?)7", 7L)]
+    [InlineData("(double?)null ?? (uint?)3u", 3.0)]
+    [InlineData("(int?)4 ?? null", 4)]
+    [InlineData("(int?)null ?? null", null)]
     [InlineData("(bool?)true & (bool?)true", true)]
     [InlineData("(bool?)null | (bool?)true", true)]
-    public void ReferenceEqualityAndCoalescing(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+    public void ReferenceEqualityAndCoalescing(string script, object? expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
     [InlineData("(object)5 == 5")]

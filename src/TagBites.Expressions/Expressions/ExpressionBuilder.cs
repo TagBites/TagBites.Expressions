@@ -370,7 +370,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 var condition = left;
 
                 if (IsNullableType(left.Type))
-                    left = Expression.MakeMemberAccess(left, left.Type.GetProperty(nameof(Nullable<>.Value))!);
+                {
+                    var unwrapped = Expression.MakeMemberAccess(left, left.Type.GetProperty(nameof(Nullable<>.Value))!);
+
+                    if (right is not DelayThrowExpression and not DelayNewExpression and not DelayDefaultExpression)
+                    {
+                        // (long?)5L ?? (int?)7 is long?
+                        if ((TryConvertExpression(right, unwrapped.Type) ?? TryConvertConstant(right, unwrapped.Type)) is { } rightAsUnderlying)
+                            return Expression.Condition(ToIsNotNull(condition), unwrapped, rightAsUnderlying);
+
+                        if (right.Type != left.Type && (TryConvertExpression(right, left.Type) ?? TryConvertConstant(right, left.Type)) is { } rightAsNullable)
+                            return Expression.Condition(ToIsNotNull(condition), left, rightAsNullable);
+                    }
+
+                    left = unwrapped;
+                }
 
                 if (!EnsureTheSameTypes(node, ref left, ref right, bestCommonOnly: true))
                     return null;
@@ -1355,8 +1369,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (right == null)
                         return null;
 
-                    if (IsCharPatternMismatch(expressionType, right))
-                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not match the 'char' input.");
+                    if (IsPatternConstantMismatch(expressionType, right))
+                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
@@ -1411,8 +1425,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (right == null)
                         return null;
 
-                    if (IsCharPatternMismatch(expressionType, right))
-                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not match the 'char' input.");
+                    if (IsPatternConstantMismatch(expressionType, right))
+                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
@@ -1711,10 +1725,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         return ToError(pattern);
 
-        static bool IsCharPatternMismatch(Type inputType, Expression constant)
+        static bool IsPatternConstantMismatch(Type inputType, Expression constant)
         {
-            return (Nullable.GetUnderlyingType(inputType) ?? inputType) == typeof(char)
-                   && (Nullable.GetUnderlyingType(constant.Type) ?? constant.Type) != typeof(char);
+            if (IsNullLiteral(constant))
+                return false;
+
+            var input = Nullable.GetUnderlyingType(inputType) ?? inputType;
+            if (!TypeUtils.IsNumericType(input) && input != typeof(char))
+                return false;
+
+            return input != constant.Type
+                   && TryConvertExpression(constant, input) == null
+                   && TryConvertConstant(constant, input) == null;
         }
     }
     private static TypeSyntax? GetPatternNarrowingType(PatternSyntax pattern)
