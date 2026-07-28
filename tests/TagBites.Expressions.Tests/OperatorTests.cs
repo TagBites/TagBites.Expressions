@@ -111,6 +111,19 @@ public class OperatorTests : ExpressionTestBase
     }
 
     [Theory]
+    [InlineData("5ul + 5", 10ul)]
+    [InlineData("5 + 5ul", 10ul)]
+    [InlineData("10ul * 2", 20ul)]
+    [InlineData("7ul % 2", 1ul)]
+    [InlineData("ulong.MaxValue - 1", ulong.MaxValue - 1)]
+    [InlineData("uint.MaxValue / 2", uint.MaxValue / 2)]
+    [InlineData("3u - 1", 2u)]
+    [InlineData("1ul < 2", true)]
+    [InlineData("ulong.MaxValue > 100", true)]
+    [InlineData("3u + (-1)", 2L)]
+    public void UnsignedConstantPromotion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("TypeCode.Boolean + 1", TypeCode.Boolean + 1)]
     [InlineData("1 + TypeCode.Boolean", 1 + TypeCode.Boolean)]
     [InlineData("TypeCode.Boolean - 1", TypeCode.Boolean - 1)]

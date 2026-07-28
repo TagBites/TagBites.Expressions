@@ -2708,6 +2708,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return true;
         }
 
+        // C# constant conversion, e.g. the int literal in '5ul + 5' or '3u - 1' takes the unsigned type
+        if (TryConvertConstant(e2, t1) is { } constant2)
+        {
+            e2 = constant2;
+            return true;
+        }
+
+        if (TryConvertConstant(e1, t2) is { } constant1)
+        {
+            e1 = constant1;
+            return true;
+        }
+
         // uint mixed with a signed sbyte/short/int promotes both operands to long
         if ((t1 == typeof(uint) && (t2 == typeof(int) || t2 == typeof(short) || t2 == typeof(sbyte)))
             || (t2 == typeof(uint) && (t1 == typeof(int) || t1 == typeof(short) || t1 == typeof(sbyte))))
