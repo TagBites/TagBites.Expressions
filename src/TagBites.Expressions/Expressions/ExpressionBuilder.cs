@@ -457,9 +457,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 comparison);
         }
 
-        // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int before applying the operator
-        left = PromoteSmallInteger(left);
-        right = PromoteSmallInteger(right);
+        // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int before applying the operator,
+        // except against uint/ulong, where byte/ushort/char convert to the unsigned type directly (e.g. (byte)3 + 5ul is ulong)
+        var leftIsUnsigned = (Nullable.GetUnderlyingType(left.Type) ?? left.Type) is var lu && (lu == typeof(uint) || lu == typeof(ulong));
+        var rightIsUnsigned = (Nullable.GetUnderlyingType(right.Type) ?? right.Type) is var ru && (ru == typeof(uint) || ru == typeof(ulong));
+
+        if (!rightIsUnsigned)
+            left = PromoteSmallInteger(left);
+        if (!leftIsUnsigned)
+            right = PromoteSmallInteger(right);
 
         // For shift operators the shift count is always int
         if (expressionType is ExpressionType.LeftShift or ExpressionType.RightShift)
@@ -529,6 +535,10 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int
         if (expressionType is ExpressionType.OnesComplement or ExpressionType.Negate or ExpressionType.UnaryPlus)
             operand = PromoteSmallInteger(operand);
+
+        // C# has no unary minus for uint - the operand converts to long
+        if (expressionType == ExpressionType.Negate && (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) == typeof(uint))
+            operand = ToCast(operand, IsNullableType(operand.Type) ? typeof(long?) : typeof(long));
 
         if (_checkedContext && expressionType == ExpressionType.Negate)
             expressionType = ExpressionType.NegateChecked;
@@ -2800,11 +2810,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         // uint mixed with a signed sbyte/short/int promotes both operands to long
-        if ((t1 == typeof(uint) && (t2 == typeof(int) || t2 == typeof(short) || t2 == typeof(sbyte)))
-            || (t2 == typeof(uint) && (t1 == typeof(int) || t1 == typeof(short) || t1 == typeof(sbyte))))
+        var u1 = Nullable.GetUnderlyingType(t1) ?? t1;
+        var u2 = Nullable.GetUnderlyingType(t2) ?? t2;
+
+        if ((u1 == typeof(uint) && (u2 == typeof(int) || u2 == typeof(short) || u2 == typeof(sbyte)))
+            || (u2 == typeof(uint) && (u1 == typeof(int) || u1 == typeof(short) || u1 == typeof(sbyte))))
         {
-            e1 = Expression.Convert(e1, typeof(long));
-            e2 = Expression.Convert(e2, typeof(long));
+            var longType = u1 != t1 ? typeof(long?) : typeof(long);
+            e1 = Expression.Convert(e1, longType);
+            e2 = Expression.Convert(e2, longType);
             return true;
         }
 
@@ -2886,10 +2900,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
     private static Expression? TryConvertConstant(Expression expression, Type targetType)
     {
-        if (expression is not ConstantExpression { Value: int value })
+        if (expression is not ConstantExpression constant)
             return null;
 
         var target = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+        // A non-negative long constant converts to ulong
+        if (constant is { Value: long longValue })
+        {
+            if (longValue < 0 || target != typeof(ulong))
+                return null;
+
+            var ulongConstant = Expression.Constant((ulong)longValue, typeof(ulong));
+            return target == targetType ? ulongConstant : (Expression)Expression.Convert(ulongConstant, targetType);
+        }
+
+        if (constant is not { Value: int value })
+            return null;
         var fits = Type.GetTypeCode(target) switch
         {
             TypeCode.SByte => value is >= sbyte.MinValue and <= sbyte.MaxValue,
@@ -2902,8 +2929,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (!fits)
             return null;
 
-        var constant = Expression.Constant(Convert.ChangeType(value, target), target);
-        return target == targetType ? constant : Expression.Convert(constant, targetType);
+        var converted = Expression.Constant(Convert.ChangeType(value, target), target);
+        return target == targetType ? converted : Expression.Convert(converted, targetType);
     }
     private static MethodInfo? FindConversionOperator(Type sourceType, Type targetType, string operatorName)
     {
