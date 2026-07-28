@@ -2190,31 +2190,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     // Unbound generic (typeof(List<>), typeof(Dictionary<,>)): return the open definition.
                     if (arguments[0] is OmittedTypeArgumentSyntax)
-                        return ResolveType(type, genericName.Identifier.Text, arguments.Count);
-
-                    var elements = new List<Type>();
-                    foreach (var item in arguments)
                     {
-                        var elementType = ResolveType(item);
-                        if (elementType == null)
-                            return null;
-
-                        elements.Add(elementType);
+                        var definition = ResolveType(type, genericName.Identifier.Text, arguments.Count);
+                        return definition == null || definition.IsGenericTypeDefinition
+                            ? definition
+                            : ToTypeError(type, null);
                     }
-
-                    var genericType = ResolveType(type, genericName.Identifier.Text, elements.Count);
-                    return genericType?.MakeGenericType(elements.ToArray());
-                }
-
-            case QualifiedNameSyntax { Right: GenericNameSyntax gen } name:
-                {
-                    var arguments = gen.TypeArgumentList.Arguments;
-
-                    if (TryResolveTypeByName(gen.Identifier.Text, arguments.Count) is not { } open || open.Namespace != name.Left.ToString())
-                        return ToTypeError(type, null);
-
-                    if (arguments[0] is OmittedTypeArgumentSyntax)
-                        return open;
 
                     var elements = new Type[arguments.Count];
                     for (var i = 0; i < arguments.Count; i++)
@@ -2226,7 +2207,37 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         elements[i] = elementType;
                     }
 
-                    return open.MakeGenericType(elements);
+                    var genericType = ResolveType(type, genericName.Identifier.Text, elements.Length, elements);
+                    return genericType != null
+                        ? TryCloseGenericType(genericType, elements) ?? ToTypeError(type, null)
+                        : null;
+                }
+
+            case QualifiedNameSyntax { Right: GenericNameSyntax gen } name:
+                {
+                    var arguments = gen.TypeArgumentList.Arguments;
+
+                    if (arguments[0] is OmittedTypeArgumentSyntax)
+                    {
+                        return TryResolveTypeByName(gen.Identifier.Text, arguments.Count) is { IsGenericTypeDefinition: true } open && open.Namespace == name.Left.ToString()
+                            ? open
+                            : ToTypeError(type, null);
+                    }
+
+                    var elements = new Type[arguments.Count];
+                    for (var i = 0; i < arguments.Count; i++)
+                    {
+                        var elementType = ResolveType(arguments[i]);
+                        if (elementType == null)
+                            return null;
+
+                        elements[i] = elementType;
+                    }
+
+                    if (TryResolveTypeByName(gen.Identifier.Text, arguments.Count, elements) is not { } resolved || resolved.Namespace != name.Left.ToString())
+                        return ToTypeError(type, null);
+
+                    return TryCloseGenericType(resolved, elements) ?? ToTypeError(type, null);
                 }
 
             case QualifiedNameSyntax { Right: IdentifierNameSyntax id } name:
@@ -2255,12 +2266,20 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return ToTypeError(type, null);
         }
     }
-    private Type? ResolveType(SyntaxNode relatedNode, string typeName, int genericArguments = 0)
+    private Type? ResolveType(SyntaxNode relatedNode, string typeName, int genericArguments = 0, Type[]? genericArgumentTypes = null)
     {
-        return TryResolveTypeByName(typeName, genericArguments)
+        return TryResolveTypeByName(typeName, genericArguments, genericArgumentTypes)
                ?? ToTypeError(relatedNode, typeName);
     }
-    private Type? TryResolveTypeByName(string typeName, int genericArguments = 0)
+    private static Type? TryCloseGenericType(Type type, Type[] arguments)
+    {
+        if (type.IsGenericTypeDefinition)
+            return type.MakeGenericType(arguments);
+
+        // A closed generic included as typeof(SortedSet<int>) is available only with those exact arguments
+        return AreTypesEqual(type.GetGenericArguments(), arguments) ? type : null;
+    }
+    private Type? TryResolveTypeByName(string typeName, int genericArguments = 0, Type[]? genericArgumentTypes = null)
     {
         if (genericArguments > 0)
             typeName += "'" + genericArguments;
@@ -2272,8 +2291,19 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 return resultType;
         }
 
-        if (_context.IncludedTypes?.TryGetValue(typeName, out var type) == true && type != null)
-            return type;
+        if (_context.IncludedTypes is { Count: > 0 } includedTypes)
+        {
+            // A closed generic is stored under a key with its exact arguments, an open definition under the arity key
+            if (genericArgumentTypes != null
+                && includedTypes.TryGetValue(TypeCollection.GetKey(typeName, genericArgumentTypes), out var closedType)
+                && closedType != null)
+            {
+                return closedType;
+            }
+
+            if (includedTypes.TryGetValue(typeName, out var type) && type != null)
+                return type;
+        }
 
         foreach (var parameter in _context.Parameters)
             if (string.Equals(parameter.Type.Name, typeName, _nameComparison))

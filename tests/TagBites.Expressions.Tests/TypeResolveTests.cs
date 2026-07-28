@@ -89,6 +89,34 @@ public class TypeResolveTests : ExpressionTestBase
     }
 
     [Fact]
+    public void IncludedTypes_GenericType()
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(SortedSet<int>), typeof(Queue<>) } };
+
+        ExecuteAndTest("new SortedSet<int> { 3, 1 }.Min", options, 1);
+        ExecuteAndTest("new Queue<string>(new[] { \"a\", \"b\" }).Peek()", options, "a");
+        ExecuteAndTest("new Queue<int>(new[] { 5 }).Peek()", options, 5);
+        ExecuteAndTest("typeof(Queue<>) == typeof(Queue<>)", options, true);
+
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("new SortedSet<long> { 5L }", options));
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("typeof(SortedSet<>)", options));
+    }
+
+    [Fact]
+    public void IncludedTypes_GenericTypeCoexistence()
+    {
+        var closedPair = new ExpressionParserOptions { IncludedTypes = { typeof(SortedSet<int>), typeof(SortedSet<long>) } };
+        ExecuteAndTest("new SortedSet<int> { 2, 1 }.Min", closedPair, 1);
+        ExecuteAndTest("new SortedSet<long> { 5L }.Max", closedPair, 5L);
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse("new SortedSet<byte> { 1 }", closedPair));
+
+        var withOpen = new ExpressionParserOptions { IncludedTypes = { typeof(SortedSet<int>), typeof(SortedSet<>) } };
+        ExecuteAndTest("new SortedSet<int> { 2, 1 }.Min", withOpen, 1);
+        ExecuteAndTest("new SortedSet<long> { 9L }.Max", withOpen, 9L);
+        ExecuteAndTest("typeof(SortedSet<>) == typeof(SortedSet<>)", withOpen, true);
+    }
+
+    [Fact]
     public void IncludedTypes_ResolvesByName()
     {
         var options = new ExpressionParserOptions { ResultType = typeof(int), IncludedTypes = { typeof(TestModel) } };
