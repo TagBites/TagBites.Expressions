@@ -24,6 +24,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static readonly MethodInfo s_lvcGetValue = typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.GetValue))!;
     private static readonly MethodInfo s_lvcSetValue = typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.SetValue))!;
     private static readonly PropertyInfo s_anonymousObjectIndexer = typeof(IDictionary<string, object>).GetProperty("Item")!;
+    private static MethodInfo?[]? s_valueTupleCreate;
 
     private readonly ExpressionBuilderOptions _options;
     private readonly ExpressionBuilderContext _context;
@@ -4390,6 +4391,16 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             ? n - 1
             : null;
     }
+    private static MethodInfo?[] BuildValueTupleCreateTable()
+    {
+        var table = new MethodInfo?[8];
+
+        foreach (var method in typeof(ValueTuple).GetMethods(BindingFlags.Public | BindingFlags.Static))
+            if (method.Name == nameof(ValueTuple.Create) && method.GetParameters().Length is var count and >= 1 and <= 7)
+                table[count] = method;
+
+        return table;
+    }
     private static Expression? BuildValueTuple(IList<Expression> elements)
     {
         var count = elements.Count;
@@ -4398,8 +4409,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         if (count <= 7)
         {
-            var create = typeof(ValueTuple).GetMethods()
-                .FirstOrDefault(x => x.Name == nameof(ValueTuple.Create) && x.GetParameters().Length == count);
+            s_valueTupleCreate ??= BuildValueTupleCreateTable();
+            var create = s_valueTupleCreate[count];
             if (create == null)
                 return null;
 
