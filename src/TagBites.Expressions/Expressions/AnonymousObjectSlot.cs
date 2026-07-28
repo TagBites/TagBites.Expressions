@@ -70,6 +70,12 @@ internal abstract class AnonymousObject : DynamicObject, IDictionary<string, obj
             return hash;
         }
     }
+    public override string ToString()
+    {
+        return _values.Count > 0
+            ? "{ " + string.Join(", ", _values.Select(x => x.Key + " = " + x.Value)) + " }"
+            : "{ }";
+    }
 
     void IDictionary<string, object>.Add(string key, object value) => _values.Add(key, value);
     void ICollection<KeyValuePair<string, object>>.Add(KeyValuePair<string, object> item) => ((IDictionary<string, object>)_values).Add(item);

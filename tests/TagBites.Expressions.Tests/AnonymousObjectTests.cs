@@ -10,6 +10,13 @@ public class AnonymousObjectTests : ExpressionTestBase
     [InlineData("new[] { 1, 2, 3 }.Select(v => new { Doubled = v * 2 }).Sum(v => v.Doubled)", 12)]
     public void AnonymousObjectCreation(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
+    [Theory]
+    [InlineData("new { A = 1 }.ToString()", "{ A = 1 }")]
+    [InlineData("new { A = 1, B = \"x\" }.ToString()", "{ A = 1, B = x }")]
+    [InlineData("new { A = (string)null }.ToString()", "{ A =  }")]
+    [InlineData("$\"{new { A = 1, B = 2 }}\"", "{ A = 1, B = 2 }")]
+    public void AnonymousObjectToString(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
     [Fact]
     public void AnonymousObjectCreation_InferredMemberName()
     {
