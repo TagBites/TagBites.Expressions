@@ -47,6 +47,11 @@ public class KeywordTests : ExpressionTestBase
     [InlineData("true ? 1 : throw null", 1)]
     [InlineData("\"x\" ?? throw null", "x")]
     [InlineData("true ? 1 : throw new InvalidOperationException(\"boom\")", 1)]
+    [InlineData("0 switch { 0 => 1, _ => throw null }", 1)]
+    [InlineData("1 switch { 0 => throw null, _ => 5 }", 5)]
+    [InlineData("1 switch { 1 => 5, 0 => throw null }", 5)]
+    [InlineData("new int[0].Sum(x => throw null)", 0)]
+    [InlineData("new[] { 7 }.Sum(x => true ? x : throw null)", 7)]
     public void ThrowExpression(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions { AllowThrowExpressions = true, IncludedTypes = { typeof(InvalidOperationException) } };

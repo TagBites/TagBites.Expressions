@@ -252,17 +252,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             if (paths.Count == 0)
                 return ToError(node);
 
+            var resultArm = paths.FindLast(x => x.Then is not DelayThrowExpression);
+            if (resultArm.Then == null)
+                return ToError(node, "Cannot infer the switch type when every arm throws.");
+
             var exceptionConstructor = typeof(InvalidOperationException).GetConstructor([typeof(string)])!;
             switchExpression = Expression.Throw(
                 Expression.New(exceptionConstructor, Expression.Constant("The input was not matched by any switch expression arm.")),
-                paths[paths.Count - 1].Then.Type);
+                resultArm.Then.Type);
         }
 
         // Convert to if-else
         for (var i = paths.Count - 1; i >= 0; i--)
         {
             var then = paths[i].Then;
-            if (switchExpression.Type != then.Type && !EnsureTheSameTypes(node.Arms[i].Expression, ref then, ref switchExpression))
+            if (!EnsureTheSameTypes(node.Arms[i].Expression, ref then, ref switchExpression))
                 return null;
 
             if (switchExpression.Type != then.Type)
@@ -2458,7 +2462,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return next;
     }
 
-    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, ValueTupleShape?[]? parameterShapes = null, Type? delegateType = null)
+    private Expression? TryResolveLambda(LambdaExpressionSyntax node, Type[] parameterTypes, ValueTupleShape?[]? parameterShapes = null, Type? delegateType = null, Type? throwReturnSource = null)
     {
         var simple = node as SimpleLambdaExpressionSyntax;
         var parenthesized = node as ParenthesizedLambdaExpressionSyntax;
@@ -2501,6 +2505,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             var body = Visit(bodyNode);
             if (body == null)
                 return null;
+
+            // A throw body takes the delegate's return type, e.g. Sum(x => throw ...)
+            if (body is DelayThrowExpression delayThrow)
+            {
+                var returnType = (delegateType ?? throwReturnSource)?.GetMethod("Invoke")?.ReturnType;
+                if (returnType == null || returnType.ContainsGenericParameters)
+                    return null;
+
+                body = returnType == typeof(void)
+                    ? Expression.Throw(delayThrow.Exception)
+                    : Expression.Throw(delayThrow.Exception, returnType);
+            }
 
             // Build the exact delegate type when known, otherwise infer Func/Action
             LambdaExpression lambda;
@@ -3830,7 +3846,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
                     if (expression == null)
                     {
-                        expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes, buildAsDelegate ? lambdaType : null);
+                        expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes, buildAsDelegate ? lambdaType : null, lambdaType);
                         if (expression == null)
                             return null;
 
