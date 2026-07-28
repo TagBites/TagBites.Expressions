@@ -137,8 +137,8 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - Lambdas and LINQ (`Select`, `Where`, `GroupBy`, ...), including nested and multi-argument lambdas.
 - Tuples, including named elements (`(Name: "Bob", Age: 30).Name`) and element-wise equality.
 - `typeof`, `default(T)`, the bare `default` literal (target-typed), `nameof`, `sizeof`, `checked`, `unchecked`.
-- Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property, positional and
-  `var` patterns, `when` guards.
+- Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property (including extended `{ A.B: 1 }`),
+  positional, `var` and list patterns, `when` guards.
 - `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the `AllowThrowExpressions` option.
 
 Not currently supported:

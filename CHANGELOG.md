@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the new `AllowThrowExpressions` option (default `false`).
 
 ### Fixed
+- Implicit arrays now infer the C# best common element type instead of requiring identical element types. `new[] { 1, 2L }` is `long[]` and `new[] { (byte)1, 2 }` is `int[]`; previously both failed with a type-not-found error.
 - `Enumerable.Max` and `Enumerable.Min` with a selector lambda (for example `items.Max(x => x.Value)`) threw an internal `Extension node must override the property Expression.Type` error during overload resolution. The not-yet-bound lambda argument is now skipped when ranking overloads, and a more-specific-signature tie-break selects the correct member (a concrete `Func<TSource, int>` result over the fully generic `Func<TSource, TResult>`). `Sum` and `Average` were not affected.
 - Overload resolution now prefers a generic `IEnumerable<T>` overload over a `params object[]` one. `string.Join(",", new[] { 3, 1, 2 })` bound the array to `params object[]` and returned `"System.Int32[]"`; it now binds the generic `Join<T>(string, IEnumerable<T>)` overload and returns `"3,1,2"`. The betterness comparison previously read the open generic parameters (`IEnumerable<T>`) instead of the closed ones (`IEnumerable<int>`).
 - LINQ and other `IEnumerable<T>` extension methods now resolve on `string`, which is `IEnumerable<char>`. `"racecar".Count()`, `"abc".Reverse()` and similar calls previously failed with a method-not-found error, because generic-argument inference did not look through the interfaces of a non-generic type.
@@ -34,9 +35,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `uint` combined with a signed `sbyte`/`short`/`int` promotes both operands to `long` (for example `1u + 1` yields `2L`).
 - Relational patterns compare enum operands via the underlying type (for example `x is >= DayOfWeek.Monday`).
 - The string literal `"default"` is no longer parsed as the `default` keyword (`"default".Length` and `x ?? "default"` now work).
+- Lambdas bind to non-`Func`/`Action` delegate parameters such as `Predicate<T>`, `Converter<T, R>` and `Comparison<T>` (for example `list.Find(x => x > 1)`, `list.ConvertAll(x => x * 2)`).
+- Generic and array types resolve on the right side of `is`/`as` (for example `x is List<int>`, `x as int[]`).
+- Comparisons with a nullable enum operand are lifted (for example `(DayOfWeek?)x == DayOfWeek.Monday`).
+- C# constant conversions apply to `int` literals in range of a smaller integral type (for example `new byte[] { 1, 2 }`, `new List<byte> { 1 }`, `new sbyte[] { -5 }`).
+- Tuple element names survive a conditional where both branches agree (for example `(c ? (a: 1, b: 2) : (a: 3, b: 4)).a`).
+- Tuples with different element types compare element-wise with implicit conversions (for example `(1, 2) == (1L, 2L)`).
+- A lambda body implicitly converts to the delegate's return type (for example `"ab".Sum(c => c)`, `bytes.Sum(b => b)`).
+- Tuple element names declared by method return metadata are visible (for example `items.Index().First().Index`, `a.Zip(b).First().Second`).
+- Escape sequences resolve in interpolated string text and format clauses (for example `$"{ts:hh\\:mm}"`, `$"a\tb{x}"`).
+- Extended property patterns (`x is { B.Length: 1 }`), with null checks on the intermediate members like C#.
+- An implicit array infers its element type when some elements are `null` literals (for example `new[] { "a", null }` is `string[]`).
 
 ### Performance
 - Indexer property lookups are cached in the shared member cache.
+- Instance member, user-defined conversion operator and `ValueTuple.Create` lookups are cached; constructed generic methods are cached per options. All caches live on the options instance, so collectible assemblies can unload.
+- A lambda body is resolved once and reused across overload candidates with the same parameter types (for example the `Enumerable.Max`/`Min`/`Sum` overload sets).
 
 ## [1.3.2] - 2026-07-24
 
