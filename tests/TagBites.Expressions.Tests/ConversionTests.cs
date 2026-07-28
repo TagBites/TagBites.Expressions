@@ -58,7 +58,24 @@ public class ConversionTests : ExpressionTestBase
     [Theory]
     [InlineData("1d + 2m")]
     [InlineData("new DateTime(2021, 8, 14) + 2")]
+    [InlineData("(int)true")]
+    [InlineData("(byte)true")]
+    [InlineData("(double)true")]
+    [InlineData("(char)true")]
+    [InlineData("(bool)1")]
+    [InlineData("(bool)0.5")]
+    [InlineData("(DayOfWeek)true")]
+    [InlineData("(bool?)1")]
     public void InvalidCastOperator(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
+    [InlineData("!5")]
+    [InlineData("!5ul")]
+    [InlineData("!(int?)4")]
+    [InlineData("!'a'")]
+    [InlineData("!2.5")]
+    [InlineData("!DayOfWeek.Monday")]
+    public void LogicalNotOnNonBool_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
     [InlineData("1u + 1", 2u)]

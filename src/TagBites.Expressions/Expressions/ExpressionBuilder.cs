@@ -519,6 +519,14 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expressionType == ExpressionType.Throw)
             return ToError(node, $"Unsupported unary operator '{node.OperatorToken.ValueText}'.");
 
+        // Operator ! only for bool
+        if (expressionType == ExpressionType.Not
+            && (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) is { } notType && notType != typeof(bool)
+            && (notType.IsPrimitive || notType.IsEnum || notType == typeof(decimal)))
+        {
+            return ToError(node, $"Operator '!' cannot be applied to operand of type '{operand.Type.GetFriendlyTypeName()}'.");
+        }
+
         // Fold so a negative literal stays a constant (C# constant conversion, e.g. new sbyte[] { -5 })
         if (expressionType == ExpressionType.Negate && operand is ConstantExpression { Value: int constant })
             return Expression.Constant(-constant);
@@ -563,9 +571,21 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (expression is DelayNewExpression delayNew)
             return ResolveDelayNew(delayNew, type);
 
+        // No conversion between bool and other primitive types
+        var sourceType = Nullable.GetUnderlyingType(expression.Type) ?? expression.Type;
+        var targetType = Nullable.GetUnderlyingType(type) ?? type;
+
+        if (sourceType == typeof(bool) && IsNonBoolPrimitive(targetType)
+            || targetType == typeof(bool) && IsNonBoolPrimitive(sourceType))
+        {
+            return ToError(node, $"Cannot convert type '{expression.Type.GetFriendlyTypeName()}' to '{type.GetFriendlyTypeName()}'.");
+        }
+
         return _checkedContext
             ? Expression.ConvertChecked(expression, type)
             : Expression.Convert(expression, type);
+
+        static bool IsNonBoolPrimitive(Type type) => type != typeof(bool) && (type.IsPrimitive || type.IsEnum || type == typeof(decimal));
     }
     public override Expression? VisitDefaultExpression(DefaultExpressionSyntax node)
     {
