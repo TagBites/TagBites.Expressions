@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-07-29
 
 ### Added
 - `ExpressionParserOptions.Fork(resultType, resultCastType, parameters, useFirstParameterAsThis)`: creates a read-only variant that reuses the prepared, shared settings of the source instance (global members, included types, static imports, the reflection member cache and the resolution flags) while overriding the result type, result cast type, parameters or `this` handling. The shared lookups are prepared once and reused by every fork; only the parameters and `this` handling rebuild the parameter-specific part of the context. Pass `null` for any argument to inherit the source value.
@@ -14,39 +14,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Unbound generic types in `typeof` (`typeof(List<>)`, `typeof(Dictionary<,>)`).
 - Tuples with more than seven elements (`(1, 2, 3, 4, 5, 6, 7, 8, 9)`): built with a nested `Rest` and accessible by `.ItemN` or element name.
 - Target-typed `new()` as a method, constructor or indexer argument (`obj.Method(new())`, `obj.Method(new() { X = 1 })`): the type comes from the resolved parameter.
-- `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the new `AllowThrowExpressions` option (default `false`).
+- `throw` expressions in `?:`, `??`, switch expression arms and as a lambda body (`x > 0 ? x : throw new ArgumentException()`, `items.Sum(x => throw ...)`), opt-in via the new `AllowThrowExpressions` option (default `false`).
+- Constant and relational patterns against an `object` input, testing the runtime type first (`(object)5 is > 3` is `true`, `(object)5L is 5` is `false`), and the `and` pattern narrowing the type for its right side (`obj is int and > 5`).
+- Enum constant patterns (`x is DayOfWeek.Monday`), relational patterns on enums via the underlying type (`x is >= DayOfWeek.Monday`), `var` deconstruction patterns (`(1, 2) is var (a, b)`), extended property patterns (`x is { B.Length: 1 }`) with null checks on intermediate members, and generic or array types on the right side of `is`/`as` (`x is List<int>`, `x as int[]`).
+- Static member access on a generic type name (`Comparer<int>.Default`, `EqualityComparer<string>.Default`).
+- Type name resolution for nested types (`typeof(List<int>.Enumerator)`), CLR names of the built-in types (`Int32`, `Int64`, `String`, ...), and namespace-qualified closed generics (`new System.Collections.Generic.List<int>()`).
+- Lambdas bind to non-`Func`/`Action` delegate parameters (`Predicate<T>`, `Converter<T, R>`, `Comparison<T>`; for example `list.Find(x => x > 1)`), and a lambda body implicitly converts to the delegate's return type (`"ab".Sum(c => c)`).
 
 ### Fixed
-- `Cast<T>()` and `OfType<T>()` now resolve on collections that implement only the non-generic `IEnumerable`, such as multidimensional arrays (`new[,] { { 1, 2 } }.Cast<int>().Sum()`). The `Enumerable` extension lookup previously required `IEnumerable<T>`.
-- Implicit arrays now infer the C# best common element type instead of requiring identical element types. `new[] { 1, 2L }` is `long[]` and `new[] { (byte)1, 2 }` is `int[]`; previously both failed with a type-not-found error.
-- `Enumerable.Max` and `Enumerable.Min` with a selector lambda (for example `items.Max(x => x.Value)`) threw an internal `Extension node must override the property Expression.Type` error during overload resolution. The not-yet-bound lambda argument is now skipped when ranking overloads, and a more-specific-signature tie-break selects the correct member (a concrete `Func<TSource, int>` result over the fully generic `Func<TSource, TResult>`). `Sum` and `Average` were not affected.
-- Overload resolution now prefers a generic `IEnumerable<T>` overload over a `params object[]` one. `string.Join(",", new[] { 3, 1, 2 })` bound the array to `params object[]` and returned `"System.Int32[]"`; it now binds the generic `Join<T>(string, IEnumerable<T>)` overload and returns `"3,1,2"`. The betterness comparison previously read the open generic parameters (`IEnumerable<T>`) instead of the closed ones (`IEnumerable<int>`).
-- LINQ and other `IEnumerable<T>` extension methods now resolve on `string`, which is `IEnumerable<char>`. `"racecar".Count()`, `"abc".Reverse()` and similar calls previously failed with a method-not-found error, because generic-argument inference did not look through the interfaces of a non-generic type.
-- Members of a `typeof(...)` value now resolve against `System.Type`. `typeof(int).Name` previously failed with `Unknown member Name` because the value was treated as a static type reference (the mechanism behind `int.MaxValue`). `Name` and `IsValueType` work without reflection; other `Type` members require `AllowReflection`.
-- `Enumerable.Aggregate` with a result selector (the three-argument overload) no longer throws an index-out-of-range error during generic inference.
-- `Enumerable.GroupJoin` and similar calls now infer generic arguments nested in a lambda parameter type (for example `Func<T, IEnumerable<TInner>, TResult>`).
+- Numeric promotion and constant conversions follow the C# rules: `byte`/`ushort`/`char` convert directly to `uint`/`ulong` (`(byte)3 + 5ul` is `ulong`, `5u & (byte)3` is `uint`), an in-range `int` constant converts to the smaller or unsigned operand type (`5ul + 5` is `10ul`, `3u - 1` is `2u`, `new byte[] { 1, 2 }`), a non-negative `long` constant converts to `ulong` (`5L + 5ul` is `10ul`), `uint` with a signed operand promotes to `long` (also lifted: `5u + (int?)4` is `long?`), and unary minus on `uint` gives `long` (`-(5u)` is `-5L`).
+- The conditional operator and switch expression arms require an implicit conversion to one of the operand types, and `??` follows the C# order (the right operand converts to the unwrapped type, else to the nullable type itself, else the left converts to the right type). Mixed cases such as `true ? (int?)4 : 5L` or `(int?)4 ?? (uint?)3u` are rejected instead of promoting to `long`; binary operators still promote (`(int?)4 + 5L` is `long?`). A nullable numeric never converts implicitly to a non-nullable type.
+- Expressions the C# compiler rejects are now rejected: `==`/`!=` between `object` and a value type (`(object)5 == 5` was a silent reference comparison returning `false`), `&&`/`||` on `bool?` operands (`&` and `|` keep the three-valued logic), `!` on non-bool operands (`!5` was a bitwise complement), and casts between `bool` and numeric, `char` or enum types (`(int)true` returned `1`).
+- A pattern constant must convert to the input type like in C#: `5L is < 3.5`, `5 is > 3f` and `'B' is 5` are rejected, while `2.5m is > 3` and `66 is 'B'` work through constant conversion.
 - Switch-arm pattern variables are scoped to their own arm, so the same name can appear in several arms.
-- Named-tuple element names flow from an array literal into LINQ lambdas (for example `new[] { (Name: "x", Val: 1) }.Sum(t => t.Val)`).
-- A numeric operand is promoted to a user-defined operator's parameter type (for example `TimeSpan.FromHours(1) * 2`).
-- The bare `null` literal binds to reference and nullable parameters (for example `string.IsNullOrEmpty(null)`).
-- Enum constant patterns (`x is DayOfWeek.Monday`) and `var` deconstruction patterns (`(1, 2) is var (a, b)`) in `is` expressions.
-- Namespace-qualified closed generic types (for example `new System.Collections.Generic.List<int>()`).
-- Nested tuple element names now flow through direct `.ItemN` access (for example `(Name: "x", (Inner: 5, 6)).Item2.Inner`).
-- `Enumerable.Max`/`Min` over an enum array now returns the enum type instead of its underlying integer.
-- `uint` combined with a signed `sbyte`/`short`/`int` promotes both operands to `long` (for example `1u + 1` yields `2L`).
-- Relational patterns compare enum operands via the underlying type (for example `x is >= DayOfWeek.Monday`).
-- The string literal `"default"` is no longer parsed as the `default` keyword (`"default".Length` and `x ?? "default"` now work).
-- Lambdas bind to non-`Func`/`Action` delegate parameters such as `Predicate<T>`, `Converter<T, R>` and `Comparison<T>` (for example `list.Find(x => x > 1)`, `list.ConvertAll(x => x * 2)`).
-- Generic and array types resolve on the right side of `is`/`as` (for example `x is List<int>`, `x as int[]`).
-- Comparisons with a nullable enum operand are lifted (for example `(DayOfWeek?)x == DayOfWeek.Monday`).
-- C# constant conversions apply to `int` literals in range of a smaller integral type (for example `new byte[] { 1, 2 }`, `new List<byte> { 1 }`, `new sbyte[] { -5 }`).
-- Tuple element names survive a conditional where both branches agree (for example `(c ? (a: 1, b: 2) : (a: 3, b: 4)).a`).
-- Tuples with different element types compare element-wise with implicit conversions (for example `(1, 2) == (1L, 2L)`).
-- A lambda body implicitly converts to the delegate's return type (for example `"ab".Sum(c => c)`, `bytes.Sum(b => b)`).
-- Tuple element names declared by method return metadata are visible (for example `items.Index().First().Index`, `a.Zip(b).First().Second`).
-- Escape sequences resolve in interpolated string text and format clauses (for example `$"{ts:hh\\:mm}"`, `$"a\tb{x}"`).
-- Extended property patterns (`x is { B.Length: 1 }`), with null checks on the intermediate members like C#.
-- An implicit array infers its element type when some elements are `null` literals (for example `new[] { "a", null }` is `string[]`).
+- The `as` operator with a nullable type whose underlying type does not match a value-type operand gives `null` like C# (`200 as long? ?? -1` is `-1`); previously it failed with an internal error.
+- Casts between `decimal` and an enum type work in both directions (`(DayOfWeek)2.5m`, `(decimal)DayOfWeek.Friday`) by going through the enum's underlying type.
+- The `~` operator works on enum types (`flags & ~StringSplitOptions.TrimEntries`): the complement is computed on the underlying type and converted back.
+- Members and method calls on a `typeof(...)` value resolve against `System.Type` (`typeof(int).Name`; `typeof(int[]).GetElementType()` with `AllowReflection`); the value was treated as a static type reference (the mechanism behind `int.MaxValue`).
+- A generic type added to `IncludedTypes` resolves by name; a closed generic (`typeof(SortedSet<int>)`) is available only with those exact arguments, an open definition (`typeof(Queue<>)`) with any.
+- Overload resolution betterness matches the C# compiler: an expanded `params` candidate compares by element type (`"a,b;c".Split(',', ';')` gives 3 parts, not 2), a more specific parameter type beats an assignable one (`1L.Equals(1)` is `true`), a closed generic `IEnumerable<T>` overload beats `params object[]` (`string.Join(",", new[] { 3, 1, 2 })` is `"3,1,2"`), and a not-yet-bound lambda argument no longer breaks ranking (`items.Max(x => x.Value)` threw an internal error), with the more specific signature as a tie-break.
+- Generic arguments infer from array parameters (`Array.Exists(new[] { 1, 2 }, x => x > 1)`, `Array.ConvertAll`), through the interfaces of a non-generic type (`"racecar".Count()` - `string` is `IEnumerable<char>`), from types nested in a lambda parameter type (`GroupJoin`), and `Aggregate` with a result selector no longer throws during inference.
+- Named tuple element names flow everywhere C# preserves them: from an array literal into LINQ lambdas (`new[] { (Name: "x", Val: 1) }.Sum(t => t.Val)`), through nested `.ItemN` access, through a conditional where both branches agree, and from method return metadata (`items.Index().First().Index`, `a.Zip(b).First().Second`).
+- Tuples with different element types compare element-wise with implicit conversions (`(1, 2) == (1L, 2L)`).
+- An implicit array infers the C# best common element type (`new[] { 1, 2L }` is `long[]`, `new[] { (byte)1, 2 }` is `int[]`) and accepts `null` literal elements (`new[] { "a", null }` is `string[]`).
+- `Cast<T>()` and `OfType<T>()` resolve on collections that implement only the non-generic `IEnumerable`, such as multidimensional arrays.
+- `Enumerable.Max`/`Min` over an enum array returns the enum type instead of its underlying integer.
+- Comparisons with a nullable enum operand are lifted (`(DayOfWeek?)x == DayOfWeek.Monday`).
+- A numeric operand is promoted to a user-defined operator's parameter type (`TimeSpan.FromHours(1) * 2`).
+- The bare `null` literal binds to reference and nullable parameters (`string.IsNullOrEmpty(null)`).
+- An anonymous object's `ToString()` returns the C# anonymous type format (`{ A = 1, B = x }`) instead of the internal type name.
+- The string literal `"default"` is no longer parsed as the `default` keyword (`"default".Length` works).
+- Escape sequences resolve in interpolated string text and format clauses (`$"{ts:hh\\:mm}"`, `$"a\tb{x}"`).
 
 ### Performance
 - Indexer property lookups are cached in the shared member cache.
@@ -207,6 +205,10 @@ A large expansion of the supported C# expression grammar, plus several correctne
 ### Added
 - Initial release. Converts C# text expressions into `System.Linq.Expressions` using Roslyn.
 
+[1.4.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.3.2...1.4.0
+[1.3.2]: https://github.com/TagBites/TagBites.Expressions/compare/1.3.1...1.3.2
+[1.3.1]: https://github.com/TagBites/TagBites.Expressions/compare/1.3.0...1.3.1
+[1.3.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.2.1...1.3.0
 [1.2.1]: https://github.com/TagBites/TagBites.Expressions/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.2...1.2.0
 [1.1.2]: https://github.com/TagBites/TagBites.Expressions/compare/1.1.1...1.1.2

@@ -17,7 +17,7 @@ int r = func(2, 4); // 3
 
 Because Roslyn does the parsing, expressions use real C# syntax: operators, precedence, numeric promotion, implicit conversions, pattern matching, tuples, lambdas, LINQ and generics behave like they do in the C# compiler. If C# accepts the expression, TagBites.Expressions accepts it; if C# rejects it, so does the parser.
 
-[Try it online](https://tagbites.github.io/TagBites.Expressions/) - type an expression and evaluate it in the browser.
+[Try it online](https://tagbites.com/expressions/demo) - type an expression and evaluate it in the browser.
 
 ## Install
 
@@ -147,6 +147,9 @@ Not currently supported:
 - Method group conversion as an argument (`items.Select(int.Parse)`) - use a lambda (`items.Select(x => int.Parse(x))`).
 - Tuple types in a type position (`default((int, int))`, `new (int A, int B)[] { ... }`) - name the elements through values instead.
 - The unsigned right-shift operator `>>>` - depends on the `Microsoft.CodeAnalysis.CSharp` version the parser is built against.
+- Invoking a delegate value (`((Func<int, int>)(x => x * 2))(5)`, `new Func<int, int>(x => x + 1)(4)`) - call a method instead.
+- Wrapping a lambda in a delegate creation inside another lambda (`items.Select(x => new Func<int, int>(y => x + y))`).
+- Compile-time evaluation of constant expressions. C# rejects an out-of-range constant conversion (`(byte)(-4)`, CS0221) and a constant overflow (`uint.MaxValue + 1`, CS0220) unless wrapped in `unchecked`; the parser accepts both and wraps the value at runtime, as C# does for a non-constant value (`(byte)(-4)` is `252`).
 
 Not supported:
  - Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.
