@@ -3393,7 +3393,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         List<MethodInfo>? members = null;
 
         // From known extensions
-        if (TypeUtils.ContainsGenericDefinition(instanceType, typeof(IEnumerable<>)))
+        if (typeof(System.Collections.IEnumerable).IsAssignableFrom(instanceType))
             FindMembers(typeof(Enumerable));
 
         // From included types

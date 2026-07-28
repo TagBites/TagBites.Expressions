@@ -150,6 +150,7 @@ Not currently supported:
 
 Not supported:
  - Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.
+ - Block-bodied lambdas (`items.Select(x => { ...; return x; })`) - a block is a statement.
  - Compound assignment and increment/decrement (`x += 1`, `x++`, `--x`, `??=`) - this is an expression parser, expressions don't mutate variables.
  - `ref`/`out` arguments, including `out var` declarations (e.g. `int.TryParse(s, out var n)`).
 

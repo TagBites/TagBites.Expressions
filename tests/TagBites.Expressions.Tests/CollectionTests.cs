@@ -81,6 +81,14 @@ public class CollectionTests : ExpressionTestBase
     public void ImplicitArrayBestCommonType(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new[,] { { 1L, 2L }, { 3L, 4L } }.Cast<long>().Sum()", 10L)]
+    [InlineData("new[,] { { 1, 2L }, { 3, 4 } }.Cast<long>().Sum()", 10L)]
+    [InlineData("new[,] { { 1, 2 }, { 3, 4 } }.Cast<int>().Max()", 4)]
+    [InlineData("new[,] { { 1, 2 } }.OfType<int>().Count()", 2)]
+    [InlineData("new[] { (object)1, \"a\" }.OfType<string>().Count()", 1)]
+    public void MultiDimensionalArrayLinq(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
     [InlineData("new int[3][1]")]
     [InlineData("new byte[] { 256 }")]
