@@ -1349,6 +1349,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (right == null)
                         return null;
 
+                    if (IsCharPatternMismatch(expressionType, right))
+                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not match the 'char' input.");
+
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
 
@@ -1401,6 +1404,9 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     var right = Visit(p.Expression);
                     if (right == null)
                         return null;
+
+                    if (IsCharPatternMismatch(expressionType, right))
+                        return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not match the 'char' input.");
 
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
@@ -1698,6 +1704,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return ToError(pattern);
+
+        static bool IsCharPatternMismatch(Type inputType, Expression constant)
+        {
+            return (Nullable.GetUnderlyingType(inputType) ?? inputType) == typeof(char)
+                   && (Nullable.GetUnderlyingType(constant.Type) ?? constant.Type) != typeof(char);
+        }
     }
     private static TypeSyntax? GetPatternNarrowingType(PatternSyntax pattern)
     {

@@ -148,6 +148,13 @@ public class PatternMatchingTests : ExpressionTestBase
     public void PatternUnaryOperator(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("'B' is > 3")]
+    [InlineData("'B' is 5")]
+    [InlineData("'B' is 4 or 5")]
+    [InlineData("'B' is > 0 and < 10")]
+    public void CharPatternWithIntConstant_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
     [InlineData("1 is (1)", true)]
     [InlineData("1 is (2 or 1)", true)]
     [InlineData("1 is (1 or 2)", true)]
