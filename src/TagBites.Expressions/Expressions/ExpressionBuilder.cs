@@ -1184,17 +1184,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         var rank = node.Commas.Count + 1;
         var elements = new List<Expression>();
         var dimensions = new List<int>();
-        Type? elementType = null;
+        var candidateTypes = new List<Type>();
 
         if (!CollectImplicitElements(node.Initializer, 0))
             return null;
 
+        var elementType = candidateTypes.Count switch
+        {
+            0 => null,
+            1 => candidateTypes[0],
+            _ => FindBestCommonType(candidateTypes)
+        };
         if (elementType == null)
             return ToError(node, "Type not found for implicit array creation.");
 
-        // Null literals take the inferred element type
+        // Null literals and narrower elements take the inferred element type
         for (var i = 0; i < elements.Count; i++)
-            if (IsNullLiteral(elements[i]))
+            if (elements[i].Type != elementType || IsNullLiteral(elements[i]))
             {
                 var element = elements[i];
                 if (!EnsureArgumentType(elementType, ref element))
@@ -1233,16 +1239,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     if (exp == null)
                         return false;
 
-                    if (!IsNullLiteral(exp))
-                    {
-                        if (elementType == null)
-                            elementType = exp.Type;
-                        else if (elementType != exp.Type)
-                        {
-                            ToError(node, "Type not found for implicit array creation.");
-                            return false;
-                        }
-                    }
+                    if (!IsNullLiteral(exp) && !candidateTypes.Contains(exp.Type))
+                        candidateTypes.Add(exp.Type);
 
                     elements.Add(exp);
                 }
@@ -2716,6 +2714,37 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
 
         argument = converted;
         return true;
+    }
+    private static Type? FindBestCommonType(List<Type> candidateTypes)
+    {
+        Type? best = null;
+        var count = candidateTypes.Count;
+
+        for (var i = 0; i < count; i++)
+        {
+            var candidate = candidateTypes[i];
+            var isBest = true;
+
+            for (var j = 0; j < count; j++)
+            {
+                var other = candidateTypes[j];
+                if (i != j && !(Nullable.GetUnderlyingType(other) != candidate && IsMatchingParameterType(candidate, other)))
+                {
+                    isBest = false;
+                    break;
+                }
+            }
+
+            if (isBest)
+            {
+                if (best != null)
+                    return null;
+
+                best = candidate;
+            }
+        }
+
+        return best;
     }
     private static Expression? TryConvertExpression(Expression expression, Type targetType)
     {

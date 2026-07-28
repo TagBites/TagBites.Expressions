@@ -63,12 +63,33 @@ public class CollectionTests : ExpressionTestBase
     public void ImplicitArrayWithNullElements(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new[] { 1, 2L }.Sum()", 3L)]
+    [InlineData("new[] { 1, 2.5 }.Sum()", 3.5)]
+    [InlineData("new[] { 1L, 2.5f }.Sum()", 3.5f)]
+    [InlineData("new[] { 1.5, 2.5f }.Sum()", 4.0)]
+    [InlineData("new[] { (byte)1, 2 }.Max()", 2)]
+    [InlineData("new[] { 'a', 65 }.Min()", 65)]
+    [InlineData("new[] { 1, (short)2, 3L }.Sum()", 6L)]
+    [InlineData("new[] { (int?)1, 2 }.Sum()", 3)]
+    [InlineData("new[] { (int?)1, 2, null }.Sum()", 3)]
+    [InlineData("new[] { \"a\", (object)\"b\" }.Length", 2)]
+    [InlineData("new[] { 1, 2L }.GetType() == typeof(long[])", true)]
+    [InlineData("new[] { (byte)1, 2 }.GetType() == typeof(int[])", true)]
+    [InlineData("new[] { (int?)1, 2 }.GetType() == typeof(int?[])", true)]
+    [InlineData("new[,] { { 1, 2L }, { 3, 4 } }[0, 1]", 2L)]
+    [InlineData("new[,] { { 1, 2L }, { 3, 4 } }.GetType() == typeof(long[,])", true)]
+    public void ImplicitArrayBestCommonType(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("new int[,] { { 1, 2 }, { 3 } }")]
     [InlineData("new int[3][1]")]
     [InlineData("new byte[] { 256 }")]
     [InlineData("new short[] { 40000 }")]
     [InlineData("new[] { 1, null }")]
     [InlineData("new[] { null, null }")]
+    [InlineData("new[] { 1, \"a\" }")]
+    [InlineData("new[] { 1, 2u }")]
+    [InlineData("new[] { 1, null, 2L }")]
     public void InvalidArrayCreation(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Fact]
