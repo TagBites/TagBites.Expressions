@@ -2296,6 +2296,23 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     {
         return typeName switch
         {
+            // CLR names of the built-in C# types
+            "Boolean" => typeof(bool),
+            "Byte" => typeof(byte),
+            "SByte" => typeof(sbyte),
+            "Int16" => typeof(short),
+            "UInt16" => typeof(ushort),
+            "Int32" => typeof(int),
+            "UInt32" => typeof(uint),
+            "Int64" => typeof(long),
+            "UInt64" => typeof(ulong),
+            "Single" => typeof(float),
+            "Double" => typeof(double),
+            "Decimal" => typeof(decimal),
+            "Char" => typeof(char),
+            "String" => typeof(string),
+            "Object" => typeof(object),
+
             // Time
             "TimeSpan" => typeof(TimeSpan),
             "DateTime" => typeof(DateTime),

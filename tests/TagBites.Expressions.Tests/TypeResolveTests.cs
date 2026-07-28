@@ -33,6 +33,13 @@ public class TypeResolveTests : ExpressionTestBase
     [InlineData("typeof(ISet<int>)", typeof(ISet<int>))]
     [InlineData("typeof(List<>)", typeof(List<>))]
     [InlineData("typeof(Dictionary<,>)", typeof(Dictionary<,>))]
+    [InlineData("typeof(Int32)", typeof(int))]
+    [InlineData("typeof(Int64)", typeof(long))]
+    [InlineData("typeof(String)", typeof(string))]
+    [InlineData("typeof(Boolean)", typeof(bool))]
+    [InlineData("typeof(Double)", typeof(double))]
+    [InlineData("typeof(Decimal)", typeof(decimal))]
+    [InlineData("typeof(Object)", typeof(object))]
     public void BuiltInType(string script, Type expectedType)
     {
         // Exists
