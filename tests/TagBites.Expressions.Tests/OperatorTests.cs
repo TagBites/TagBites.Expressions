@@ -53,7 +53,21 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("1 == 1 ? 1 : null", 1)]
     [InlineData("1 == 2 ? null : 1", 1)]
     [InlineData("1 == 1 ? null : 1", null)]
+    [InlineData("true ? 1 : 2L", 1L)]
+    [InlineData("true ? (byte)1 : 2", 1)]
+    [InlineData("true ? 4 : (long?)5", 4L)]
+    [InlineData("true ? (int?)4 : 5", 4)]
+    [InlineData("false ? null : \"a\"", "a")]
     public void TernaryOperator(string script, object? expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("true ? (int?)4 : 5L")]
+    [InlineData("true ? 2.5 : (int?)4")]
+    [InlineData("true ? 2.5m : (int?)4")]
+    [InlineData("true ? (sbyte)-2 : 5u")]
+    [InlineData("true ? 5u : -4")]
+    [InlineData("1 switch { 1 => (int?)4, _ => 5L }")]
+    public void TernaryWithoutCommonOperandType_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
     [InlineData("~(byte)5", -6)]

@@ -161,7 +161,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (whenFalse == null)
             return null;
 
-        if (!EnsureTheSameTypes(node, ref whenTrue, ref whenFalse))
+        if (!EnsureTheSameTypes(node, ref whenTrue, ref whenFalse, bestCommonOnly: true))
             return null;
 
         var result = Expression.Condition(condition, whenTrue, whenFalse);
@@ -266,7 +266,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         for (var i = paths.Count - 1; i >= 0; i--)
         {
             var then = paths[i].Then;
-            if (!EnsureTheSameTypes(node.Arms[i].Expression, ref then, ref switchExpression))
+            if (!EnsureTheSameTypes(node.Arms[i].Expression, ref then, ref switchExpression, bestCommonOnly: true))
                 return null;
 
             if (switchExpression.Type != then.Type)
@@ -2715,7 +2715,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         return Expression.Lambda(delegateType, body, lambda.Parameters);
     }
 
-    private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2)
+    private bool EnsureTheSameTypes(SyntaxNode node, ref Expression e1, ref Expression e2, bool bestCommonOnly = false)
     {
         // throw operand takes the type of the other side, e.g. cond ? value : throw ex
         if (e1 is DelayThrowExpression || e2 is DelayThrowExpression)
@@ -2801,13 +2801,17 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (t1 == t2)
             return true;
 
-        if (Nullable.GetUnderlyingType(t1) != null)
+        // Operator ?: and switch require one of the operand types, so lifting to a third type is a binary-operator rule only
+        if (!bestCommonOnly)
         {
-            if (Nullable.GetUnderlyingType(t2) == null && t2.IsValueType)
-                e2 = Expression.Convert(e2, typeof(Nullable<>).MakeGenericType(t2));
+            if (Nullable.GetUnderlyingType(t1) != null)
+            {
+                if (Nullable.GetUnderlyingType(t2) == null && t2.IsValueType)
+                    e2 = Expression.Convert(e2, typeof(Nullable<>).MakeGenericType(t2));
+            }
+            else if (Nullable.GetUnderlyingType(t2) != null && t1.IsValueType)
+                e1 = Expression.Convert(e1, typeof(Nullable<>).MakeGenericType(t1));
         }
-        else if (Nullable.GetUnderlyingType(t2) != null && t1.IsValueType)
-            e1 = Expression.Convert(e1, typeof(Nullable<>).MakeGenericType(t1));
 
         t1 = e1.Type;
         t2 = e2.Type;
@@ -2839,6 +2843,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         {
             e1 = constant1;
             return true;
+        }
+
+        if (bestCommonOnly && (t1.IsValueType || t2.IsValueType))
+        {
+            ToError(node, $"No implicit conversion between '{t1.GetFriendlyTypeName()}' and '{t2.GetFriendlyTypeName()}'.");
+            return false;
         }
 
         // uint mixed with a signed sbyte/short/int promotes both operands to long
@@ -2922,7 +2932,8 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (targetType.IsAssignableFrom(sourceType))
             return ToCast(expression, targetType);
 
-        if (TypeUtils.HasImplicitNumericConversion(sourceType, targetType))
+        // A nullable source never converts implicitly to a non-nullable target
+        if (TypeUtils.HasImplicitNumericConversion(sourceType, targetType) && !(IsNullableType(sourceType) && !IsNullableType(targetType)))
             return ToCast(expression, targetType);
 
         var method = FindConversionOperator(sourceType, targetType, "op_Implicit");
