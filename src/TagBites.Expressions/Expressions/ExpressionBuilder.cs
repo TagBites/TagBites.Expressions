@@ -3577,6 +3577,12 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             return true;
         }
 
+        // Element-wise for arrays, e.g. T from T[] in Array.Exists(new[] { 1, 2 }, x => x > 1)
+        if (parameterWithGeneric.IsArray)
+            return argumentType.IsArray
+                   && parameterWithGeneric.GetArrayRank() == argumentType.GetArrayRank()
+                   && TryExtractGenericArguments(parameterWithGeneric.GetElementType()!, argumentType.GetElementType()!, argumentTypes);
+
         if (!parameterWithGeneric.IsGenericType)
             return parameterWithGeneric == argumentType;
 

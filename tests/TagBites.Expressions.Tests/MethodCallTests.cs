@@ -18,6 +18,19 @@ public class MethodCallTests : ExpressionTestBase
     public void NumericOverloadOverObject(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("Array.Exists(new[] { 1, 2 }, x => x > 1)", true)]
+    [InlineData("Array.Find(new[] { 1, 2, 3 }, x => x % 2 == 0)", 2)]
+    [InlineData("Array.FindIndex(new[] { 1, 2, 3 }, x => x > 2)", 2)]
+    [InlineData("Array.TrueForAll(new[] { 1, 2 }, x => x > 0)", true)]
+    [InlineData("Array.ConvertAll(new[] { 1, 2 }, x => x * 2)[1]", 4)]
+    [InlineData("Array.IndexOf(new[] { 1, 2, 3 }, 2)", 1)]
+    public void GenericMethodsWithArrayParameter(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(Array) } };
+        ExecuteAndTest(script, options, expectedResult);
+    }
+
+    [Theory]
     [InlineData("v", 10)]
     [InlineData("v + v", 20)]
     [InlineData(@"v.ToString() + ""-"" + t", "10-ten")]
