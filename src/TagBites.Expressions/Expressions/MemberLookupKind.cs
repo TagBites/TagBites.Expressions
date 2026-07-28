@@ -1,3 +1,3 @@
 namespace TagBites.Expressions;
 
-internal enum MemberLookupKind : byte { Methods, Indexers, ExtensionMethods, Properties }
+internal enum MemberLookupKind : byte { Methods, Indexers, ExtensionMethods, Properties, Members }

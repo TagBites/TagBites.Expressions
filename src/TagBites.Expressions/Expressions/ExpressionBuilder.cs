@@ -2354,35 +2354,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
             }
         }
 
-        // From instance
-        for (var type = expressionType; type != null; type = type.BaseType)
+        // From instance or interface
         {
-            var members = type.GetMember(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly | BindingFlags.Public | _context.CaseInsensitiveFlag);
+            var members = GetTypeMembers(expressionType, name, includeInterfaces: staticType == null);
             switch (members.Length)
             {
                 case 1:
                     return Expression.MakeMemberAccess(staticType != null ? null : expression, members[0]);
                 case > 1:
                     return setErrorWhenNotFound ? ToError(node, $"More then one member with name {name}.") : null;
-            }
-
-            if (type == typeof(object))
-                break;
-        }
-
-        // From interface
-        if (staticType == null)
-        {
-            foreach (var interfaceType in expressionType.GetInterfaces())
-            {
-                var members = interfaceType.GetMember(name, BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | _context.CaseInsensitiveFlag);
-                switch (members.Length)
-                {
-                    case 1:
-                        return Expression.MakeMemberAccess(expression, members[0]);
-                    case > 1:
-                        return setErrorWhenNotFound ? ToError(node, $"More then one member with name {name}.") : null;
-                }
             }
         }
 
@@ -3252,6 +3232,44 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return false;
+    }
+    private MemberInfo[] GetTypeMembers(Type instanceType, string name, bool includeInterfaces)
+    {
+        var flags = (includeInterfaces ? BindingFlags.FlattenHierarchy : default) | _context.CaseInsensitiveFlag;
+
+        if (_context.MemberCache == null)
+            return GetTypeMembersCore(instanceType, name, includeInterfaces, _context.CaseInsensitiveFlag);
+
+        var key = (MemberLookupKind.Members, instanceType, name, flags);
+        if (_context.MemberCache.TryGetValue(key, out var cached))
+            return cached;
+
+        var result = GetTypeMembersCore(instanceType, name, includeInterfaces, _context.CaseInsensitiveFlag);
+        _context.MemberCache[key] = result;
+
+        return result;
+    }
+    private static MemberInfo[] GetTypeMembersCore(Type instanceType, string name, bool includeInterfaces, BindingFlags caseFlag)
+    {
+        for (var type = instanceType; type != null; type = type.BaseType)
+        {
+            var members = type.GetMember(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly | BindingFlags.Public | caseFlag);
+            if (members.Length > 0)
+                return members;
+
+            if (type == typeof(object))
+                break;
+        }
+
+        if (includeInterfaces)
+            foreach (var interfaceType in instanceType.GetInterfaces())
+            {
+                var members = interfaceType.GetMember(name, BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public | caseFlag);
+                if (members.Length > 0)
+                    return members;
+            }
+
+        return [];
     }
     private IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
     {
