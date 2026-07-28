@@ -4010,6 +4010,13 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                 continue;
             }
 
+            // Expanded params compares by the element type, e.g. Split(params char[]) vs Split(char, int)
+            if (method1.HasParams && p1 == method1.Parameters.Length - 1 && t1.IsArray && args[i].Type != t1)
+                t1 = t1.GetElementType()!;
+
+            if (method2.HasParams && p2 == method2.Parameters.Length - 1 && t2.IsArray && args[i].Type != t2)
+                t2 = t2.GetElementType()!;
+
             if (GetBestMatchingType(args[i].Type, t1, t2) is { } best)
                 return best == t1 ? method1 : method2;
         }

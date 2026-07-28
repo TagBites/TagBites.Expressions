@@ -38,6 +38,10 @@ public class MethodCallTests : ExpressionTestBase
     [InlineData(@"string.Join("","", new[] { 3, 1, 2 })", "3,1,2")]
     [InlineData(@"string.Join(""-"", new[] { 3, 1, 2 }.OrderBy(x => x))", "1-2-3")]
     [InlineData(@"string.Join("","", new List<int> { 1, 2, 3 })", "1,2,3")]
+    [InlineData(@"""a,b;c"".Split(',', ';').Length", 3)]
+    [InlineData(@"""a,b;c"".Split(',', ';')[2]", "c")]
+    [InlineData(@"""a,b,c"".Split(',', 2).Length", 2)]
+    [InlineData(@"""a,b,c"".Split(',', 2)[1]", "b,c")]
     public void ParamsBclMethods(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
