@@ -117,6 +117,12 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("1 is 1", true)]
     [InlineData("1 is 0 or 1", true)]
     [InlineData("1 is 1 and > 0", true)]
+    [InlineData("((object)7) is int and > 5", true)]
+    [InlineData("((object)3) is int and > 5", false)]
+    [InlineData("((object)7) is int and (> 5 and < 10)", true)]
+    [InlineData("((object)\"ab\") is string and { Length: 2 }", true)]
+    [InlineData("((object)7) switch { int and > 5 => \"big\", int => \"int\", _ => \"other\" }", "big")]
+    [InlineData("((object)2) switch { int and > 5 => \"big\", int => \"int\", _ => \"other\" }", "int")]
     public void PatternOrAnd(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]

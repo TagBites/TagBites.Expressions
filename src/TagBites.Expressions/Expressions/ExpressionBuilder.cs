@@ -1336,16 +1336,28 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                     var left = ResolvePattern(expression, p.Left);
                     if (left == null)
                         return null;
+
+                    // The right side of 'and' sees the type narrowed by the left, e.g. (object)x is int and > 5
+                    var isAnd = (SyntaxKind)p.OperatorToken.RawKind == SyntaxKind.AndKeyword;
+                    if (isAnd && GetPatternNarrowingType(p.Left) is { } narrowingType)
+                    {
+                        var narrowedType = ResolveType(narrowingType);
+                        if (narrowedType == null)
+                            return null;
+
+                        if (narrowedType != expression.Type)
+                            expression = Expression.Convert(expression, narrowedType);
+                    }
+
                     var right = ResolvePattern(expression, p.Right);
                     if (right == null)
                         return null;
 
-                    return (SyntaxKind)p.OperatorToken.RawKind switch
-                    {
-                        SyntaxKind.OrKeyword => Expression.OrElse(left, right),
-                        SyntaxKind.AndKeyword => Expression.AndAlso(left, right),
-                        _ => ToError(pattern)
-                    };
+                    return isAnd
+                        ? Expression.AndAlso(left, right)
+                        : (SyntaxKind)p.OperatorToken.RawKind == SyntaxKind.OrKeyword
+                            ? Expression.OrElse(left, right)
+                            : ToError(pattern);
                 }
 
             // >, <, >=, <=
@@ -1651,6 +1663,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         }
 
         return ToError(pattern);
+    }
+    private static TypeSyntax? GetPatternNarrowingType(PatternSyntax pattern)
+    {
+        return pattern switch
+        {
+            TypePatternSyntax p => p.Type,
+            DeclarationPatternSyntax p => p.Type,
+            RecursivePatternSyntax { Type: { } type } => type,
+            ParenthesizedPatternSyntax p => GetPatternNarrowingType(p.Pattern),
+            BinaryPatternSyntax { OperatorToken.RawKind: (int)SyntaxKind.AndKeyword } p => GetPatternNarrowingType(p.Right) ?? GetPatternNarrowingType(p.Left),
+            _ => null
+        };
     }
 
     public override Expression VisitSimpleLambdaExpression(SimpleLambdaExpressionSyntax node) => new DelayLambdaExpression(node);
