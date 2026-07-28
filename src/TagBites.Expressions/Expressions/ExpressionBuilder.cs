@@ -4048,6 +4048,15 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (argType == type1 || argType == type2)
             return argType;
 
+        // More specific type wins, e.g. 1L.Equals(1) takes Equals(long) over Equals(object)
+        var m1 = IsMatchingParameterType(type2, type1);
+        var m2 = IsMatchingParameterType(type1, type2);
+
+        if (m1 && !m2)
+            return type1;
+        if (m2 && !m1)
+            return type2;
+
         // Assignable
         var a1 = type1.IsAssignableFrom(argType);
         var a2 = type2.IsAssignableFrom(argType);
@@ -4055,15 +4064,6 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         if (a1 && !a2)
             return type1;
         if (a2 && !a1)
-            return type2;
-
-        // Matching
-        var m1 = IsMatchingParameterType(type2, type1);
-        var m2 = IsMatchingParameterType(type1, type2);
-
-        if (m1 && !m2)
-            return type1;
-        if (m2 && !m1)
             return type2;
 
         // Sign

@@ -10,6 +10,14 @@ public class MethodCallTests : ExpressionTestBase
     public void MethodInvocation(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("1L.Equals(1)", true)]
+    [InlineData("1.0.Equals(1)", true)]
+    [InlineData("1.Equals((short)1)", true)]
+    [InlineData("1.Equals(1L)", false)]
+    [InlineData("1m.Equals(1)", true)]
+    public void NumericOverloadOverObject(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("v", 10)]
     [InlineData("v + v", 20)]
     [InlineData(@"v.ToString() + ""-"" + t", "10-ten")]
