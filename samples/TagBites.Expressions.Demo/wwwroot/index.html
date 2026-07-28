@@ -23,6 +23,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <link href="css/app.css" rel="stylesheet" />
 
+    <script>
+        (function () {
+            var value = new URLSearchParams(location.search).get('embed');
+            if (value !== null && value !== '0' && value !== 'false')
+                document.documentElement.classList.add('embed');
+        })();
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -70,22 +77,22 @@
     </script>
 </head>
 <body>
+<header id="page-header" class="container">
+    <div class="titlebar">
+        <h1>TagBites.Expressions</h1>
+        <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <p>
+        A C# expression is evaluated as you type.
+        It's parsed using Roslyn, converted to an expression tree and then compiled, all client-side.
+        Reflection is enabled, but only common built-in types are available.
+    </p>
+</header>
+
 <div id="app"></div>
 
 <div id="app-loading">
     <main class="container loading-screen">
-        <header>
-            <div class="titlebar">
-                <h1>TagBites.Expressions</h1>
-                <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
-            </div>
-            <p>
-                A C# expression is evaluated as you type.
-                It's parsed using Roslyn, converted to an expression tree and then compiled, all client-side.
-                Reflection is enabled, but only common built-in types are available.
-            </p>
-        </header>
-
         <div class="loading-status" role="status" aria-live="polite">
             <span class="spinner" aria-hidden="true"></span>
             <span>Loading the interactive playground&hellip;</span>
@@ -120,6 +127,31 @@
             });
             obs.observe(app, { childList: true });
         });
+    </script>
+    <script>
+        // Autosize for embedded mode
+        (function () {
+            if (!document.documentElement.classList.contains('embed'))
+                return;
+
+            var last = 0;
+            var send = function () {
+                var height = Math.ceil(document.body.getBoundingClientRect().height);
+                if (height === last)
+                    return;
+
+                last = height;
+                parent.postMessage({ type: 'tagbites:demo-height', height: height }, '*');
+            };
+
+            send();
+            addEventListener('load', send);
+
+            if (window.ResizeObserver)
+                new ResizeObserver(send).observe(document.body);
+
+            setInterval(send, 500);
+        })();
     </script>
 </body>
 </html>

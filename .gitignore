@@ -12,3 +12,6 @@
 packages/
 [Bb]in/
 [Oo]bj/
+
+# Local working files
+*.local.*

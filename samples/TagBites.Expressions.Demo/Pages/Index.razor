@@ -3,18 +3,6 @@
 <PageTitle>TagBites.Expressions playground</PageTitle>
 
 <main class="container">
-    <header>
-        <div class="titlebar">
-            <h1>TagBites.Expressions</h1>
-            <a class="repo" href="https://github.com/TagBites/TagBites.Expressions" target="_blank" rel="noopener">GitHub</a>
-        </div>
-        <p>
-            A C# expression is evaluated as you type.
-            It's parsed using Roslyn, converted to an expression tree and then compiled, all client-side.
-            Reflection is enabled, but only common built-in types are available.
-        </p>
-    </header>
-
     <div class="examples">
         @foreach (var example in VisibleExamples)
         {
