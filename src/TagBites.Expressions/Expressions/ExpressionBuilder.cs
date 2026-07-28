@@ -3520,6 +3520,7 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
         // Select best method
         MethodCallInfo? bestMethod = null;
         List<MethodCallInfo>? ambiguous = null;
+        List<(DelayLambdaExpression Node, Type[] Parameters, Expression Lambda)>? reusableLambdas = null;
 
         // ReSharper disable once ForCanBeConvertedToForeach
         for (var i = 0; i < candidates.Count; i++)
@@ -3723,9 +3724,27 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
                         && !lambdaType.Name.StartsWith("Func`", StringComparison.Ordinal)
                         && !lambdaType.Name.StartsWith("Action`", StringComparison.Ordinal);
 
-                    var expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes, buildAsDelegate ? lambdaType : null);
+                    // Reuse a body already built for the same parameter types by another overload candidate
+                    Expression? expression = null;
+                    var reusable = !buildAsDelegate && lambdaParameterShapes == null;
+
+                    if (reusable && reusableLambdas != null)
+                        foreach (var item in reusableLambdas)
+                            if (item.Node == dl && AreTypesEqual(item.Parameters, lambdaParameters))
+                            {
+                                expression = item.Lambda;
+                                break;
+                            }
+
                     if (expression == null)
-                        return null;
+                    {
+                        expression = TryResolveLambda(dl.Node, lambdaParameters, lambdaParameterShapes, buildAsDelegate ? lambdaType : null);
+                        if (expression == null)
+                            return null;
+
+                        if (reusable)
+                            (reusableLambdas ??= []).Add((dl, lambdaParameters, expression));
+                    }
 
                     methodArguments[i] = expression;
 
@@ -4257,6 +4276,18 @@ internal class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     }
 
     private static bool IsNullableType(Type type) => Nullable.GetUnderlyingType(type) != null;
+    private static bool AreTypesEqual(Type[] a, Type[] b)
+    {
+        if (a.Length != b.Length)
+            return false;
+
+        // ReSharper disable once LoopCanBeConvertedToQuery
+        for (var i = 0; i < a.Length; i++)
+            if (a[i] != b[i])
+                return false;
+
+        return true;
+    }
     private static bool IsNullLiteral(Expression expression) => expression is ConstantExpression { Value: null } && expression.Type == typeof(object);
     private static bool HasMatchingParameters(IList<ParameterInfo> parameters, IList<Expression> arguments)
     {
