@@ -37,6 +37,7 @@ public static class LibraryFeatureComparer
         ("Bare `default` literal (target-typed)", "1 + default", "1"),
         ("Null-coalescing `??` / null-conditional `?.`", "\"abc\"?.Length ?? 0", "3"),
         ("Object and collection initializers", "new List<int> { 1, 2, 3 }.Count", "3"),
+        ("Index initializers (`new Dictionary<string, int> { [\"a\"] = 1 }`)", "new Dictionary<string, int> { [\"a\"] = 1, [\"b\"] = 2 }[\"b\"]", "2"),
         ("Verbatim strings `@\"...\"`", "@\"a\\b\".Length", "3"),
         ("Digit separators `1_000`", "1_000_000", "1000000"),
         ("String interpolation `$\"{x,6:0.00}\"` (alignment + format)", "$\"{5,6:000}\"", "   005"),
@@ -48,14 +49,21 @@ public static class LibraryFeatureComparer
         ("`checked` / `unchecked`", "unchecked(2147483647 + 1)", "-2147483648"),
         ("`nameof`, `sizeof`", "nameof(xs) + sizeof(int)", "xs4"),
         ("Array creation: sized and multidimensional", "new int[,] { { 1, 2 }, { 3, 4 } }[1, 1]", "4"),
+        ("Jagged arrays (`new int[][] { ... }`)", "new int[][] { new[] { 1 }, new[] { 2, 3 } }[1][1]", "3"),
+        ("Implicit arrays with the best common type (`new[] { 1, 2L }`)", "new[] { 1, 2L }.Sum()", "3"),
         ("Target-typed `new()`", "new List<List<int>> { new() { 1, 2 } }[0][0]", "1"),
         ("Lambdas and LINQ", "xs.Where(x => x > 1).Sum()", "5"),
+        ("Lambdas for `Predicate<T>`/`Comparison<T>` delegates (`list.Find(x => x > 1)`)", "new List<int> { 1, 2, 3 }.Find(x => x > 1)", "2"),
+        ("Static members on a generic type (`Comparer<int>.Default`)", "Comparer<int>.Default.Compare(2, 1)", "1"),
+        ("Nested types (`typeof(List<int>.Enumerator)`)", "typeof(List<int>.Enumerator) == typeof(List<int>.Enumerator)", "True"),
+        ("`throw` expressions (`x > 0 ? x : throw ...`) - opt-in", "1 > 0 ? 5 : throw new Exception(\"e\")", "5"),
         ("Generic method call with explicit type argument (`xs.OfType<int>()`)", "xs.OfType<int>().Count()", "3"),
         ("Static imports (`using static`, unqualified `Sqrt(16)`)", "Sqrt(16)", "4"),
         ("User-defined operator overloads (`DateTime.Now + TimeSpan.FromDays(1)`)", "DateTime.Now + TimeSpan.FromDays(1) > DateTime.Now", "True"),
         ("User-defined implicit/explicit conversion operators", "Math.Sqrt(m)", "4"),
         ("Switch expressions", "1 switch { 1 => 10, _ => 0 }", "10"),
         ("Pattern matching: relational, `and`/`or`/`not`, property", "\"ab\" is { Length: > 0 and < 5 }", "True"),
+        ("Patterns against an `object` input (`(object)x is > 3`)", "((object)5) is > 3 and < 10", "True"),
         ("List patterns (`arr is [1, 2, 3]`)", "xs is [1, 2, 3]", "True"),
         ("Tuple/recursive deconstruction patterns (`x is (int a, int b)`)", "(1, 2) is (int a, int b)", "True"),
     ];
@@ -97,8 +105,9 @@ public static class LibraryFeatureComparer
             var options = new ExpressionParserOptions
             {
                 Parameters = { (typeof(int[]), "xs"), (typeof(Meters), "m") },
-                IncludedTypes = { typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Enumerable) },
-                StaticImports = { typeof(Math) }
+                IncludedTypes = { typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Enumerable), typeof(Comparer<>), typeof(Exception) },
+                StaticImports = { typeof(Math) },
+                AllowThrowExpressions = true
             };
 
             var result = ExpressionParser.Parse(expr, options).Compile().DynamicInvoke(s_xsValue, s_mValue);
@@ -116,6 +125,9 @@ public static class LibraryFeatureComparer
             interpreter.Reference(typeof(TimeSpan));
             interpreter.Reference(typeof(Enumerable));
             interpreter.Reference(typeof(List<>));
+            interpreter.Reference(typeof(Dictionary<,>));
+            interpreter.Reference(typeof(Comparer<>));
+            interpreter.Reference(typeof(Exception));
             // No static import option
 
             var result = interpreter.Parse(expr, new Parameter("xs", typeof(int[])), new Parameter("m", typeof(Meters)))
@@ -132,7 +144,8 @@ public static class LibraryFeatureComparer
             {
                 CustomTypeProvider = new DefaultDynamicLinqCustomTypeProvider(ParsingConfig.Default, new List<Type>
                 {
-                    typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Meters), typeof(List<int>), typeof(List<List<int>>)
+                    typeof(StringBuilder), typeof(DateTime), typeof(TimeSpan), typeof(Meters), typeof(List<int>), typeof(List<List<int>>),
+                    typeof(Dictionary<string, int>), typeof(Comparer<int>), typeof(Exception)
                 }, false)
             };
             // No static import option

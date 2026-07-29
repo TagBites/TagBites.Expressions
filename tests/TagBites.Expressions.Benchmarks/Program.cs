@@ -1,8 +1,10 @@
 using System.Text;
 using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Loggers;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
+using Perfolizer.Horology;
 
 namespace TagBites.Expressions.Benchmarks;
 
@@ -17,10 +19,19 @@ public class Program
         }
 
         var logger = new ConsoleLogger();
+        var job = Job.Default
+            .WithEnvironmentVariable("DOTNET_TieredCompilation", "0")
+            .WithGcConcurrent(false)
+            .WithLaunchCount(1)
+            .WithWarmupCount(3)
+            .WithIterationCount(20)
+            .WithIterationTime(TimeInterval.FromMilliseconds(500))
+            .AsDefault();
         var config = ManualConfig.Create(DefaultConfig.Instance)
             .AddLogger(logger)
             .WithOptions(ConfigOptions.DisableOptimizationsValidator)
-            .WithOption(ConfigOptions.LogBuildOutput, false);
+            .WithOption(ConfigOptions.LogBuildOutput, false)
+            .AddJob(job);
 
         var summaries = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
         PrintPivotTable(summaries, logger);
