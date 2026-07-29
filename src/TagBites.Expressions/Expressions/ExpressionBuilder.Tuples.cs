@@ -158,7 +158,7 @@ internal partial class ExpressionBuilder
         return result;
     }
 
-    private Expression? TryBuildTupleEquality(SyntaxNode node, Expression left, Expression right)
+    private Expression? BuildTupleEquality(SyntaxNode node, Expression left, Expression right)
     {
         var count = left.Type.GetGenericArguments().Length;
         if (count != right.Type.GetGenericArguments().Length)
@@ -174,7 +174,7 @@ internal partial class ExpressionBuilder
 
             Expression? comparison;
             if (IsValueTupleType(leftItem.Type) && IsValueTupleType(rightItem.Type))
-                comparison = TryBuildTupleEquality(node, leftItem, rightItem);
+                comparison = BuildTupleEquality(node, leftItem, rightItem);
             else if (EnsureTheSameTypes(node, ref leftItem, ref rightItem) && leftItem.Type == rightItem.Type)
                 comparison = Expression.Equal(leftItem, rightItem);
             else

@@ -313,7 +313,7 @@ internal partial class ExpressionBuilder
 
         // Enum arithmetic
         if ((Nullable.GetUnderlyingType(left.Type) ?? left.Type).IsEnum || (Nullable.GetUnderlyingType(right.Type) ?? right.Type).IsEnum)
-            return TryBuildEnumBinaryOperation(node, expressionType, left, right);
+            return BuildEnumBinaryOperation(node, expressionType, left, right);
 
         // Tuple has no == operator
         if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual
@@ -328,7 +328,7 @@ internal partial class ExpressionBuilder
             // Different element types compare element-wise with implicit conversions
             var leftVariable = Expression.Variable(left.Type);
             var rightVariable = Expression.Variable(right.Type);
-            var comparison = TryBuildTupleEquality(node, leftVariable, rightVariable);
+            var comparison = BuildTupleEquality(node, leftVariable, rightVariable);
             if (comparison == null)
                 return null;
 
@@ -496,7 +496,7 @@ internal partial class ExpressionBuilder
         return new DelayThrowExpression(exception);
     }
 
-    private Expression? TryBuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
+    private Expression? BuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
         // Nullable enum operand
         var leftType = Nullable.GetUnderlyingType(left.Type) ?? left.Type;

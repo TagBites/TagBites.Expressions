@@ -143,7 +143,7 @@ internal partial class ExpressionBuilder
 
                     // Enums have no relational operator of their own
                     return expression.Type.IsEnum || right.Type.IsEnum
-                        ? TryBuildEnumBinaryOperation(pattern, opr.Value, expression, right)
+                        ? BuildEnumBinaryOperation(pattern, opr.Value, expression, right)
                         : Expression.MakeBinary(opr.Value, expression, right);
                 }
 
@@ -181,7 +181,7 @@ internal partial class ExpressionBuilder
 
             // is var (a, b)
             case VarPatternSyntax { Designation: ParenthesizedVariableDesignationSyntax d }:
-                return TryResolveVarDesignation(expression, d);
+                return ResolveVarDesignation(expression, d);
 
             // is ... x
             case DeclarationPatternSyntax { Designation: SingleVariableDesignationSyntax v } p:
@@ -451,7 +451,7 @@ internal partial class ExpressionBuilder
         };
     }
 
-    private Expression? TryResolveVarDesignation(Expression expression, ParenthesizedVariableDesignationSyntax designation)
+    private Expression? ResolveVarDesignation(Expression expression, ParenthesizedVariableDesignationSyntax designation)
     {
         var count = designation.Variables.Count;
         var elements = GetTupleItemAccessors(expression, count);
@@ -471,7 +471,7 @@ internal partial class ExpressionBuilder
 
         for (var i = 0; i < count; i++)
         {
-            var bound = TryResolveDesignation(elements[i], designation.Variables[i]);
+            var bound = ResolveDesignation(elements[i], designation.Variables[i]);
             if (bound == null)
                 return null;
 
@@ -480,7 +480,7 @@ internal partial class ExpressionBuilder
 
         return deconstructVariables.Length > 0 ? Expression.Block(deconstructVariables, check) : check;
     }
-    private Expression? TryResolveDesignation(Expression expression, VariableDesignationSyntax designation)
+    private Expression? ResolveDesignation(Expression expression, VariableDesignationSyntax designation)
     {
         switch (designation)
         {
@@ -494,7 +494,7 @@ internal partial class ExpressionBuilder
                 }
 
             case ParenthesizedVariableDesignationSyntax nested:
-                return TryResolveVarDesignation(expression, nested);
+                return ResolveVarDesignation(expression, nested);
 
             default:
                 return ToError(designation);

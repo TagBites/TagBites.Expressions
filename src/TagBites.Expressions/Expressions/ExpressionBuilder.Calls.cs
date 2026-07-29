@@ -671,7 +671,7 @@ internal partial class ExpressionBuilder
                 if (parameterType != argumentType)
                 {
                     // Rebind a Func/Action lambda to a signature-compatible delegate parameter
-                    if (methodArguments[i] is LambdaExpression lambdaArgument && RebindLambdaToDelegate(lambdaArgument, parameterType) is { } rebound)
+                    if (methodArguments[i] is LambdaExpression lambdaArgument && TryRebindLambdaToDelegate(lambdaArgument, parameterType) is { } rebound)
                     {
                         methodArguments[i] = rebound;
                         continue;
@@ -843,7 +843,7 @@ internal partial class ExpressionBuilder
             if (TryConvertConstant(arguments[i], mpt) != null)
                 continue;
 
-            if (arguments[i] is LambdaExpression lambdaArgument && RebindLambdaToDelegate(lambdaArgument, mpt) != null)
+            if (arguments[i] is LambdaExpression lambdaArgument && TryRebindLambdaToDelegate(lambdaArgument, mpt) != null)
                 continue;
 
             return false;
