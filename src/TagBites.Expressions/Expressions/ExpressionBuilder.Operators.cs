@@ -729,12 +729,12 @@ internal partial class ExpressionBuilder
         // Operator ?: and switch require one of the operand types, so lifting to a third type is a binary-operator rule only
         if (!bestCommonOnly)
         {
-            if (Nullable.GetUnderlyingType(t1) != null)
+            if (IsNullableType(t1))
             {
-                if (Nullable.GetUnderlyingType(t2) == null && t2.IsValueType)
+                if (!IsNullableType(t2) && t2.IsValueType)
                     e2 = Expression.Convert(e2, typeof(Nullable<>).MakeGenericType(t2));
             }
-            else if (Nullable.GetUnderlyingType(t2) != null && t1.IsValueType)
+            else if (IsNullableType(t2) && t1.IsValueType)
                 e1 = Expression.Convert(e1, typeof(Nullable<>).MakeGenericType(t1));
         }
 

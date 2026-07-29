@@ -24,7 +24,7 @@ internal partial class ExpressionBuilder
         if (type == null)
             return null;
 
-        if (!type.IsValueType || Nullable.GetUnderlyingType(type) != null)
+        if (!type.IsValueType || IsNullableType(type))
             return ToError(node, "Invalid nullable type.");
 
         return Expression.Constant(typeof(Nullable<>).MakeGenericType(type));

@@ -50,7 +50,7 @@ internal partial class ExpressionBuilder
         // Resolve Member
         var valueInstance = instance;
 
-        if (instance.Type.IsValueType && Nullable.GetUnderlyingType(instance.Type) != null)
+        if (instance.Type.IsValueType && IsNullableType(instance.Type))
             valueInstance = Expression.MakeMemberAccess(instance, instance.Type.GetProperty("Value")!);
 
         Push(valueInstance);

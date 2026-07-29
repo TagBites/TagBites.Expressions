@@ -148,7 +148,7 @@ internal partial class ExpressionBuilder
     private static Expression[]? GetTupleItemAccessors(Expression expression, int count)
     {
         var type = expression.Type;
-        if (!type.IsGenericType || type.Namespace != "System" || !type.Name.StartsWith("ValueTuple`", StringComparison.Ordinal) || type.GetGenericArguments().Length != count)
+        if (!IsValueTupleType(type) || type.GetGenericArguments().Length != count)
             return null;
 
         var result = new Expression[count];
