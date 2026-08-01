@@ -278,7 +278,7 @@ public class ExpressionParserOptions
 
         UseFirstParameterAsThis = other.UseFirstParameterAsThis;
     }
-    private ExpressionParserOptions(ExpressionParserOptions other, CommonExpressionParserOptions common)
+    private ExpressionParserOptions(CommonExpressionParserOptions common)
     {
         Common = common;
     }
@@ -309,7 +309,7 @@ public class ExpressionParserOptions
         if (resultType == null && resultCastType == null && parameters == null && useFirstParameterAsThis == null)
             return this;
 
-        var fork = new ExpressionParserOptions(this, Common)
+        var fork = new ExpressionParserOptions(Common)
         {
             ResultType = resultType ?? ResultType,
             ResultCastType = resultCastType ?? ResultCastType
