@@ -4,6 +4,9 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace TagBites.Expressions;
 
+/// <summary>
+/// Parses C# expressions into <see cref="LambdaExpression"/> trees, and compiles or evaluates them.
+/// </summary>
 [PublicAPI]
 public static class ExpressionParser
 {

@@ -258,6 +258,9 @@ public class ExpressionParserOptions
         }
     }
 
+    /// <summary>
+    /// Initializes a new options instance with the default settings.
+    /// </summary>
     public ExpressionParserOptions() => Common = new CommonExpressionParserOptions();
     /// <summary>
     /// Initializes a new mutable options instance by copying every setting from <paramref name="other"/>.
@@ -368,9 +371,10 @@ public class ExpressionParserOptions
     }
 
     /// <summary>
-    /// Now parser produces only standard expression. No reduce is needed.
+    /// Gets or sets an unused value. Always returns <c>true</c>, the setter is ignored.
     /// </summary>
-    [Obsolete, EditorBrowsable(EditorBrowsableState.Never)]
+    [Obsolete("The parser always produces standard expression nodes, so there is nothing to reduce. Remove this option.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public bool UseReducedExpressions
     {
         get => true;
