@@ -3,7 +3,6 @@
 [![Nuget](https://img.shields.io/nuget/v/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 ![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4)
 [![License](https://img.shields.io/github/license/TagBites/TagBites.Expressions)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
-[![Build](https://img.shields.io/github/actions/workflow/status/TagBites/TagBites.Expressions/build-and-test.yml?branch=master)](https://github.com/TagBites/TagBites.Expressions/actions/workflows/build-and-test.yml)
 [![Downloads](https://img.shields.io/nuget/dt/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 
 **TagBites.Expressions is a Roslyn-based C# expression parser and evaluator for .NET.**
@@ -15,7 +14,7 @@ var func = ExpressionParser.Compile<Func<int, int, int>>("(a + b) / 2", options)
 int r = func(2, 4); // 3
 ```
 
-Because Roslyn does the parsing, expressions use real C# syntax: operators, precedence, numeric promotion, implicit conversions, pattern matching, tuples, lambdas, LINQ and generics behave like they do in the C# compiler. If C# accepts the expression, TagBites.Expressions accepts it; if C# rejects it, so does the parser.
+Roslyn does the parsing, so expressions use real C# syntax with the compiler's semantics. 
 
 [Try it online](https://tagbites.com/expressions/demo) - type an expression and evaluate it in the browser.
 
@@ -90,7 +89,7 @@ ExpressionParser.Invoke(@"$""{new DateTime(2021, 8, 14):yyyy-MM-dd}"""); // 2021
 ExpressionParser.Invoke(@"$""{(1 < 2 ? ""yes"" : ""no"")}""");           // yes
 ```
 
-Anonymous objects (`new { ... }`) **work like a real anonymous type without generating a new one, by internally mapping it to `DynamicObject`**:
+Anonymous objects (`new { ... }`) behave like real anonymous types without generating one - internally they map to `DynamicObject`:
 
 ```csharp
 var script = "new[] { 1, 2, 3 }.Select(v => new { Value = v, Doubled = v * 2 }).Sum(v => v.Value + v.Doubled)";
@@ -109,21 +108,7 @@ if (!ExpressionParser.TryParse("a + ", options, out var expr, out var error))
 
 ## Use cases
 
-Use TagBites.Expressions when you need to parse, validate, evaluate or compile C# expressions from strings at runtime:
-- dynamic business rules and predicates
-- user-defined formulas and calculations
-- configurable filters and scoring logic
-- compile-once/run-many `Func<>` delegates
-- `LambdaExpression` trees for expression-based APIs
-- LINQ-style runtime logic with real C# expression syntax
-
-## Why TagBites.Expressions?
-
-- **Real C# expression syntax** - parsed by Roslyn, not by a custom C#-like grammar.
-- **Runtime expression evaluation** - evaluate once or compile once and invoke many times.
-- **Delegates or expression trees** - compile to `Func<>` delegates or parse to `LambdaExpression`.
-- **Modern C# expressions** - supports LINQ, lambdas, pattern matching, switch expressions, tuples, generics, interpolated strings, etc.
-- **No generated assembly** - expressions are compiled without creating a new assembly.
+Typical uses: business rules and predicates defined at runtime, user-defined formulas and calculations, configurable filters and scoring logic.
 
 ## Supported C# expression syntax
 
@@ -139,7 +124,7 @@ Use TagBites.Expressions when you need to parse, validate, evaluate or compile C
 - `typeof`, `default(T)`, the bare `default` literal (target-typed), `nameof`, `sizeof`, `checked`, `unchecked`.
 - Pattern matching in `is` and `switch`: type, constant, relational, `and`/`or`/`not`, property (including extended `{ A.B: 1 }`),
   positional, `var` and list patterns, `when` guards.
-- `throw` expressions in `?:` and `??` (`x > 0 ? x : throw new ArgumentException()`), opt-in via the `AllowThrowExpressions` option.
+- `throw` expressions in `?:`, `??`, switch arms and as a lambda body (`x > 0 ? x : throw new ArgumentException()`), opt-in via the `AllowThrowExpressions` option.
 
 Not currently supported:
 - LINQ query syntax (`from x in items where x > 1 select x`) - use the method syntax (`items.Where(x => x > 1)`).
@@ -149,7 +134,6 @@ Not currently supported:
 - The unsigned right-shift operator `>>>` - depends on the `Microsoft.CodeAnalysis.CSharp` version the parser is built against.
 - Invoking a delegate value (`((Func<int, int>)(x => x * 2))(5)`, `new Func<int, int>(x => x + 1)(4)`) - call a method instead.
 - Wrapping a lambda in a delegate creation inside another lambda (`items.Select(x => new Func<int, int>(y => x + y))`).
-- Compile-time evaluation of constant expressions. C# rejects an out-of-range constant conversion (`(byte)(-4)`, CS0221) and a constant overflow (`uint.MaxValue + 1`, CS0220) unless wrapped in `unchecked`; the parser accepts both and wraps the value at runtime, as C# does for a non-constant value (`(byte)(-4)` is `252`).
 
 Not supported:
  - Statements (like `if`), `async`/`await`, and declarations (methods, types) are out of scope - this is an expression parser.
@@ -291,7 +275,7 @@ var options = new ExpressionParserOptions
 Like `JsonSerializerOptions`, an `ExpressionParserOptions` instance becomes read-only after it is first used for parsing, enabling fast concurrent use.
 
 **Fork**:  
-`Fork` reuses the prepared, shared settings of an instance - global members, included types, static imports, the reflection member cache and the resolution flags - and overrides only the result type, parameters or `this` handling. Use it when one set of options is shared but different delegates must be produced from it, so the shared lookups are prepared once instead of per delegate.
+`Fork` reuses the prepared, shared settings of an instance - global members, included types, static imports, the reflection member cache and the resolution flags - and overrides only the result type, parameters or `this` handling. Use it when one set of options is shared, but different delegates must be produced from it, so the shared lookups are prepared once instead of per delegate.
 
 ```csharp
 var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
@@ -430,8 +414,6 @@ Full example: [CustomPropertyResolverTests.cs](https://github.com/TagBites/TagBi
 
 ## Alternatives
 
-TagBites.Expressions fits between lightweight expression evaluators and full C# scripting engines: it supports real C# expression syntax through Roslyn, returns delegates or expression trees, and avoids generating a new assembly.
-
 | | [TagBites.Expressions](https://github.com/TagBites/TagBites.Expressions) | [DynamicExpresso](https://github.com/dynamicexpresso/DynamicExpresso) | [System.Linq.Dynamic.Core](https://github.com/zzzprojects/System.Linq.Dynamic.Core) | [Roslyn scripting](https://www.nuget.org/packages/Microsoft.CodeAnalysis.CSharp.Scripting/) (`CSharpScript`) |
 |---|---|---|---|---|
 | Language | C# expressions (Roslyn) | C#-like (own parser) | Dynamic LINQ dialect | Full C# (official) |
@@ -508,6 +490,4 @@ Benchmark source: [ParseToExpression.cs](https://github.com/TagBites/TagBites.Ex
 
 ## Links
 
-- [Changelog](https://github.com/TagBites/TagBites.Expressions/blob/master/CHANGELOG.md)
-- [Security policy](https://github.com/TagBites/TagBites.Expressions/blob/master/SECURITY.md)
-- [License (MIT)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
+- [Changelog](https://tagbites.com/expressions/changelog/)
