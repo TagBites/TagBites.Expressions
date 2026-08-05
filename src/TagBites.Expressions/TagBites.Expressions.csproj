@@ -2,24 +2,21 @@
 
   <!-- Targets -->
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>TagBites</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Build -->
+  <PropertyGroup>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
-  <!-- Symbols/Source Link -->
+  <!-- Package info -->
   <PropertyGroup>
-    <DebugType>portable</DebugType>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
-  </PropertyGroup>
-
-  <!-- General -->
-  <PropertyGroup>
-    <RootNamespace>TagBites</RootNamespace>
-    <Nullable>enable</Nullable>
+    <Description>Roslyn-based C# expression parser and evaluator for .NET. Compiles runtime string expressions to strongly typed Func delegates or LINQ expression trees without creating a new assembly.</Description>
+    <PackageTags>roslyn; parser; expression; expression-parser; expression-evaluator; expression-trees; lambda-expressions; linq; dynamic-linq; eval; runtime-compilation; formula-parser; rules-engine; delegate</PackageTags>
+    <PackageProjectUrl>https://tagbites.com/expressions/</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <!-- References -->
@@ -27,16 +24,9 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.2.0" />
   </ItemGroup>
 
-  <!-- README and icon -->
+  <!-- Usings -->
   <ItemGroup>
-    <None Include="..\..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-    <None Include="..\..\logo.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+    <Using Include="JetBrains.Annotations" />
   </ItemGroup>
 
 </Project>

@@ -10,10 +10,12 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - uses: TagBites/actions/dotnet-build@master
       with:
-        solution: TagBites.Expressions.sln
+        solution: TagBites.Expressions.slnx
     - uses: TagBites/actions/dotnet-test@master

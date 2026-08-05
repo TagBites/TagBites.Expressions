@@ -3,18 +3,22 @@ name: publish preview
 on:
   push:
     tags:
-    - "v?[0-9]+.[0-9]+.[0-9]+-preview.[0-9]+"
+    - "[0-9]+.[0-9]+.[0-9]+-preview.[0-9]+"
 
 jobs:
   publish-preview:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - uses: TagBites/actions/dotnet-build@master
       with:
-        solution: TagBites.Expressions.sln
+        solution: TagBites.Expressions.slnx
+    - uses: TagBites/actions/dotnet-test@master
     - name: Drop symbol packages
       run: find . -name "*.snupkg" -type f -delete
       shell: bash

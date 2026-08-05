@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/workflows/build-and-test.yml" />
+    <File Path=".github/workflows/deploy-demo.yml" />
+    <File Path=".github/workflows/publish-preview.yml" />
+    <File Path=".github/workflows/publish.yml" />
+  </Folder>
+  <Folder Name="/.root/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="CHANGELOG.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="SECURITY.md" />
+  </Folder>
+  <Project Path="samples/TagBites.Expressions.Demo/TagBites.Expressions.Demo.csproj" />
+  <Project Path="src/TagBites.Expressions/TagBites.Expressions.csproj" />
+  <Project Path="tests/TagBites.Expressions.Benchmarks/TagBites.Expressions.Benchmarks.csproj" />
+  <Project Path="tests/TagBites.Expressions.Tests/TagBites.Expressions.Tests.csproj" />
+</Solution>
