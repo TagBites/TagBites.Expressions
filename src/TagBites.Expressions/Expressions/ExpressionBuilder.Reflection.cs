@@ -1,8 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using TagBites.Utils;
 
 namespace TagBites.Expressions;
 
@@ -48,6 +46,20 @@ internal partial class ExpressionBuilder
         foreach (var type in instanceType.GetInterfaces())
         {
             var nextMembers = type.GetMethods(BindingFlags.Public | additionalFlags);
+
+            // ReSharper disable once ForCanBeConvertedToForeach
+            // ReSharper disable once LoopCanBeConvertedToQuery
+            for (var i = 0; i < nextMembers.Length; i++)
+            {
+                var item = nextMembers[i];
+                if (string.Equals(item.Name, name, comparison) && names.Add(item.ToString()))
+                    members.Add(item);
+            }
+        }
+
+        if (instanceType.IsInterface)
+        {
+            var nextMembers = typeof(object).GetMethods(BindingFlags.Public | additionalFlags);
 
             // ReSharper disable once ForCanBeConvertedToForeach
             // ReSharper disable once LoopCanBeConvertedToQuery

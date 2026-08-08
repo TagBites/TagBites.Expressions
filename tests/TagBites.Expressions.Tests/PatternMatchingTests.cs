@@ -202,6 +202,26 @@ public class PatternMatchingTests : ExpressionTestBase
     }
 
     [Theory]
+    [InlineData("i.ToString().Length > 0", true)]
+    [InlineData("i.GetType() == typeof(TestModel)", true)]
+    [InlineData("i.Equals(i)", true)]
+    [InlineData("i.GetHashCode() == i.GetHashCode()", true)]
+    [InlineData("(i as TestModel) != null", true)]
+    [InlineData("(i as ParamsModel) == null", true)]
+    [InlineData("i is TestModel", true)]
+    public void ObjectMembersOnInterfaceReceiver(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(ITestModel), "i") },
+            IncludedTypes = { typeof(TestModel), typeof(ParamsModel) },
+            AllowReflection = true
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new TestModel());
+    }
+
+    [Theory]
     [InlineData("5 is object", true)]
     [InlineData("2.5 is object", true)]
     [InlineData("DayOfWeek.Friday is object", true)]

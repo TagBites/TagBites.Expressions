@@ -65,6 +65,13 @@ internal partial class ExpressionBuilder
         if (castType.IsAssignableFrom(expressionType) || expressionType.IsAssignableFrom(castType))
             return Expression.Convert(left, castType);
 
+        // Cast between an interface and a non-sealed class is checked at runtime
+        if ((castType.IsInterface && expressionType is { IsValueType: false, IsSealed: false })
+            || (expressionType.IsInterface && castType is { IsValueType: false, IsSealed: false }))
+        {
+            return Expression.Convert(left, castType);
+        }
+
         return ToError(node, $"Cannot convert value type '{left.Type.GetFriendlyTypeName()}' to '{castType.GetFriendlyTypeName()}' using build-in conversion.");
     }
     private Expression? ToAsOperator(SyntaxNode node, Expression left, Expression right)
