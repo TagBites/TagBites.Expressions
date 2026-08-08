@@ -16,7 +16,16 @@ public class ObjectCreationTests : ExpressionTestBase
     [InlineData("new TestModel { Property1 = 1, Property2 = 2 }.Property2", 2)]
     [InlineData("new TestModel { Property1 = 0, Property2 = 0 }.Value", 1)]
     [InlineData("new TestModel(5) { Property1 = 1, Property2 = 2 }.Value", 5)]
-    public void ObjectCreation(string script, object expectedResult)
+    [InlineData("new TestModel { Property1 = (byte)3 }.Property1", 3)]
+    [InlineData("new TestModel { Property1 = 'a' }.Property1", 97)]
+    [InlineData("new TestModel { Ratio = 1 }.Ratio", 1.0)]
+    [InlineData("new TestModel { Ratio = 2L }.Ratio", 2.0)]
+    [InlineData("new TestModel { Ratio = 1.5f }.Ratio", 1.5)]
+    [InlineData("new TestModel { Total = 3 }.Total == 3m", true)]
+    [InlineData("new TestModel { Optional = 4 }.Optional", 4)]
+    [InlineData("new TestModel { Optional = null }.Optional", null)]
+    [InlineData("new TestModel { Ratio = 1, Total = 2, Optional = 3 }.Ratio", 1.0)]
+    public void ObjectCreation(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions
         {

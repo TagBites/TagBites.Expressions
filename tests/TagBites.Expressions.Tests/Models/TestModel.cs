@@ -7,6 +7,9 @@ internal class TestModel(int value = 1) : ITestModel
     public int Value { get; } = value;
     public int Property1 { get; set; }
     public int Property2 { get; set; }
+    public double Ratio { get; set; }
+    public decimal Total { get; set; }
+    public int? Optional { get; set; }
 
     public TestModel? ChildNull => null;
     public TestModel ChildTimesTen => field ??= new TestModel(Value * 10);

@@ -363,11 +363,16 @@ internal partial class ExpressionBuilder
                 if (member == null)
                     return ToError(item, "Member not found.");
 
-                _targetType = member is PropertyInfo pi ? pi.PropertyType : ((FieldInfo)member).FieldType;
+                var memberType = member is PropertyInfo pi ? pi.PropertyType : ((FieldInfo)member).FieldType;
+
+                _targetType = memberType;
                 var expression = Visit(ae.Right);
                 _targetType = previousTargetType;
                 if (expression == null)
                     return null;
+
+                if (!EnsureArgumentType(memberType, ref expression))
+                    return ToError(ae.Right, $"Cannot convert initializer value to '{memberType.GetFriendlyTypeName()}'.");
 
                 bindings.Add(Expression.Bind(member, expression));
             }
