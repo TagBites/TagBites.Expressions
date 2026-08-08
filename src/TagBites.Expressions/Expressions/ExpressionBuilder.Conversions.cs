@@ -95,6 +95,10 @@ internal partial class ExpressionBuilder
             castType = Nullable.GetUnderlyingType(castType) ?? castType;
             expressionType = Nullable.GetUnderlyingType(expressionType) ?? expressionType;
 
+            // A boxed value matches any base type or implemented interface (5 is object)
+            if (castType != expressionType && castType.IsAssignableFrom(expressionType))
+                return Expression.Constant(true);
+
             return Expression.MakeBinary(ExpressionType.Equal, Expression.Constant(expressionType), Expression.Constant(castType));
         }
 

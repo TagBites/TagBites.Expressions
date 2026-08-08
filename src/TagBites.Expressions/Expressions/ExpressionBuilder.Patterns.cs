@@ -1,13 +1,8 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using TagBites.Expressions.Extensions;
 using TagBites.Utils;
 
 namespace TagBites.Expressions;
@@ -56,6 +51,10 @@ internal partial class ExpressionBuilder
                     if (right == null)
                         return null;
 
+                    // Type name is a pattern, not a constant
+                    if (TryGetPatternType(right) is { } patternType)
+                        return ToIsOperator(expression, Expression.Constant(patternType));
+
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
@@ -92,11 +91,16 @@ internal partial class ExpressionBuilder
                     var isAnd = (SyntaxKind)p.OperatorToken.RawKind == SyntaxKind.AndKeyword;
                     if (isAnd && GetPatternNarrowingType(p.Left) is { } narrowingType)
                     {
-                        var narrowedType = ResolveType(narrowingType);
-                        if (narrowedType == null)
-                            return null;
+                        // Narrows only when it resolves to a type, not a constant pattern
+                        var narrowedType = narrowingType switch
+                        {
+                            IdentifierNameSyntax bareName => TryResolveTypeByName(bareName.Identifier.Text),
+                            MemberAccessExpressionSyntax qualifiedName => TryResolveNamespaceQualifiedType(qualifiedName),
+                            TypeSyntax typeName => ResolveType(typeName),
+                            _ => null
+                        };
 
-                        if (narrowedType != expression.Type)
+                        if (narrowedType != null && narrowedType != expression.Type)
                             expression = Expression.Convert(expression, narrowedType);
                     }
 
@@ -438,12 +442,21 @@ internal partial class ExpressionBuilder
                    && TryConvertConstant(constant, input) == null;
         }
     }
-    private static TypeSyntax? GetPatternNarrowingType(PatternSyntax pattern)
+    private static Type? TryGetPatternType(Expression expression)
+    {
+        // A compiler type reference keeps the Type as its value, while typeof(...) has Type == typeof(Type)
+        return expression is ConstantExpression { Value: Type type } && expression.Type != typeof(Type)
+            ? type
+            : null;
+    }
+
+    private static ExpressionSyntax? GetPatternNarrowingType(PatternSyntax pattern)
     {
         return pattern switch
         {
             TypePatternSyntax p => p.Type,
             DeclarationPatternSyntax p => p.Type,
+            ConstantPatternSyntax { Expression: IdentifierNameSyntax or MemberAccessExpressionSyntax } p => p.Expression,
             RecursivePatternSyntax { Type: { } type } => type,
             ParenthesizedPatternSyntax p => GetPatternNarrowingType(p.Pattern),
             BinaryPatternSyntax { OperatorToken.RawKind: (int)SyntaxKind.AndKeyword } p => GetPatternNarrowingType(p.Right) ?? GetPatternNarrowingType(p.Left),

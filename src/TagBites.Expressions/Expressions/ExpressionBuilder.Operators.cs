@@ -66,6 +66,13 @@ internal partial class ExpressionBuilder
                         if (value == null)
                             return null;
 
+                        // Type name is a pattern, not a constant
+                        if (TryGetPatternType(value) is { } armType)
+                        {
+                            condition = ToIsOperator(governing, Expression.Constant(armType));
+                            break;
+                        }
+
                         if (!EnsureArgumentType(governing.Type, ref value))
                             return ToError(arm.Pattern, "Switch governing and arm type mismatch.");
 

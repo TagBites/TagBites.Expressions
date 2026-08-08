@@ -170,6 +170,53 @@ public class PatternMatchingTests : ExpressionTestBase
     public void PatternConstantConversion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("m is TestModel", true)]
+    [InlineData("m is not TestModel", false)]
+    [InlineData("m is ITestModel", true)]
+    [InlineData("m is not ITestModel", false)]
+    [InlineData("m is not string", true)]
+    [InlineData("m is TestModel or string", true)]
+    [InlineData("m is string or TestModel", true)]
+    [InlineData("m is TestModel and { Value: 1 }", true)]
+    [InlineData("m switch { TestModel => 1, _ => 0 }", 1)]
+    [InlineData("m switch { string => 1, TestModel => 2, _ => 0 }", 2)]
+    [InlineData("m switch { ITestModel => 1, _ => 0 }", 1)]
+    [InlineData("m switch { TestModel or string => 1, _ => 0 }", 1)]
+    [InlineData("m switch { not null => 1, _ => 0 }", 1)]
+    [InlineData("((object)m) switch { TestModel and { Value: 1 } => 1, _ => 0 }", 1)]
+    [InlineData("((object)m) is TestModel and { Value: 1 }", true)]
+    [InlineData("((object)m) is TestModel and { Value: 2 }", false)]
+    [InlineData("((object)m) is TagBites.Expressions.Tests.Models.TestModel and { Value: 1 }", true)]
+    [InlineData("((object)m) is TagBites.Expressions.Tests.Models.TestModel and { Value: 2 }", false)]
+    [InlineData("((object)m) switch { TagBites.Expressions.Tests.Models.TestModel and { Value: 1 } => 1, _ => 0 }", 1)]
+    [InlineData("((object)1) is System.Int32 and > 0", true)]
+    public void TypePatternByName(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(TestModel), "m") },
+            IncludedTypes = { typeof(TestModel), typeof(ITestModel) }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new TestModel());
+    }
+
+    [Theory]
+    [InlineData("5 is object", true)]
+    [InlineData("2.5 is object", true)]
+    [InlineData("DayOfWeek.Friday is object", true)]
+    [InlineData("(1, 2) is object", true)]
+    [InlineData("5 is IComparable", true)]
+    [InlineData("5 is ValueType", true)]
+    [InlineData("5 is int", true)]
+    [InlineData("5 is long", false)]
+    public void ValueTypeIsBaseType(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(DayOfWeek), typeof(IComparable), typeof(ValueType) } };
+        ExecuteAndTest(script, options, expectedResult);
+    }
+
+    [Theory]
     [InlineData("((object)5) is > 3", true)]
     [InlineData("((object)2) is > 3", false)]
     [InlineData("((object)5L) is > 3", false)]
