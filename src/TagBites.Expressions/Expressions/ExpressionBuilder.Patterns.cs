@@ -53,7 +53,7 @@ internal partial class ExpressionBuilder
 
                     // Type name is a pattern, not a constant
                     if (TryGetPatternType(right) is { } patternType)
-                        return ToIsOperator(expression, Expression.Constant(patternType));
+                        return ToTypePattern(pattern, expression, patternType);
 
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
@@ -77,7 +77,7 @@ internal partial class ExpressionBuilder
                     if (type == null)
                         return null;
 
-                    return ToIsOperator(expression, Expression.Constant(type));
+                    return ToTypePattern(pattern, expression, type);
                 }
 
             // or, and
@@ -194,13 +194,17 @@ internal partial class ExpressionBuilder
                     if (type == null)
                         return null;
 
+                    var typeCheck = ToTypePattern(pattern, expression, type);
+                    if (typeCheck == null)
+                        return null;
+
                     var name = v.Identifier.Text;
                     var declareExpression = DeclareVariable(v, Expression.Convert(expression, type), name);
                     if (declareExpression == null)
                         return null;
 
                     return Expression.AndAlso(
-                        ToIsOperator(expression, Expression.Constant(type)),
+                        typeCheck,
                         Expression.Block(declareExpression, Expression.Constant(true)));
                 }
 
@@ -448,6 +452,28 @@ internal partial class ExpressionBuilder
         return expression is ConstantExpression { Value: Type type } && expression.Type != typeof(Type)
             ? type
             : null;
+    }
+
+    private Expression? ToTypePattern(SyntaxNode node, Expression expression, Type type)
+    {
+        // C# rejects a type pattern that can never match (unlike the is operator)
+        if (!IsPossibleTypeTest(expression.Type, type))
+            return ToError(node, $"An expression of type '{expression.Type.GetFriendlyTypeName()}' cannot be handled by a pattern of type '{type.GetFriendlyTypeName()}'.");
+
+        return ToIsOperator(expression, Expression.Constant(type));
+    }
+    private static bool IsPossibleTypeTest(Type inputType, Type testType)
+    {
+        var input = Nullable.GetUnderlyingType(inputType) ?? inputType;
+        var test = Nullable.GetUnderlyingType(testType) ?? testType;
+
+        if (input == typeof(object) || test == typeof(object) || test.IsAssignableFrom(input) || input.IsAssignableFrom(test))
+            return true;
+
+        if (test.IsInterface)
+            return input is { IsValueType: false, IsSealed: false };
+
+        return input.IsInterface && test is { IsValueType: false, IsSealed: false };
     }
 
     private static ExpressionSyntax? GetPatternNarrowingType(PatternSyntax pattern)

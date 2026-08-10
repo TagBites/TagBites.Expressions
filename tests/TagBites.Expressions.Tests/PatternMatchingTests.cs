@@ -174,14 +174,9 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("m is not TestModel", false)]
     [InlineData("m is ITestModel", true)]
     [InlineData("m is not ITestModel", false)]
-    [InlineData("m is not string", true)]
-    [InlineData("m is TestModel or string", true)]
-    [InlineData("m is string or TestModel", true)]
     [InlineData("m is TestModel and { Value: 1 }", true)]
     [InlineData("m switch { TestModel => 1, _ => 0 }", 1)]
-    [InlineData("m switch { string => 1, TestModel => 2, _ => 0 }", 2)]
     [InlineData("m switch { ITestModel => 1, _ => 0 }", 1)]
-    [InlineData("m switch { TestModel or string => 1, _ => 0 }", 1)]
     [InlineData("m switch { not null => 1, _ => 0 }", 1)]
     [InlineData("((object)m) switch { TestModel and { Value: 1 } => 1, _ => 0 }", 1)]
     [InlineData("((object)m) is TestModel and { Value: 1 }", true)]
@@ -199,6 +194,25 @@ public class PatternMatchingTests : ExpressionTestBase
         };
 
         ExecuteAndTest(script, options, expectedResult, new TestModel());
+    }
+
+    [Theory]
+    [InlineData("m is not string")]
+    [InlineData("m is TestModel or string")]
+    [InlineData("m is string or TestModel")]
+    [InlineData("m switch { string => 1, TestModel => 2, _ => 0 }")]
+    [InlineData("m switch { TestModel or string => 1, _ => 0 }")]
+    [InlineData("m is not int")]
+    [InlineData("m is string s")]
+    public void ImpossibleTypePattern_Throws(string script)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(TestModel), "m") },
+            IncludedTypes = { typeof(TestModel), typeof(ITestModel) }
+        };
+
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, options));
     }
 
     [Theory]

@@ -69,7 +69,10 @@ internal partial class ExpressionBuilder
                         // Type name is a pattern, not a constant
                         if (TryGetPatternType(value) is { } armType)
                         {
-                            condition = ToIsOperator(governing, Expression.Constant(armType));
+                            condition = ToTypePattern(arm.Pattern, governing, armType);
+                            if (condition == null)
+                                return null;
+
                             break;
                         }
 
