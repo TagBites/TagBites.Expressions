@@ -94,7 +94,29 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("(int?)null is { }", false)]
     [InlineData("(int?)1 is not { }", false)]
     [InlineData("(int?)null is not  { }", true)]
+    [InlineData("5 is { }", true)]
+    [InlineData("5 is not { }", false)]
+    [InlineData("2.5m is { }", true)]
+    [InlineData("DayOfWeek.Friday is { }", true)]
+    [InlineData("(1, 2) is { }", true)]
     public void PatternNullCheck(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("5 is null")]
+    [InlineData("5 is not null")]
+    [InlineData("2.5m is null")]
+    [InlineData("DayOfWeek.Friday is not null")]
+    [InlineData("5?.ToString()")]
+    [InlineData("2.5m?.ToString()")]
+    [InlineData("DayOfWeek.Friday?.ToString()")]
+    [InlineData("5 ?? 0")]
+    [InlineData("2.5m ?? 1m")]
+    [InlineData("\"a\".Length ?? 0")]
+    public void NullOperationOnNonNullableValueType_Throws(string script)
+    {
+        var options = new ExpressionParserOptions { IncludedTypes = { typeof(DayOfWeek) } };
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, options));
+    }
 
     [Theory]
     [InlineData("(int?)1 is int", true)]

@@ -47,10 +47,13 @@ internal partial class ExpressionBuilder
         if (instance == null)
             return null;
 
+        if (instance.Type.IsValueType && !IsNullableType(instance.Type))
+            return ToError(node, $"Operator '?' cannot be applied to operand of type '{instance.Type.GetFriendlyTypeName()}'.");
+
         // Resolve Member
         var valueInstance = instance;
 
-        if (instance.Type.IsValueType && IsNullableType(instance.Type))
+        if (instance.Type.IsValueType)
             valueInstance = Expression.MakeMemberAccess(instance, instance.Type.GetProperty("Value")!);
 
         Push(valueInstance);

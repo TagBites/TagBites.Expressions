@@ -241,6 +241,9 @@ internal partial class ExpressionBuilder
                 if (left is DelayNewExpression or DelayThrowExpression)
                     return ToError(node, "Cannot infer the type of the left operand here.");
 
+                if (left.Type.IsValueType && !IsNullableType(left.Type))
+                    return ToError(node, $"Operator '??' cannot be applied to an operand of type '{left.Type.GetFriendlyTypeName()}'.");
+
                 var condition = left;
 
                 if (IsNullableType(left.Type))

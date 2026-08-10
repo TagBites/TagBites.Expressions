@@ -38,7 +38,12 @@ internal partial class ExpressionBuilder
                     }
 
                     if (expressionType.IsValueType)
-                        return ToError(pattern, $"Cannot convert null to '{expressionType.Name}'.");
+                    {
+                        // { } always matches while a null check is an error
+                        return pattern is RecursivePatternSyntax
+                            ? Expression.Block(expression, Expression.Constant(true))
+                            : ToError(pattern, $"Cannot convert null to '{expressionType.GetFriendlyTypeName()}' because it is a non-nullable value type.");
+                    }
 
                     var isNull = Expression.ReferenceEqual(expression, Expression.Constant(null, expressionType));
                     return isNullCheck ? isNull : Expression.Not(isNull);
