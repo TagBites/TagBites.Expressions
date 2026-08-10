@@ -47,6 +47,14 @@ internal partial class ExpressionBuilder
             expression = Expression.Convert(expression, underlyingType);
         }
 
+        // Standard numeric conversion with a user-defined one, e.g. (Money)1 through decimal
+        if (!type.IsAssignableFrom(expression.Type) && !expression.Type.IsAssignableFrom(type)
+            && !(TypeUtils.IsNumericType(sourceType) && TypeUtils.IsNumericType(targetType))
+            && (TryConvertWithOperator(expression, type, "op_Explicit") ?? TryConvertWithOperator(expression, type, "op_Implicit")) is { } viaOperator)
+        {
+            return viaOperator;
+        }
+
         return _checkedContext
             ? Expression.ConvertChecked(expression, type)
             : Expression.Convert(expression, type);
@@ -133,10 +141,16 @@ internal partial class ExpressionBuilder
         if (TypeUtils.HasImplicitNumericConversion(sourceType, targetType) && !(IsNullableType(sourceType) && !IsNullableType(targetType)))
             return ToCast(expression, targetType);
 
-        var method = FindConversionOperator(sourceType, targetType, "op_Implicit");
-        return method != null
-            ? Expression.Convert(expression, targetType, method)
-            : null;
+        return TryConvertWithOperator(expression, targetType, "op_Implicit");
+    }
+    private static Expression? TryConvertWithOperator(Expression expression, Type targetType, string operatorName)
+    {
+        var method = FindConversionOperator(expression.Type, targetType, operatorName);
+        if (method == null)
+            return null;
+
+        var parameterType = method.GetParameters()[0].ParameterType;
+        return Expression.Convert(ToCast(expression, parameterType), targetType, method);
     }
     private static Expression? TryConvertConstant(Expression expression, Type targetType)
     {
@@ -189,8 +203,12 @@ internal partial class ExpressionBuilder
                     continue;
 
                 var parameters = method.GetParameters();
-                if (parameters.Length != 1 || !parameters[0].ParameterType.IsAssignableFrom(sourceType))
+                if (parameters.Length != 1
+                    || (!parameters[0].ParameterType.IsAssignableFrom(sourceType)
+                        && !(!IsNullableType(sourceType) && TypeUtils.HasImplicitNumericConversion(sourceType, parameters[0].ParameterType))))
+                {
                     continue;
+                }
 
                 if (!targetType.IsAssignableFrom(method.ReturnType))
                     continue;

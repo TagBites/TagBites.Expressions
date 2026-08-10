@@ -44,6 +44,23 @@ public class ConversionTests : ExpressionTestBase
         Assert.Equal(3.5m, result.Value);
     }
 
+    [Theory]
+    [InlineData("((Money)3).Value == 3m", true)]
+    [InlineData("((Money)3L).Value == 3m", true)]
+    [InlineData("((Money)(byte)3).Value == 3m", true)]
+    [InlineData("((Money)3m).Value == 3m", true)]
+    [InlineData("(m + 2).Value == 3m", true)]
+    public void CustomOperatorAfterStandardConversion(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(Money), "m") },
+            IncludedTypes = { typeof(Money) }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new Money(1m));
+    }
+
     [Fact]
     public void MixedTypeOperatorOverload()
     {
