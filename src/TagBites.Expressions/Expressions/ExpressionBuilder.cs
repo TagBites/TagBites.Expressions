@@ -20,6 +20,8 @@ internal partial class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private static readonly MethodInfo s_typeIsAssignableFrom = typeof(Type).GetMethod(nameof(Type.IsAssignableFrom))!;
     private static readonly MethodInfo s_lvcGetValue = typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.GetValue))!;
     private static readonly MethodInfo s_lvcSetValue = typeof(LambdaVariableContext).GetMethod(nameof(LambdaVariableContext.SetValue))!;
+    private static readonly MethodInfo s_doubleIsNaN = typeof(double).GetMethod(nameof(double.IsNaN))!;
+    private static readonly MethodInfo s_floatIsNaN = typeof(float).GetMethod(nameof(float.IsNaN))!;
     private static readonly PropertyInfo s_anonymousObjectIndexer = typeof(IDictionary<string, object>).GetProperty("Item")!;
     private static MethodInfo?[]? s_valueTupleCreate;
 

@@ -79,6 +79,15 @@ internal partial class ExpressionBuilder
                             break;
                         }
 
+                        if (!IsConstantPatternValue(value))
+                            return ToError(arm.Pattern, $"A constant value of type '{value.Type.GetFriendlyTypeName()}' is expected.");
+
+                        if (IsNaNConstant(value))
+                        {
+                            condition = ToNaNPattern(governing, value.Type);
+                            break;
+                        }
+
                         if (governing.Type == typeof(object) && value.Type.IsValueType)
                         {
                             condition = ToBoxedConstantPattern(governing, value);
@@ -174,6 +183,9 @@ internal partial class ExpressionBuilder
                 : TryResolveNamespaceQualifiedType(constantName.Left)) is { } declaringType
             && ResolveMember(node.Right, Expression.Constant(declaringType), constantMember.Identifier.Text, setErrorWhenNotFound: false) is { } constantValue)
         {
+            if (!IsConstantPatternValue(constantValue))
+                return ToError(node.Right, $"A constant value of type '{constantValue.Type.GetFriendlyTypeName()}' is expected.");
+
             if (left.Type == typeof(object) && constantValue.Type.IsValueType)
                 return ToBoxedConstantPattern(left, constantValue);
 
@@ -296,7 +308,11 @@ internal partial class ExpressionBuilder
 
         // is operator
         if (expressionType == ExpressionType.TypeIs)
-            return ToIsOperator(left, right);
+        {
+            return TryGetPatternType(right) != null
+                ? ToIsOperator(left, right)
+                : ToError(node.Right, $"'{node.Right}' is not a type or a constant value.");
+        }
 
         // as operator
         if (expressionType == ExpressionType.TypeAs)

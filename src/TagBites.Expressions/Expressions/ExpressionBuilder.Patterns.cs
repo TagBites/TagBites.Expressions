@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -60,8 +61,14 @@ internal partial class ExpressionBuilder
                     if (TryGetPatternType(right) is { } patternType)
                         return ToTypePattern(pattern, expression, patternType);
 
+                    if (!IsConstantPatternValue(right))
+                        return ToError(pattern, $"A constant value of type '{right.Type.GetFriendlyTypeName()}' is expected.");
+
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
+
+                    if (IsNaNConstant(right))
+                        return ToNaNPattern(expression, right.Type);
 
                     if (expressionType == typeof(object) && right.Type.IsValueType)
                         return ToBoxedConstantPattern(expression, right);
@@ -123,6 +130,9 @@ internal partial class ExpressionBuilder
                     var right = Visit(p.Expression);
                     if (right == null)
                         return null;
+
+                    if (!IsConstantPatternValue(right))
+                        return ToError(pattern, $"A constant value of type '{right.Type.GetFriendlyTypeName()}' is expected.");
 
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
@@ -545,6 +555,48 @@ internal partial class ExpressionBuilder
             _ => null
         };
     }
+
+    private static Expression ToNaNPattern(Expression expression, Type constantType)
+    {
+        if (expression.Type == typeof(object))
+        {
+            return Expression.AndAlso(
+                ToIsOperator(expression, Expression.Constant(constantType)),
+                ToIsNaN(Expression.Convert(expression, constantType)));
+        }
+
+        if (IsNullableType(expression.Type))
+        {
+            var value = Expression.Call(expression, expression.Type.GetMethod(nameof(Nullable<>.GetValueOrDefault), Type.EmptyTypes)!);
+            return ToIsNaN(value);
+        }
+
+        return ToIsNaN(expression);
+    }
+    private static Expression ToIsNaN(Expression value) => Expression.Call(value.Type == typeof(float) ? s_floatIsNaN : s_doubleIsNaN, value);
+    private static object? TryGetConstantValue(Expression expression)
+    {
+        return expression switch
+        {
+            ConstantExpression c => c.Value,
+            // double.NaN stays a field access
+            MemberExpression { Expression: null, Member: FieldInfo { IsLiteral: true } field } => field.GetRawConstantValue(),
+            _ => null
+        };
+    }
+    private static bool IsConstantPatternValue(Expression expression)
+    {
+        return expression switch
+        {
+            ConstantExpression => true,
+            // A decimal constant is compiled as a static readonly field with the value in an attribute
+            MemberExpression { Expression: null, Member: FieldInfo field } => field.IsLiteral || field.IsDefined(typeof(DecimalConstantAttribute), false),
+            UnaryExpression u => IsConstantPatternValue(u.Operand),
+            BinaryExpression b => IsConstantPatternValue(b.Left) && IsConstantPatternValue(b.Right),
+            _ => false
+        };
+    }
+    private static bool IsNaNConstant(Expression expression) => TryGetConstantValue(expression) is double.NaN or float.NaN;
 
     private static MethodInfo? GetDeconstructMethod(Type type, int count)
     {

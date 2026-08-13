@@ -212,6 +212,46 @@ public class PatternMatchingTests : ExpressionTestBase
     public void PatternConstantConversion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("(0.0/0.0) is double.NaN", true)]
+    [InlineData("(0.0/0.0) is not double.NaN", false)]
+    [InlineData("5.0 is double.NaN", false)]
+    [InlineData("((double?)(0.0/0.0)) is double.NaN", true)]
+    [InlineData("((double?)null) is double.NaN", false)]
+    [InlineData("((object)(0.0/0.0)) is double.NaN", true)]
+    [InlineData("(0.0f/0.0f) is float.NaN", true)]
+    [InlineData("(0.0/0.0) switch { double.NaN => 1, _ => 0 }", 1)]
+    [InlineData("5.0 switch { double.NaN => 1, _ => 0 }", 0)]
+    [InlineData("(0.0/0.0) == double.NaN", false)]
+    [InlineData("(1.0/0.0) is double.PositiveInfinity", true)]
+    public void NaNPattern(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("TimeSpan.FromDays(1) is TimeSpan.Zero")]
+    [InlineData("TimeSpan.FromDays(1) is > TimeSpan.Zero")]
+    [InlineData("TimeSpan.FromDays(1) switch { TimeSpan.Zero => 1, _ => 0 }")]
+    [InlineData("\"ab\" is string.Empty")]
+    [InlineData("DateTime.Now is DateTime.MinValue")]
+    [InlineData("5 is m")]
+    public void NonConstantPattern_Throws(string script)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(TestModel), "m") }
+        };
+
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, options));
+    }
+
+    [Theory]
+    [InlineData("5 is 5 + 3", false)]
+    [InlineData("8 is 5 + 3", true)]
+    [InlineData("5 is (int)5.0", true)]
+    [InlineData("2147483647 is int.MaxValue", true)]
+    [InlineData("1m is decimal.One", true)]
+    [InlineData("2.5m is decimal.One", false)]
+    public void ConstantPatternExpression(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
     [InlineData("m is TestModel", true)]
     [InlineData("m is not TestModel", false)]
     [InlineData("m is ITestModel", true)]
