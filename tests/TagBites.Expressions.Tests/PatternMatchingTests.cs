@@ -18,6 +18,13 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("1 switch { 1 => 1, _ => 2L }", 1L)]
     [InlineData("n switch { int a when a > 5 => a, int a => a * 10 }", 10)]
     [InlineData("n switch { 1 => 1, int a when a > 0 => a, int a => -a }", 1)]
+    [InlineData("((object)5) switch { 5 => 1, _ => 0 }", 1)]
+    [InlineData("((object)5) switch { 4 => 1, _ => 0 }", 0)]
+    [InlineData("((object)5) switch { 5L => 1, _ => 0 }", 0)]
+    [InlineData("((object)DayOfWeek.Monday) switch { DayOfWeek.Monday => 1, _ => 0 }", 1)]
+    [InlineData("((object)DayOfWeek.Monday) switch { System.DayOfWeek.Monday => 1, _ => 0 }", 1)]
+    [InlineData("((object)DayOfWeek.Monday) switch { DayOfWeek.Friday => 1, _ => 0 }", 0)]
+    [InlineData("((object)\"ab\") switch { \"ab\" => 1, _ => 0 }", 1)]
     public void Switch(string script, object expectedResult)
     {
         var options = new ExpressionParserOptions
@@ -67,6 +74,19 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("((long)5 as int?) ?? -1", -1)]
     [InlineData("((int?)5 as long?) == null", true)]
     [InlineData("((object)5 as int?) ?? -1", 5)]
+    [InlineData("m is TagBites.Expressions.Tests.Models.TestModel", true)]
+    [InlineData("m is not TagBites.Expressions.Tests.Models.ITestModel", false)]
+    [InlineData("m as TagBites.Expressions.Tests.Models.TestModel != null", true)]
+    [InlineData("((object)5) is System.Int32", true)]
+    [InlineData("((object)5) is System.Int64", false)]
+    [InlineData("((object)5) as System.Collections.Generic.List<int> == null", true)]
+    [InlineData("DayOfWeek.Monday is System.DayOfWeek.Monday", true)]
+    [InlineData("DayOfWeek.Monday is System.DayOfWeek.Friday", false)]
+    [InlineData("((object)DayOfWeek.Monday) is DayOfWeek.Monday", true)]
+    [InlineData("((object)DayOfWeek.Monday) is DayOfWeek.Friday", false)]
+    [InlineData("((object)DayOfWeek.Monday) is System.DayOfWeek.Monday", true)]
+    [InlineData("((object)1) is DayOfWeek.Monday", false)]
+    [InlineData("((object)null) is DayOfWeek.Monday", false)]
     public void IsAndAsOperators(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions

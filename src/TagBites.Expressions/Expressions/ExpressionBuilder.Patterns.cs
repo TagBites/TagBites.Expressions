@@ -63,11 +63,8 @@ internal partial class ExpressionBuilder
                     if (IsPatternConstantMismatch(expressionType, right))
                         return ToError(pattern, $"Pattern constant of type '{right.Type.GetFriendlyTypeName()}' does not convert to the input type '{expressionType.GetFriendlyTypeName()}'.");
 
-                    // A value-type constant against an object input tests the runtime type first, e.g. (object)5 is 5
                     if (expressionType == typeof(object) && right.Type.IsValueType)
-                        return Expression.AndAlso(
-                            ToIsOperator(expression, Expression.Constant(right.Type)),
-                            Expression.MakeBinary(ExpressionType.Equal, Expression.Convert(expression, right.Type), right));
+                        return ToBoxedConstantPattern(expression, right);
 
                     if (!EnsureTheSameTypes(pattern, ref expression, ref right))
                         return null;
@@ -451,50 +448,6 @@ internal partial class ExpressionBuilder
                    && TryConvertConstant(constant, input) == null;
         }
     }
-    private static Type? TryGetPatternType(Expression expression)
-    {
-        // A compiler type reference keeps the Type as its value, while typeof(...) has Type == typeof(Type)
-        return expression is ConstantExpression { Value: Type type } && expression.Type != typeof(Type)
-            ? type
-            : null;
-    }
-
-    private Expression? ToTypePattern(SyntaxNode node, Expression expression, Type type)
-    {
-        // C# rejects a type pattern that can never match (unlike the is operator)
-        if (!IsPossibleTypeTest(expression.Type, type))
-            return ToError(node, $"An expression of type '{expression.Type.GetFriendlyTypeName()}' cannot be handled by a pattern of type '{type.GetFriendlyTypeName()}'.");
-
-        return ToIsOperator(expression, Expression.Constant(type));
-    }
-    private static bool IsPossibleTypeTest(Type inputType, Type testType)
-    {
-        var input = Nullable.GetUnderlyingType(inputType) ?? inputType;
-        var test = Nullable.GetUnderlyingType(testType) ?? testType;
-
-        if (input == typeof(object) || test == typeof(object) || test.IsAssignableFrom(input) || input.IsAssignableFrom(test))
-            return true;
-
-        if (test.IsInterface)
-            return input is { IsValueType: false, IsSealed: false };
-
-        return input.IsInterface && test is { IsValueType: false, IsSealed: false };
-    }
-
-    private static ExpressionSyntax? GetPatternNarrowingType(PatternSyntax pattern)
-    {
-        return pattern switch
-        {
-            TypePatternSyntax p => p.Type,
-            DeclarationPatternSyntax p => p.Type,
-            ConstantPatternSyntax { Expression: IdentifierNameSyntax or MemberAccessExpressionSyntax } p => p.Expression,
-            RecursivePatternSyntax { Type: { } type } => type,
-            ParenthesizedPatternSyntax p => GetPatternNarrowingType(p.Pattern),
-            BinaryPatternSyntax { OperatorToken.RawKind: (int)SyntaxKind.AndKeyword } p => GetPatternNarrowingType(p.Right) ?? GetPatternNarrowingType(p.Left),
-            _ => null
-        };
-    }
-
     private Expression? ResolveVarDesignation(Expression expression, ParenthesizedVariableDesignationSyntax designation)
     {
         var count = designation.Variables.Count;
@@ -543,6 +496,54 @@ internal partial class ExpressionBuilder
             default:
                 return ToError(designation);
         }
+    }
+
+    private static Type? TryGetPatternType(Expression expression)
+    {
+        // A compiler type reference keeps the Type as its value, while typeof(...) has Type == typeof(Type)
+        return expression is ConstantExpression { Value: Type type } && expression.Type != typeof(Type)
+            ? type
+            : null;
+    }
+    private static Expression ToBoxedConstantPattern(Expression expression, Expression constant)
+    {
+        return Expression.AndAlso(
+            ToIsOperator(expression, Expression.Constant(constant.Type)),
+            Expression.MakeBinary(ExpressionType.Equal, Expression.Convert(expression, constant.Type), constant));
+    }
+    private Expression? ToTypePattern(SyntaxNode node, Expression expression, Type type)
+    {
+        // C# rejects a type pattern that can never match (unlike the is operator)
+        if (!IsPossibleTypeTest(expression.Type, type))
+            return ToError(node, $"An expression of type '{expression.Type.GetFriendlyTypeName()}' cannot be handled by a pattern of type '{type.GetFriendlyTypeName()}'.");
+
+        return ToIsOperator(expression, Expression.Constant(type));
+    }
+    private static bool IsPossibleTypeTest(Type inputType, Type testType)
+    {
+        var input = Nullable.GetUnderlyingType(inputType) ?? inputType;
+        var test = Nullable.GetUnderlyingType(testType) ?? testType;
+
+        if (input == typeof(object) || test == typeof(object) || test.IsAssignableFrom(input) || input.IsAssignableFrom(test))
+            return true;
+
+        if (test.IsInterface)
+            return input is { IsValueType: false, IsSealed: false };
+
+        return input.IsInterface && test is { IsValueType: false, IsSealed: false };
+    }
+    private static ExpressionSyntax? GetPatternNarrowingType(PatternSyntax pattern)
+    {
+        return pattern switch
+        {
+            TypePatternSyntax p => p.Type,
+            DeclarationPatternSyntax p => p.Type,
+            ConstantPatternSyntax { Expression: IdentifierNameSyntax or MemberAccessExpressionSyntax } p => p.Expression,
+            RecursivePatternSyntax { Type: { } type } => type,
+            ParenthesizedPatternSyntax p => GetPatternNarrowingType(p.Pattern),
+            BinaryPatternSyntax { OperatorToken.RawKind: (int)SyntaxKind.AndKeyword } p => GetPatternNarrowingType(p.Right) ?? GetPatternNarrowingType(p.Left),
+            _ => null
+        };
     }
 
     private static MethodInfo? GetDeconstructMethod(Type type, int count)

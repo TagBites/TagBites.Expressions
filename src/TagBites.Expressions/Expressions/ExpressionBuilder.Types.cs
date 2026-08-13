@@ -264,6 +264,12 @@ internal partial class ExpressionBuilder
                     fullName = prefix + "." + simpleName;
                     return true;
 
+                case QualifiedNameSyntax { Right: IdentifierNameSyntax name } qualifiedName
+                    when TryGetDottedName(qualifiedName.Left, out var prefix, out _):
+                    simpleName = name.Identifier.Text;
+                    fullName = prefix + "." + simpleName;
+                    return true;
+
                 default:
                     fullName = simpleName = string.Empty;
                     return false;

@@ -76,6 +76,12 @@ internal partial class ExpressionBuilder
                             break;
                         }
 
+                        if (governing.Type == typeof(object) && value.Type.IsValueType)
+                        {
+                            condition = ToBoxedConstantPattern(governing, value);
+                            break;
+                        }
+
                         if (!EnsureArgumentType(governing.Type, ref value))
                             return ToError(arm.Pattern, "Switch governing and arm type mismatch.");
 
@@ -159,19 +165,24 @@ internal partial class ExpressionBuilder
 
         // Roslyn parses `x is Enum.Member` as the is-type operator with a qualified name; when it names a constant it is an equality test
         if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.IsKeyword
-            && node.Right is QualifiedNameSyntax { Left: IdentifierNameSyntax constantType, Right: IdentifierNameSyntax constantMember }
-            && TryResolveTypeByName(constantType.Identifier.Text) is { } declaringType
+            && node.Right is QualifiedNameSyntax { Right: IdentifierNameSyntax constantMember } constantName
+            && (constantName.Left is IdentifierNameSyntax constantType
+                ? TryResolveTypeByName(constantType.Identifier.Text)
+                : TryResolveNamespaceQualifiedType(constantName.Left)) is { } declaringType
             && ResolveMember(node.Right, Expression.Constant(declaringType), constantMember.Identifier.Text, setErrorWhenNotFound: false) is { } constantValue)
         {
+            if (left.Type == typeof(object) && constantValue.Type.IsValueType)
+                return ToBoxedConstantPattern(left, constantValue);
+
             if (!EnsureTheSameTypes(node, ref left, ref constantValue))
                 return null;
 
             return Expression.MakeBinary(ExpressionType.Equal, left, constantValue);
         }
 
-        // is/as with a generic or array type (x is List<int>, x as int[]) - resolve the right side as a type
+        // is/as with a generic, array or qualified type - resolve the right side as a type
         if ((SyntaxKind)node.OperatorToken.RawKind is SyntaxKind.IsKeyword or SyntaxKind.AsKeyword
-            && node.Right is GenericNameSyntax or ArrayTypeSyntax)
+            && node.Right is GenericNameSyntax or ArrayTypeSyntax or QualifiedNameSyntax)
         {
             var type = ResolveType((TypeSyntax)node.Right);
             if (type == null)
