@@ -71,6 +71,8 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("(double?)null ?? (uint?)3u", 3.0)]
     [InlineData("(int?)4 ?? null", 4)]
     [InlineData("(int?)null ?? null", null)]
+    [InlineData("null ?? \"pending\"", "pending")]
+    [InlineData("1 > 0 ? \"active\" : null", "active")]
     [InlineData("(bool?)true & (bool?)true", true)]
     [InlineData("(bool?)null | (bool?)true", true)]
     public void ReferenceEqualityAndCoalescing(string script, object? expectedResult) => ExecuteAndTest(script, expectedResult);
@@ -86,6 +88,7 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("false || (bool?)null")]
     [InlineData("(int?)4 ?? (uint?)3u")]
     [InlineData("(uint?)7u ?? (int?)7")]
+    [InlineData("null ?? null")]
     public void InvalidOperatorOperands_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
@@ -95,6 +98,7 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("true ? (sbyte)-2 : 5u")]
     [InlineData("true ? 5u : -4")]
     [InlineData("1 switch { 1 => (int?)4, _ => 5L }")]
+    [InlineData("1 > 0 ? null : null")]
     public void TernaryWithoutCommonOperandType_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]

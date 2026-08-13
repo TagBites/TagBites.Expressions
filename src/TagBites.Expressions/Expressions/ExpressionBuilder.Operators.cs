@@ -24,6 +24,9 @@ internal partial class ExpressionBuilder
         if (whenFalse == null)
             return null;
 
+        if (IsNullLiteral(whenTrue) && IsNullLiteral(whenFalse))
+            return ToError(node, "Type of conditional expression cannot be determined because there is no implicit conversion between '<null>' and '<null>'.");
+
         if (!EnsureTheSameTypes(node, ref whenTrue, ref whenFalse, bestCommonOnly: true))
             return null;
 
@@ -251,6 +254,9 @@ internal partial class ExpressionBuilder
             {
                 if (left is DelayNewExpression or DelayThrowExpression)
                     return ToError(node, "Cannot infer the type of the left operand here.");
+
+                if (IsNullLiteral(left) && IsNullLiteral(right))
+                    return ToError(node, "Operator '??' cannot be applied to operands of type '<null>' and '<null>'.");
 
                 if (left.Type.IsValueType && !IsNullableType(left.Type))
                     return ToError(node, $"Operator '??' cannot be applied to an operand of type '{left.Type.GetFriendlyTypeName()}'.");
