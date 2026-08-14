@@ -143,6 +143,11 @@ internal partial class ExpressionBuilder
             if (_context.StaticImports?.Count > 0 && TryResolveStaticImportCall(node, methodName, genericTypes, parameters, out var staticExpression, argumentNames))
                 return staticExpression;
 
+            // Statics methods that every type inherits from object: Equals, ReferenceEquals
+            var objectMethods = GetMethods(typeof(object), methodName, BindingFlags.Static);
+            if (objectMethods.Count > 0 && TryResolveMethodCall(node, null, parameters, objectMethods, out var objectStatic, argumentNames))
+                return objectStatic;
+
             if (FirstError != null)
                 return null;
 
