@@ -365,6 +365,13 @@ internal partial class ExpressionBuilder
             return ToError(node, $"Operator '{node.OperatorToken.ValueText}' cannot be applied to operands of type '{left.Type.GetFriendlyTypeName()}' and '{right.Type.GetFriendlyTypeName()}'.");
         }
 
+        // Two null literals compare through the lifted operators, e.g. null > null is false
+        if (IsNullLiteral(left) && IsNullLiteral(right)
+            && expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+        {
+            return Expression.Constant(false);
+        }
+
         // Enum arithmetic
         if ((Nullable.GetUnderlyingType(left.Type) ?? left.Type).IsEnum || (Nullable.GetUnderlyingType(right.Type) ?? right.Type).IsEnum)
             return BuildEnumBinaryOperation(node, expressionType, left, right);
@@ -572,6 +579,12 @@ internal partial class ExpressionBuilder
 
     private Expression? BuildEnumBinaryOperation(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
+        // The null literal lifts the operation, e.g. day == null is always false (C# warns with CS0472)
+        if (IsNullLiteral(left))
+            left = Expression.Constant(null, typeof(Nullable<>).MakeGenericType(Nullable.GetUnderlyingType(right.Type) ?? right.Type));
+        else if (IsNullLiteral(right))
+            right = Expression.Constant(null, typeof(Nullable<>).MakeGenericType(Nullable.GetUnderlyingType(left.Type) ?? left.Type));
+
         // Nullable enum operand
         var leftType = Nullable.GetUnderlyingType(left.Type) ?? left.Type;
         var rightType = Nullable.GetUnderlyingType(right.Type) ?? right.Type;
