@@ -189,8 +189,8 @@ public class MethodCallTests : ExpressionTestBase
     public void UnqualifiedObjectStaticCall(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
-    [InlineData("Equals(1)")]
     [InlineData("Equals(1, 2, 3)")]
     [InlineData("ReferenceEquals(1)")]
+    [InlineData("ReferenceEquals(1, 2, 3)")]
     public void UnqualifiedObjectStaticCall_WrongArgumentCount_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 }

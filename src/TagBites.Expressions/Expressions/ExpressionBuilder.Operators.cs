@@ -420,6 +420,13 @@ internal partial class ExpressionBuilder
         if (left.Type != right.Type && TryResolveUserDefinedBinaryOperator(expressionType, left, right) is { } userOperator)
             return userOperator;
 
+        // Built-in operators through a user-defined conversion, but only when no user-defined operator applies
+        if (!DeclaresApplicableOperator(left.Type, expressionType, left, right)
+            && !DeclaresApplicableOperator(right.Type, expressionType, left, right))
+        {
+            TryConvertToCommonOperandType(ref left, ref right);
+        }
+
         if (_checkedContext)
             expressionType = expressionType switch
             {
@@ -670,15 +677,7 @@ internal partial class ExpressionBuilder
     }
     private Expression? TryResolveUserDefinedBinaryOperator(ExpressionType type, Expression left, Expression right)
     {
-        var operatorName = type switch
-        {
-            ExpressionType.Add => "op_Addition",
-            ExpressionType.Subtract => "op_Subtraction",
-            ExpressionType.Multiply => "op_Multiply",
-            ExpressionType.Divide => "op_Division",
-            ExpressionType.Modulo => "op_Modulus",
-            _ => null
-        };
+        var operatorName = GetOperatorMethodName(type);
         if (operatorName == null)
             return null;
 
@@ -895,6 +894,102 @@ internal partial class ExpressionBuilder
         {
             TypeCode.SByte or TypeCode.Byte or TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Char => ToCast(expression, IsNullableType(expression.Type) ? typeof(int?) : typeof(int)),
             _ => expression
+        };
+    }
+
+    private void TryConvertToCommonOperandType(ref Expression e1, ref Expression e2)
+    {
+        if (TryConvertToNumericTargetOf(e1.Type, ref e1, ref e2))
+            return;
+
+        TryConvertToNumericTargetOf(e2.Type, ref e1, ref e2);
+    }
+    private bool TryConvertToNumericTargetOf(Type operandType, ref Expression e1, ref Expression e2)
+    {
+        var source = Nullable.GetUnderlyingType(operandType) ?? operandType;
+        if (IsBuiltInOperandType(operandType))
+            return false;
+
+        foreach (var method in GetMethods(source, "op_Implicit", BindingFlags.Static))
+        {
+            if (!TypeUtils.IsNumericType(method.ReturnType) || method.GetParameters()[0].ParameterType != source)
+                continue;
+
+            var target = IsNullableType(operandType)
+                ? typeof(Nullable<>).MakeGenericType(method.ReturnType)
+                : method.ReturnType;
+
+            if (TryConvertOperand(e1, target, source, method) is { } converted1
+                && TryConvertOperand(e2, target, source, method) is { } converted2)
+            {
+                e1 = converted1;
+                e2 = converted2;
+                return true;
+            }
+        }
+
+        return false;
+    }
+    private static Expression? TryConvertOperand(Expression expression, Type target, Type source, MethodInfo conversion)
+    {
+        return (Nullable.GetUnderlyingType(expression.Type) ?? expression.Type) == source
+            ? Expression.Convert(expression, target, conversion)
+            : TryConvertExpression(expression, target);
+    }
+    private bool DeclaresApplicableOperator(Type type, ExpressionType expressionType, Expression left, Expression right)
+    {
+        if (IsBuiltInOperandType(type) || GetOperatorMethodName(expressionType) is not { } operatorName)
+            return false;
+
+        // ReSharper disable once LoopCanBeConvertedToQuery
+        foreach (var method in GetMethods(Nullable.GetUnderlyingType(type) ?? type, operatorName, BindingFlags.Static))
+        {
+            var parameters = method.GetParameters();
+            if (parameters.Length == 2
+                && IsOperandCompatible(left, parameters[0].ParameterType)
+                && IsOperandCompatible(right, parameters[1].ParameterType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    private static bool IsOperandCompatible(Expression operand, Type parameterType)
+    {
+        return (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) == parameterType
+               || TryConvertExpression(operand, parameterType) != null;
+    }
+    private static bool IsBuiltInOperandType(Type type)
+    {
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+
+        return underlying.IsPrimitive
+               || underlying.IsEnum
+               || underlying == typeof(decimal)
+               || underlying == typeof(string);
+    }
+    private static string? GetOperatorMethodName(ExpressionType type)
+    {
+        return type switch
+        {
+            ExpressionType.Add or ExpressionType.AddChecked => "op_Addition",
+            ExpressionType.Subtract or ExpressionType.SubtractChecked => "op_Subtraction",
+            ExpressionType.Multiply or ExpressionType.MultiplyChecked => "op_Multiply",
+            ExpressionType.Divide => "op_Division",
+            ExpressionType.Modulo => "op_Modulus",
+            ExpressionType.Equal => "op_Equality",
+            ExpressionType.NotEqual => "op_Inequality",
+            ExpressionType.LessThan => "op_LessThan",
+            ExpressionType.LessThanOrEqual => "op_LessThanOrEqual",
+            ExpressionType.GreaterThan => "op_GreaterThan",
+            ExpressionType.GreaterThanOrEqual => "op_GreaterThanOrEqual",
+            ExpressionType.And => "op_BitwiseAnd",
+            ExpressionType.Or => "op_BitwiseOr",
+            ExpressionType.ExclusiveOr => "op_ExclusiveOr",
+            ExpressionType.LeftShift => "op_LeftShift",
+            ExpressionType.RightShift => "op_RightShift",
+            _ => null
         };
     }
 }

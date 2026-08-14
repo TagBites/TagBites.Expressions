@@ -61,6 +61,62 @@ public class ConversionTests : ExpressionTestBase
         ExecuteAndTest(script, options, expectedResult, new Money(1m));
     }
 
+    [Theory]
+    [InlineData("p + 1 == 4m", true)]
+    [InlineData("1 + p == 4m", true)]
+    [InlineData("p * 2 == 6m", true)]
+    [InlineData("p / 2 == 1.5m", true)]
+    [InlineData("p % 2 == 1m", true)]
+    [InlineData("p - p == 0m", true)]
+    [InlineData("p + p == 6m", true)]
+    [InlineData("p + 1L == 4m", true)]
+    [InlineData("p > 1", true)]
+    [InlineData("p >= 3m", true)]
+    [InlineData("p > p", false)]
+    [InlineData("p == 3m", true)]
+    [InlineData("p == p", true)]
+    [InlineData("np + 1 == 4m", true)]
+    [InlineData("np - 1 == 2m", true)]
+    [InlineData("np > 1", true)]
+    public void BuiltInOperatorAfterUserConversion(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(Percentage), "p"), (typeof(Percentage?), "np") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new Percentage(3m), new Percentage(3m));
+    }
+
+    [Theory]
+    [InlineData("(c + c).Amount == 19m", true)]
+    [InlineData("(c * 2).Amount == 19m", true)]
+    [InlineData("(c + c * 2).Amount == 28.5m", true)]
+    [InlineData("c + 1 == 10.5m", true)]
+    [InlineData("c > 1", true)]
+    public void UserOperatorWinsOverUserConversion(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(Coin), "c") }
+        };
+
+        ExecuteAndTest(script, options, expectedResult, new Coin(9.5m));
+    }
+
+    [Theory]
+    [InlineData("p + 1.5")]
+    [InlineData("true ? p : 1")]
+    public void BuiltInOperatorAfterUserConversion_NoCommonType_Throws(string script)
+    {
+        var options = new ExpressionParserOptions
+        {
+            Parameters = { (typeof(Percentage), "p") }
+        };
+
+        Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script, options));
+    }
+
     [Fact]
     public void MixedTypeOperatorOverload()
     {
