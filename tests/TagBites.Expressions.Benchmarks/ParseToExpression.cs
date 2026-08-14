@@ -12,14 +12,17 @@ public class ParseToExpression
 {
     private const string Script = "Math.Pow(x, y) + 5";
     private const string LambdaScript = "list.Where(x => x > limit).Select(x => Math.Pow(x, y)).Sum()";
+    private const string CallsScript = "name.Trim().ToUpper().Length + Math.Round(total, 2)";
 
     private readonly IList<int> _list = new List<int> { 1, 2, 3, 4 };
 
     private readonly ExpressionParserOptions _options = CreateTagBitesParseOptions(true);
     private readonly ExpressionParserOptions _lambdaOptions = CreateTagBitesParseLambdaOptions(true);
+    private readonly ExpressionParserOptions _callsOptions = CreateTagBitesParseCallsOptions(true);
 
     private readonly Interpreter _interpreter = CreateDynamicExpressoInterpreter();
     private readonly Interpreter _lambdaInterpreter = CreateDynamicExpressoLambdaInterpreter();
+    private readonly Interpreter _callsInterpreter = CreateDynamicExpressoInterpreter();
 
     private readonly ParsingConfig _dynamicLinqConfig = new();
 
@@ -78,6 +81,32 @@ public class ParseToExpression
     }
 
     [Benchmark]
+    [BenchmarkCategory("Calls")]
+    public LambdaExpression TagBites_ParseCalls()
+    {
+        var options = CreateTagBitesParseCallsOptions();
+        return ExpressionParser.Parse(CallsScript, options);
+    }
+    [Benchmark]
+    [BenchmarkCategory("Calls", "Shared")]
+    public LambdaExpression TagBites_ParseCalls_SharedEnv()
+    {
+        return ExpressionParser.Parse(CallsScript, _callsOptions);
+    }
+    private static ExpressionParserOptions CreateTagBitesParseCallsOptions(bool useCache = false)
+    {
+        return new ExpressionParserOptions
+        {
+            Parameters =
+            {
+                (typeof(string), "name"),
+                (typeof(decimal), "total")
+            },
+            UseMemberCache = useCache
+        };
+    }
+
+    [Benchmark]
     [BenchmarkCategory("Parse")]
     public Lambda DynamicExpresso_Parse()
     {
@@ -125,6 +154,25 @@ public class ParseToExpression
     }
 
     [Benchmark]
+    [BenchmarkCategory("Calls")]
+    public Lambda DynamicExpresso_ParseCalls()
+    {
+        var interpreter = CreateDynamicExpressoInterpreter();
+        return interpreter.Parse(CallsScript, CreateDynamicExpressoCallsParameters());
+    }
+    [Benchmark]
+    [BenchmarkCategory("Calls", "Shared")]
+    public Lambda DynamicExpresso_ParseCalls_SharedEnv()
+    {
+        return _callsInterpreter.Parse(CallsScript, CreateDynamicExpressoCallsParameters());
+    }
+    private Parameter[] CreateDynamicExpressoCallsParameters()
+    {
+        return [new Parameter("name", typeof(string), "abc"),
+                new Parameter("total", typeof(decimal), 1234.567m)];
+    }
+
+    [Benchmark]
     [BenchmarkCategory("Parse")]
     public LambdaExpression DynamicLinqCore_Parse()
     {
@@ -158,5 +206,23 @@ public class ParseToExpression
     private static ParameterExpression[] CreateDynamicLinqCoreLambdaParameters()
     {
         return [Expression.Parameter(typeof(IList<int>), "list"), Expression.Parameter(typeof(int), "limit"), Expression.Parameter(typeof(double), "y")];
+    }
+
+    [Benchmark]
+    [BenchmarkCategory("Calls")]
+    public LambdaExpression DynamicLinqCore_ParseCalls()
+    {
+        var config = new ParsingConfig();
+        return DynamicExpressionParser.ParseLambda(config, false, CreateDynamicLinqCoreCallsParameters(), null, CallsScript);
+    }
+    [Benchmark]
+    [BenchmarkCategory("Calls", "Shared")]
+    public LambdaExpression DynamicLinqCore_ParseCalls_SharedEnv()
+    {
+        return DynamicExpressionParser.ParseLambda(_dynamicLinqConfig, false, CreateDynamicLinqCoreCallsParameters(), null, CallsScript);
+    }
+    private static ParameterExpression[] CreateDynamicLinqCoreCallsParameters()
+    {
+        return [Expression.Parameter(typeof(string), "name"), Expression.Parameter(typeof(decimal), "total")];
     }
 }

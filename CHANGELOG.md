@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.5.0] - 2026-08-15
 
 ### Added
 - Namespace-qualified type names on the right of `is` and `as` (`x is System.Int32`, `x as System.Text.StringBuilder`).
@@ -18,7 +18,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Subtraction with the enum on the right side (`1 - TypeCode.Boolean`).
 - An empty property pattern on a non-nullable value type, which always matches (`5 is { }`).
 - Conversion of the assigned value in an object initializer (`new Circle { R = 1 }`).
-- Expressions the C# compiler rejects are now rejected: a pattern that can never or always match, an unreachable switch arm, a pattern value that is not a constant, a constant overflow outside `unchecked`, `is null`/`?.`/`??` on a non-nullable value type, a null literal against a non-nullable value type in `?:` and `switch`, and a null literal on both sides of `?:` and `??`.
 
 ### Fixed
 - A type name in a pattern is a type pattern instead of a constant comparison (`x is not Circle`), and it narrows the right side of `and`.
@@ -27,6 +26,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - An enum constant matches a boxed input (`((object)DayOfWeek.Monday) is DayOfWeek.Monday` returned `false`).
 - Subtracting a number from a nullable enum keeps the enum type; it returned the underlying type.
 - `-2147483648` is `int`; it was `long`.
+- A relational operator and a relational pattern accept the literal zero on an enum (`day > 0`, `day is > 0`).
+- A null literal compared with an enum lifts the operation instead of being rejected (`day == null` is `false`).
+- A pattern that can never or always match is rejected (`5 is not { }`).
+- An unreachable switch arm is rejected (`1 switch { { } => 1, _ => 2 }`).
+- A pattern value that is not a constant is rejected (`ts is TimeSpan.Zero`).
+- A constant that overflows outside `unchecked` is rejected (`int.MaxValue + 1`).
+- `is null`, `?.` and `??` on a non-nullable value type are rejected (`5 is null`).
+- A null literal against a non-nullable value type in `?:` and `switch` is rejected (`x > 0 ? 1 : null`).
+- A null literal on both sides of `?:` and `??` is rejected (`null ?? null`).
+- A constant negative array size is rejected (`new int[-1]`).
+
+### Performance
+- Conversion operator lookups are cached when options are shared with `UseMemberCache = true`, so a call-heavy expression parses up to four times faster.
+- Method signatures are cached the same way, which helps repeated calls to overloaded methods.
 
 ## [1.4.0] - 2026-07-29
 
