@@ -447,7 +447,7 @@ internal partial class ExpressionBuilder
 
         return ToError(pattern);
 
-        static bool IsPatternConstantMismatch(Type inputType, Expression constant)
+        bool IsPatternConstantMismatch(Type inputType, Expression constant)
         {
             if (IsNullLiteral(constant))
                 return false;

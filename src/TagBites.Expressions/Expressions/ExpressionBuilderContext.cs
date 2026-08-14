@@ -21,6 +21,7 @@ internal readonly struct ExpressionBuilderContext
     public readonly BindingFlags CaseInsensitiveFlag;
     public readonly ConcurrentDictionary<MemberCacheKey, MemberInfo[]>? MemberCache;
     public readonly ConcurrentDictionary<MethodBase, (ParameterInfo[] Parameters, bool HasParams)>? SignatureCache;
+    public readonly ConcurrentDictionary<(Type Source, Type Target, string Name), MethodInfo?>? ConversionCache;
 
     internal ExpressionBuilderContext(ExpressionParserOptions options)
     {
@@ -75,6 +76,7 @@ internal readonly struct ExpressionBuilderContext
         // Cache
         MemberCache = common.UseMemberCache ? common.GetOrCreateMemberCache() : null;
         SignatureCache = common.UseMemberCache ? common.GetOrCreateSignatureCache() : null;
+        ConversionCache = common.UseMemberCache ? common.GetOrCreateConversionCache() : null;
 
         // Parameters
         Parameters = options.ParametersInternal?.ToFastArray(x => Expression.Parameter(x.Type, x.Name)) ?? [];
@@ -99,6 +101,7 @@ internal readonly struct ExpressionBuilderContext
 
         MemberCache = other.MemberCache;
         SignatureCache = other.SignatureCache;
+        ConversionCache = other.ConversionCache;
 
         // Parameters
         Parameters = parameters != null

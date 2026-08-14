@@ -100,7 +100,7 @@ internal partial class ExpressionBuilder
                     _variables.RemoveAt(_variables.Count - 1);
         }
     }
-    private static LambdaExpression? TryRebindLambdaToDelegate(LambdaExpression lambda, Type delegateType)
+    private LambdaExpression? TryRebindLambdaToDelegate(LambdaExpression lambda, Type delegateType)
     {
         if (lambda.Type == delegateType || !typeof(Delegate).IsAssignableFrom(delegateType) || delegateType.GetMethod("Invoke") is not { } invoke)
             return null;

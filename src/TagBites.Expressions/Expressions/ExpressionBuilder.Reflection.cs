@@ -109,7 +109,7 @@ internal partial class ExpressionBuilder
         return result;
     }
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(Enumerable))]
-    private static IList<MethodInfo>? GetExtensionMethodsCore(Type instanceType, string name, TypeCollection? includedTypes, StringComparison comparison)
+    private IList<MethodInfo>? GetExtensionMethodsCore(Type instanceType, string name, TypeCollection? includedTypes, StringComparison comparison)
     {
         List<MethodInfo>? members = null;
 

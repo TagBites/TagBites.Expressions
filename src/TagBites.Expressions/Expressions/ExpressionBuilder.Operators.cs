@@ -989,7 +989,7 @@ internal partial class ExpressionBuilder
 
         return false;
     }
-    private static Expression? TryConvertOperand(Expression expression, Type target, Type source, MethodInfo conversion)
+    private Expression? TryConvertOperand(Expression expression, Type target, Type source, MethodInfo conversion)
     {
         return (Nullable.GetUnderlyingType(expression.Type) ?? expression.Type) == source
             ? Expression.Convert(expression, target, conversion)
@@ -1014,7 +1014,7 @@ internal partial class ExpressionBuilder
 
         return false;
     }
-    private static bool IsOperandCompatible(Expression operand, Type parameterType)
+    private bool IsOperandCompatible(Expression operand, Type parameterType)
     {
         return (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) == parameterType
                || TryConvertExpression(operand, parameterType) != null;

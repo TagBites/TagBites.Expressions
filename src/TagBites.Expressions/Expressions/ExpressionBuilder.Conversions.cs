@@ -127,7 +127,7 @@ internal partial class ExpressionBuilder
             Expression.Call(right, s_typeIsAssignableFrom, leftType));
     }
 
-    private static Expression? TryConvertExpression(Expression expression, Type targetType)
+    private Expression? TryConvertExpression(Expression expression, Type targetType)
     {
         var sourceType = expression.Type;
         if (sourceType == targetType)
@@ -146,7 +146,7 @@ internal partial class ExpressionBuilder
 
         return TryConvertWithOperator(expression, targetType, "op_Implicit");
     }
-    private static Expression? TryConvertWithOperator(Expression expression, Type targetType, string operatorName)
+    private Expression? TryConvertWithOperator(Expression expression, Type targetType, string operatorName)
     {
         var method = FindConversionOperator(expression.Type, targetType, operatorName);
         if (method == null)
@@ -190,7 +190,19 @@ internal partial class ExpressionBuilder
         return target == targetType ? converted : Expression.Convert(converted, targetType);
     }
 
-    private static MethodInfo? FindConversionOperator(Type sourceType, Type targetType, string operatorName)
+    private MethodInfo? FindConversionOperator(Type sourceType, Type targetType, string operatorName)
+    {
+        if (_context.ConversionCache is not { } cache)
+            return FindConversionOperatorCore(sourceType, targetType, operatorName);
+
+        if (cache.TryGetValue((sourceType, targetType, operatorName), out var cached))
+            return cached;
+
+        var result = FindConversionOperatorCore(sourceType, targetType, operatorName);
+        cache[(sourceType, targetType, operatorName)] = result;
+        return result;
+    }
+    private static MethodInfo? FindConversionOperatorCore(Type sourceType, Type targetType, string operatorName)
     {
         return FindIn(sourceType) ?? FindIn(targetType);
 
@@ -222,7 +234,7 @@ internal partial class ExpressionBuilder
             return null;
         }
     }
-    private static Type? FindBestCommonType(List<Type> candidateTypes)
+    private Type? FindBestCommonType(List<Type> candidateTypes)
     {
         Type? best = null;
         var count = candidateTypes.Count;

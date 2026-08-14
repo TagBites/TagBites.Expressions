@@ -12,6 +12,7 @@ internal sealed class CommonExpressionParserOptions : ExpressionBuilderOptions
 {
     private ConcurrentDictionary<MemberCacheKey, MemberInfo[]>? _memberCache;
     private ConcurrentDictionary<MethodBase, (ParameterInfo[] Parameters, bool HasParams)>? _signatureCache;
+    private ConcurrentDictionary<(Type Source, Type Target, string Name), MethodInfo?>? _conversionCache;
 
     public bool IgnoreCase;
     public bool UseMemberCache;
@@ -56,4 +57,5 @@ internal sealed class CommonExpressionParserOptions : ExpressionBuilderOptions
 
     public ConcurrentDictionary<MemberCacheKey, MemberInfo[]> GetOrCreateMemberCache() => _memberCache ??= new ConcurrentDictionary<MemberCacheKey, MemberInfo[]>();
     public ConcurrentDictionary<MethodBase, (ParameterInfo[] Parameters, bool HasParams)> GetOrCreateSignatureCache() => _signatureCache ??= new ConcurrentDictionary<MethodBase, (ParameterInfo[], bool)>();
+    public ConcurrentDictionary<(Type Source, Type Target, string Name), MethodInfo?> GetOrCreateConversionCache() => _conversionCache ??= new ConcurrentDictionary<(Type, Type, string), MethodInfo?>();
 }

@@ -823,7 +823,7 @@ internal partial class ExpressionBuilder
         return true;
     }
 
-    private static bool HasMatchingParameters(IList<ParameterInfo> parameters, IList<Expression> arguments)
+    private bool HasMatchingParameters(IList<ParameterInfo> parameters, IList<Expression> arguments)
     {
         if (parameters.Count < arguments.Count)
             return false;
@@ -855,7 +855,7 @@ internal partial class ExpressionBuilder
 
         return true;
     }
-    private static bool IsMatchingParameterType(Type parameterType, Type argumentType)
+    private bool IsMatchingParameterType(Type parameterType, Type argumentType)
     {
         if (parameterType.IsAssignableFrom(argumentType))
         {
@@ -880,7 +880,7 @@ internal partial class ExpressionBuilder
         return TryExtractGenericArguments(parameterType, argumentType, null);
     }
 
-    private static MethodCallInfo? GetBestMatchingMethod(MethodCallInfo method1, MethodCallInfo method2)
+    private MethodCallInfo? GetBestMatchingMethod(MethodCallInfo method1, MethodCallInfo method2)
     {
         // Both candidates get the same source-order args. If named arguments were used, each candidate's ArgumentMap tells which parameter a given arg was bound to.
         var args = method1.RawArguments;
@@ -965,7 +965,7 @@ internal partial class ExpressionBuilder
 
         return null;
     }
-    private static Type? GetBestMatchingType(Type argType, Type type1, Type type2)
+    private Type? GetBestMatchingType(Type argType, Type type1, Type type2)
     {
         if (type1 == type2)
             return null;
