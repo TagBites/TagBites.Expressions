@@ -226,18 +226,6 @@ internal partial class ExpressionBuilder
             }
         }
 
-        // From instance or interface
-        {
-            var members = GetTypeMembers(expressionType, name, includeInterfaces: staticType == null);
-            switch (members.Length)
-            {
-                case 1:
-                    return Expression.MakeMemberAccess(staticType != null ? null : expression, members[0]);
-                case > 1:
-                    return setErrorWhenNotFound ? ToError(node, $"More then one member with name {name}.") : null;
-            }
-        }
-
         // Anonymous object
         if (staticType == null && _anonymousObjects != null && typeof(AnonymousObject).IsAssignableFrom(expressionType))
         {
@@ -256,6 +244,18 @@ internal partial class ExpressionBuilder
                 SetTupleShape(result, memberShape);
 
                 return result;
+            }
+        }
+
+        // From instance or interface
+        {
+            var members = GetTypeMembers(expressionType, name, includeInterfaces: staticType == null);
+            switch (members.Length)
+            {
+                case 1:
+                    return Expression.MakeMemberAccess(staticType != null ? null : expression, members[0]);
+                case > 1:
+                    return setErrorWhenNotFound ? ToError(node, $"More then one member with name {name}.") : null;
             }
         }
 

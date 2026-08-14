@@ -17,6 +17,24 @@ public class AnonymousObjectTests : ExpressionTestBase
     [InlineData("$\"{new { A = 1, B = 2 }}\"", "{ A = 1, B = 2 }")]
     public void AnonymousObjectToString(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
+    [Theory]
+    [InlineData("new { Count = 7 }.Count", 7)]
+    [InlineData("new { Keys = 1 }.Keys", 1)]
+    [InlineData("new { Values = 2 }.Values", 2)]
+    [InlineData("new { IsReadOnly = 3 }.IsReadOnly", 3)]
+    [InlineData("new { Add = 1 }.Add", 1)]
+    [InlineData("new { Item = 7 }.Item", 7)]
+    [InlineData("new { Clear = 1 }.Clear", 1)]
+    [InlineData("new { Remove = 1 }.Remove", 1)]
+    [InlineData("new { Contains = 1 }.Contains", 1)]
+    [InlineData("new { Equals = 1 }.Equals", 1)]
+    [InlineData("new { GetType = 1 }.GetType", 1)]
+    [InlineData("new { ToString = 1 }.ToString", 1)]
+    [InlineData("new { Name = \"disk\", Count = 7 }.Count", 7)]
+    [InlineData("new { Slot = new { Count = 2 } }.Slot.Count", 2)]
+    [InlineData("new { Count = 7 }.ToString()", "{ Count = 7 }")]
+    public void AnonymousMemberHidesCarrierMember(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
     [Fact]
     public void AnonymousObjectCreation_InferredMemberName()
     {
