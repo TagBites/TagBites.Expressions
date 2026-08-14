@@ -115,11 +115,20 @@ public class PatternMatchingTests : ExpressionTestBase
     [InlineData("(int?)1 is not { }", false)]
     [InlineData("(int?)null is not  { }", true)]
     [InlineData("5 is { }", true)]
-    [InlineData("5 is not { }", false)]
     [InlineData("2.5m is { }", true)]
     [InlineData("DayOfWeek.Friday is { }", true)]
     [InlineData("(1, 2) is { }", true)]
     public void PatternNullCheck(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("5 is not { }")]
+    [InlineData("2.5m is not { }")]
+    [InlineData("DayOfWeek.Friday is not { }")]
+    [InlineData("5 switch { { } => 1, _ => 0 }")]
+    [InlineData("5 switch { int a => a, _ => 0 }")]
+    [InlineData("DayOfWeek.Friday is not DayOfWeek")]
+    [InlineData("5 is not object")]
+    public void AlwaysMatchingPattern_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
 
     [Theory]
     [InlineData("5 is null")]

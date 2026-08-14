@@ -48,10 +48,15 @@ internal partial class ExpressionBuilder
         var paths = new List<(Expression When, Expression Then)>();
         Expression? switchExpression = null!;
 
+        var alwaysMatchedArm = false;
+
         for (var i = 0; i < node.Arms.Count; i++)
         {
             var arm = node.Arms[i];
             Expression? condition = null;
+
+            if (alwaysMatchedArm)
+                return ToError(arm.Pattern, "The pattern is unreachable. It has already been handled by a previous arm of the switch expression.");
 
             // Pattern variables are scoped to their own arm, so each arm starts from the same variable set
             var variablesBefore = _variables?.Count ?? 0;
@@ -130,7 +135,10 @@ internal partial class ExpressionBuilder
             if (condition == null)
                 switchExpression = expression;
             else
+            {
                 paths.Add((condition, expression));
+                alwaysMatchedArm = arm.WhenClause == null && IsAlwaysTrue(condition);
+            }
 
             // Drop this arm's pattern variables so a later arm can declare the same names
             if (_variables != null && _variables.Count > variablesBefore)

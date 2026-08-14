@@ -170,6 +170,9 @@ internal partial class ExpressionBuilder
                     if (right == null)
                         return null;
 
+                    if (IsAlwaysTrue(right))
+                        return ToError(pattern, $"An expression of type '{expressionType.GetFriendlyTypeName()}' can never match the provided pattern.");
+
                     return (SyntaxKind)p.OperatorToken.RawKind switch
                     {
                         SyntaxKind.NotKeyword => Expression.Not(right),
@@ -574,6 +577,16 @@ internal partial class ExpressionBuilder
         return ToIsNaN(expression);
     }
     private static Expression ToIsNaN(Expression value) => Expression.Call(value.Type == typeof(float) ? s_floatIsNaN : s_doubleIsNaN, value);
+    private static bool IsAlwaysTrue(Expression expression)
+    {
+        return expression switch
+        {
+            ConstantExpression { Value: true } => true,
+            BlockExpression block => IsAlwaysTrue(block.Result),
+            BinaryExpression { NodeType: ExpressionType.AndAlso } binary => IsAlwaysTrue(binary.Left) && IsAlwaysTrue(binary.Right),
+            _ => false
+        };
+    }
     private static bool IsConstantPatternValue(Expression expression)
     {
         return expression switch

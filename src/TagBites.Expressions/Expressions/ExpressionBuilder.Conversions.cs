@@ -117,7 +117,7 @@ internal partial class ExpressionBuilder
             if (castType != expressionType && castType.IsAssignableFrom(expressionType))
                 return Expression.Constant(true);
 
-            return Expression.MakeBinary(ExpressionType.Equal, Expression.Constant(expressionType), Expression.Constant(castType));
+            return Expression.Constant(expressionType == castType);
         }
 
         var leftType = Expression.Call(left, s_objectGetType);
