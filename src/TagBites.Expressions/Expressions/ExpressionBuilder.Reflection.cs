@@ -6,6 +6,25 @@ namespace TagBites.Expressions;
 
 internal partial class ExpressionBuilder
 {
+    private (ParameterInfo[] Parameters, bool HasParams) GetSignature(MethodBase method)
+    {
+        if (_context.SignatureCache is not { } cache)
+            return ComputeSignature(method);
+
+        if (cache.TryGetValue(method, out var cached))
+            return cached;
+
+        var result = ComputeSignature(method);
+        cache[method] = result;
+        return result;
+    }
+    private static (ParameterInfo[] Parameters, bool HasParams) ComputeSignature(MethodBase method)
+    {
+        var parameters = method.GetParameters();
+        var hasParams = parameters.Length > 0 && parameters[parameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
+        return (parameters, hasParams);
+    }
+
     private IList<MethodInfo> GetMethods(Type instanceType, string name, BindingFlags additionalFlags)
     {
         if (_context.MemberCache == null)

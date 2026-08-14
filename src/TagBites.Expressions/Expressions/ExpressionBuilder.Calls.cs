@@ -400,8 +400,7 @@ internal partial class ExpressionBuilder
 
         MethodCallInfo? ToMatchingMethod(MethodBase x)
         {
-            var methodParameters = x.GetParameters();
-            var hasParams = methodParameters.Length > 0 && methodParameters[methodParameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
+            var (methodParameters, hasParams) = GetSignature(x);
 
             // Reorder named arguments into declared parameter order, filling omitted optional parameters with their default values.
             // arguments stays in source order (RawArguments) so overload resolution can compare candidates by the argument the caller actually wrote;
