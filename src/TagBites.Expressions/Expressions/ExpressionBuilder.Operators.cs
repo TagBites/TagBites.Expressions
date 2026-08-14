@@ -366,8 +366,8 @@ internal partial class ExpressionBuilder
         }
 
         // Two null literals compare through the lifted operators, e.g. null > null is false
-        if (IsNullLiteral(left) && IsNullLiteral(right)
-            && expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+        if (expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
+            && IsNullLiteral(left) && IsNullLiteral(right))
         {
             return Expression.Constant(false);
         }
@@ -436,7 +436,8 @@ internal partial class ExpressionBuilder
             return userOperator;
 
         // Built-in operators through a user-defined conversion, but only when no user-defined operator applies
-        if (!DeclaresApplicableOperator(left.Type, expressionType, left, right)
+        if ((!IsBuiltInOperandType(left.Type) || !IsBuiltInOperandType(right.Type))
+            && !DeclaresApplicableOperator(left.Type, expressionType, left, right)
             && !DeclaresApplicableOperator(right.Type, expressionType, left, right))
         {
             TryConvertToCommonOperandType(ref left, ref right);

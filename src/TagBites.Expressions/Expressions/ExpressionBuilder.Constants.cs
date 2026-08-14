@@ -29,7 +29,8 @@ internal partial class ExpressionBuilder
     }
     private bool HasConstantOperationError(SyntaxNode node, ExpressionType expressionType, Expression left, Expression right)
     {
-        if (_checkedContext == false
+        if (expressionType is not (ExpressionType.Add or ExpressionType.Subtract or ExpressionType.Multiply)
+            || _checkedContext == false
             || TryGetConstantValue(left) is not { } leftValue
             || TryGetConstantValue(right) is not { } rightValue
             || leftValue.GetType() != rightValue.GetType()
