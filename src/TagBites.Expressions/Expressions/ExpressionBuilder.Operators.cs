@@ -813,14 +813,32 @@ internal partial class ExpressionBuilder
         {
             var type = e2.Type;
             if (type.IsValueType && !IsNullableType(type))
+            {
+                if (bestCommonOnly)
+                {
+                    ToError(node, $"No implicit conversion between '<null>' and '{type.GetFriendlyTypeName()}'.");
+                    return false;
+                }
+
                 type = typeof(Nullable<>).MakeGenericType(type);
+            }
+
             e1 = Expression.Convert(e1, type);
         }
         else if (e2 is ConstantExpression c2 && c2.Type == typeof(object) && c2.Value == null)
         {
             var type = e1.Type;
             if (type.IsValueType && !IsNullableType(type))
+            {
+                if (bestCommonOnly)
+                {
+                    ToError(node, $"No implicit conversion between '{type.GetFriendlyTypeName()}' and '<null>'.");
+                    return false;
+                }
+
                 type = typeof(Nullable<>).MakeGenericType(type);
+            }
+
             e2 = Expression.Convert(e2, type);
         }
 

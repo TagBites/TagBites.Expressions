@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using System.Reflection;
-using Microsoft.CodeAnalysis;
 using TagBites.Expressions.Extensions;
 
 namespace TagBites.Expressions;
