@@ -427,7 +427,10 @@ internal partial class ExpressionBuilder
             TryConvertToCommonOperandType(ref left, ref right);
         }
 
-        if (_checkedContext)
+        if (HasConstantOperationError(node, expressionType, left, right))
+            return null;
+
+        if (_checkedContext == true)
             expressionType = expressionType switch
             {
                 ExpressionType.Add => ExpressionType.AddChecked,
@@ -477,6 +480,16 @@ internal partial class ExpressionBuilder
             return Expression.Convert(complement, operand.Type);
         }
 
+        // A literal too large for its type is negated into the smallest value of that type, e.g. -2147483648 is int
+        if (expressionType == ExpressionType.Negate && node.Operand is LiteralExpressionSyntax && operand is ConstantExpression literal)
+        {
+            if (literal.Value is 2147483648U)
+                return Expression.Constant(int.MinValue);
+
+            if (literal.Value is 9223372036854775808UL)
+                return Expression.Constant(long.MinValue);
+        }
+
         // C# promotes operands smaller than int (byte/sbyte/short/ushort/char) to int
         if (expressionType is ExpressionType.OnesComplement or ExpressionType.Negate or ExpressionType.UnaryPlus)
             operand = PromoteSmallInteger(operand);
@@ -485,7 +498,7 @@ internal partial class ExpressionBuilder
         if (expressionType == ExpressionType.Negate && (Nullable.GetUnderlyingType(operand.Type) ?? operand.Type) == typeof(uint))
             operand = ToCast(operand, IsNullableType(operand.Type) ? typeof(long?) : typeof(long));
 
-        if (_checkedContext && expressionType == ExpressionType.Negate)
+        if (_checkedContext == true && expressionType == ExpressionType.Negate)
             expressionType = ExpressionType.NegateChecked;
 
         return Expression.MakeUnary(expressionType, operand, null);

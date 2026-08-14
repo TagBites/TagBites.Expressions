@@ -38,7 +38,7 @@ internal partial class ExpressionBuilder : CSharpSyntaxVisitor<Expression>
     private List<(Type Type, string Name, int Index)>? _variables;
     private Dictionary<Expression, string>? _fullMemberPath;
     private int _nextVariableIndex;
-    private bool _checkedContext;
+    private bool? _checkedContext; // null == outside checked(x) and unchecked(x):
     private List<(Type SlotType, List<(string Name, Type Type, ValueTupleShape? TupleShape)> Shape)>? _anonymousObjects;
     private Dictionary<Expression, ValueTupleShape>? _tupleShapes;
     private Type? _targetType;

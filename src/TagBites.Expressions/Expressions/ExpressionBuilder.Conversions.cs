@@ -55,7 +55,10 @@ internal partial class ExpressionBuilder
             return viaOperator;
         }
 
-        return _checkedContext
+        if (HasConstantConversionError(node, expression, type))
+            return null;
+
+        return _checkedContext == true
             ? Expression.ConvertChecked(expression, type)
             : Expression.Convert(expression, type);
 

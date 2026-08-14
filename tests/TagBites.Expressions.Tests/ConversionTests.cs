@@ -161,7 +161,7 @@ public class ConversionTests : ExpressionTestBase
     [InlineData("1u + 1", 2u)]
     [InlineData("2u - 1", 1u)]
     [InlineData("(uint)5 + (int)3", 8L)]
-    [InlineData("uint.MaxValue + 1", 0u)]
+    [InlineData("unchecked(uint.MaxValue + 1)", 0u)]
     [InlineData("(short)1 + 2u", 3L)]
     [InlineData("5u + 3u", 8u)]
     public void UIntPromotion(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);

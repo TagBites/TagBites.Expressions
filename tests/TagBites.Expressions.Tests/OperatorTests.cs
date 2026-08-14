@@ -133,9 +133,37 @@ public class OperatorTests : ExpressionTestBase
     [Fact]
     public void CheckedOverflowThrows()
     {
-        var ex = Assert.ThrowsAny<Exception>(() => Execute("checked(2147483647 + 1)", null));
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+        var ex = Assert.ThrowsAny<Exception>(() => Execute("checked(n + 1)", options, int.MaxValue));
+
         Assert.IsType<OverflowException>(ex.InnerException ?? ex);
     }
+
+    [Theory]
+    [InlineData("checked(2147483647 + 1)")]
+    [InlineData("2147483647 + 1")]
+    [InlineData("uint.MaxValue + 1")]
+    [InlineData("(byte)3 - 5u")]
+    [InlineData("(uint)(-4)")]
+    [InlineData("(byte)300")]
+    [InlineData("-2147483648 - 1")]
+    [InlineData("unchecked(checked(int.MaxValue + 1))")]
+    [InlineData("unchecked((byte)300) * 2000000000")]
+    [InlineData("unchecked(int.MaxValue + 1) - 1")]
+    [InlineData("(byte)(200 + 100)")]
+    public void ConstantOverflow_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
+    [InlineData("unchecked(2147483647 + 1)", int.MinValue)]
+    [InlineData("unchecked(uint.MaxValue + 1)", 0u)]
+    [InlineData("unchecked((byte)3 - 5u)", 4294967294u)]
+    [InlineData("unchecked((uint)(-4))", 4294967292u)]
+    [InlineData("unchecked((byte)300)", (byte)44)]
+    [InlineData("-2147483648", int.MinValue)]
+    [InlineData("checked(unchecked(int.MaxValue + 1))", int.MinValue)]
+    [InlineData("unchecked((byte)300) + 1", 45)]
+    [InlineData("unchecked((int)(2147483647L + 1))", int.MinValue)]
+    public void ConstantOverflow_UncheckedIsAllowed(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Fact]
     public void UncheckedNegation_WrapsAtRuntime()

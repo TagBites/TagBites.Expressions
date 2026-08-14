@@ -574,16 +574,6 @@ internal partial class ExpressionBuilder
         return ToIsNaN(expression);
     }
     private static Expression ToIsNaN(Expression value) => Expression.Call(value.Type == typeof(float) ? s_floatIsNaN : s_doubleIsNaN, value);
-    private static object? TryGetConstantValue(Expression expression)
-    {
-        return expression switch
-        {
-            ConstantExpression c => c.Value,
-            // double.NaN stays a field access
-            MemberExpression { Expression: null, Member: FieldInfo { IsLiteral: true } field } => field.GetRawConstantValue(),
-            _ => null
-        };
-    }
     private static bool IsConstantPatternValue(Expression expression)
     {
         return expression switch
