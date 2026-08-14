@@ -102,6 +102,9 @@ internal partial class ExpressionBuilder
             if (TryConvertExpression(sizeExpression, typeof(int)) is not { } bound)
                 return ToError(rankSpecifier.Sizes[i], "Array size must be convertible to int.");
 
+            if (TryGetConstantValue(bound) is int and < 0)
+                return ToError(rankSpecifier.Sizes[i], "Cannot create an array with a negative size.");
+
             bounds[i] = bound;
         }
 

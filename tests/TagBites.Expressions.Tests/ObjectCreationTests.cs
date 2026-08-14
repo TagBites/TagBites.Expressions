@@ -10,6 +10,12 @@ public class ObjectCreationTests : ExpressionTestBase
     public void NewOperator(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
 
     [Theory]
+    [InlineData("new int[-1]")]
+    [InlineData("new int[2, -1]")]
+    [InlineData("new int[1 - 2]")]
+    public void NegativeArraySize_Throws(string script) => Assert.ThrowsAny<Exception>(() => ExpressionParser.Parse(script));
+
+    [Theory]
     [InlineData("new TestModel().Value", 1)]
     [InlineData("new TestModel(5).Value", 5)]
     [InlineData("new TestModel { Property1 = 1, Property2 = 2 }.Property1", 1)]
