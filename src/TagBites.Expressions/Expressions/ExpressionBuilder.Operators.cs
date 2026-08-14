@@ -604,7 +604,7 @@ internal partial class ExpressionBuilder
                 case ExpressionType.LessThanOrEqual:
                 case ExpressionType.GreaterThan:
                 case ExpressionType.GreaterThanOrEqual:
-                    if (bothEnums)
+                    if (bothEnums || numberSide is ConstantExpression { Value: 0 })
                         return Expression.MakeBinary(expressionType, l, r);
                     break;
 
@@ -678,8 +678,14 @@ internal partial class ExpressionBuilder
         var enumType2 = enumSide.Type;
         var underlyingType2 = Enum.GetUnderlyingType(enumType2);
 
-        if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual && otherSide is ConstantExpression { Value: 0 })
-            return Expression.MakeBinary(expressionType, enumSide, Expression.Convert(otherSide, enumType2));
+        if (otherSide is ConstantExpression { Value: 0 })
+        {
+            if (expressionType is ExpressionType.Equal or ExpressionType.NotEqual)
+                return Expression.MakeBinary(expressionType, enumSide, Expression.Convert(otherSide, enumType2));
+
+            if (expressionType is ExpressionType.LessThan or ExpressionType.LessThanOrEqual or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual)
+                return Expression.MakeBinary(expressionType, Expression.Convert(enumSide, underlyingType2), Expression.Convert(otherSide, underlyingType2));
+        }
 
         if (expressionType == ExpressionType.Add && TryConvertExpression(otherSide, underlyingType2) is { } addOperand)
             return Expression.Convert(Expression.Add(Expression.Convert(enumSide, underlyingType2), addOperand), enumType2);

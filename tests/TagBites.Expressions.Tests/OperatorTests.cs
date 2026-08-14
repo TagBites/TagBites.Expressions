@@ -256,6 +256,13 @@ public class OperatorTests : ExpressionTestBase
     [InlineData("((TypeCode?)TypeCode.Boolean) == 3", null)]
     [InlineData("((TypeCode?)TypeCode.Boolean) < 3", null)]
     [InlineData("((TypeCode?)TypeCode.Boolean) & 3", null)]
+    [InlineData("TypeCode.Boolean > 0", true)]
+    [InlineData("TypeCode.Boolean >= 0", true)]
+    [InlineData("TypeCode.Empty < 0", false)]
+    [InlineData("TypeCode.Boolean is > 0", true)]
+    [InlineData("((TypeCode?)TypeCode.Boolean) > 0", true)]
+    [InlineData("TypeCode.Boolean > 1", null)]
+    [InlineData("TypeCode.Boolean is > 1", null)]
     public void EnumOperators(string script, object? expectedResult)
     {
         var options = new ExpressionParserOptions { IncludedTypes = { typeof(TypeCode), typeof(DayOfWeek) } };
