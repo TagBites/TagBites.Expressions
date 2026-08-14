@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Namespace-qualified type names on the right of `is` and `as` (`x is System.Int32`, `x as System.Text.StringBuilder`).
+- Verbatim identifiers (`@value`).
+- Unqualified `Equals` and `ReferenceEquals`.
+- A standard numeric conversion chained with a user-defined one (`(Money)1` goes through `decimal`).
+- A built-in operator after a user-defined conversion (`p + 1` where `Percentage` converts to `decimal`).
+- The members of `object` on an interface type (`shape.ToString()`).
+- Reference conversions between an interface and a non-sealed class (`shape as Node`).
+- `+` on a nullable enum (`(DayOfWeek?)d + 1`).
+- Subtraction with the enum on the right side (`1 - TypeCode.Boolean`).
+- An empty property pattern on a non-nullable value type, which always matches (`5 is { }`).
+- Conversion of the assigned value in an object initializer (`new Circle { R = 1 }`).
+- Expressions the C# compiler rejects are now rejected: a pattern that can never or always match, an unreachable switch arm, a pattern value that is not a constant, a constant overflow outside `unchecked`, `is null`/`?.`/`??` on a non-nullable value type, a null literal against a non-nullable value type in `?:` and `switch`, and a null literal on both sides of `?:` and `??`.
+
+### Fixed
+- A type name in a pattern is a type pattern instead of a constant comparison (`x is not Circle`), and it narrows the right side of `and`.
+- An anonymous object member is no longer hidden by a member of its carrier; `new { Count = 7 }.Count` returned `1`.
+- `double.NaN is double.NaN` is `true`; a pattern constant matches like `Equals`, not like `==`.
+- An enum constant matches a boxed input (`((object)DayOfWeek.Monday) is DayOfWeek.Monday` returned `false`).
+- Subtracting a number from a nullable enum keeps the enum type; it returned the underlying type.
+- `-2147483648` is `int`; it was `long`.
+
 ## [1.4.0] - 2026-07-29
 
 ### Added
