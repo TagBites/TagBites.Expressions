@@ -29,7 +29,7 @@ internal partial class ExpressionBuilder
             parameters = new ParameterExpression[parameterTypes.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
-                var name = (simple != null ? simple.Parameter : parenthesized!.ParameterList.Parameters[i]).Identifier.Text;
+                var name = (simple != null ? simple.Parameter : parenthesized!.ParameterList.Parameters[i]).Identifier.ValueText;
                 if (string.IsNullOrEmpty(name))
                     return null;
 

@@ -76,4 +76,21 @@ public class ParsingTests : ExpressionTestBase
     [Theory]
     [InlineData("1 switch { 1 => new [] { 1, 2, 3 }.Select(x => (x, x + 1).Item2).Sum() }", 9)]
     public void ComplexExpressions(string script, object expectedResult) => ExecuteAndTest(script, expectedResult);
+
+    [Theory]
+    [InlineData("@n + 1", 6)]
+    [InlineData("nameof(@n)", "n")]
+    [InlineData("new { @Name = 1 }.Name", 1)]
+    [InlineData("new { Name = 1 }.@Name", 1)]
+    [InlineData("new[] { 1, 2 }.Select(@x => @x * 2).Sum()", 6)]
+    [InlineData("(@n, 2).Item1", 5)]
+    [InlineData("(@Size: 3, Fill: 'x').Size", 3)]
+    [InlineData("@n is > 1", true)]
+    [InlineData("@n.@ToString()", "5")]
+    [InlineData("@n switch { 5 => \"five\", _ => \"other\" }", "five")]
+    public void VerbatimIdentifier(string script, object expectedResult)
+    {
+        var options = new ExpressionParserOptions { Parameters = { (typeof(int), "n") } };
+        ExecuteAndTest(script, options, expectedResult, 5);
+    }
 }

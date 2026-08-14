@@ -179,9 +179,9 @@ internal partial class ExpressionBuilder
         if ((SyntaxKind)node.OperatorToken.RawKind == SyntaxKind.IsKeyword
             && node.Right is QualifiedNameSyntax { Right: IdentifierNameSyntax constantMember } constantName
             && (constantName.Left is IdentifierNameSyntax constantType
-                ? TryResolveTypeByName(constantType.Identifier.Text)
+                ? TryResolveTypeByName(constantType.Identifier.ValueText)
                 : TryResolveNamespaceQualifiedType(constantName.Left)) is { } declaringType
-            && ResolveMember(node.Right, Expression.Constant(declaringType), constantMember.Identifier.Text, setErrorWhenNotFound: false) is { } constantValue)
+            && ResolveMember(node.Right, Expression.Constant(declaringType), constantMember.Identifier.ValueText, setErrorWhenNotFound: false) is { } constantValue)
         {
             if (!IsConstantPatternValue(constantValue))
                 return ToError(node.Right, $"A constant value of type '{constantValue.Type.GetFriendlyTypeName()}' is expected.");

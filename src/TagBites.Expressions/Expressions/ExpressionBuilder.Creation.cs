@@ -251,13 +251,13 @@ internal partial class ExpressionBuilder
             // Name
             string? name;
             if (member.NameEquals != null)
-                name = member.NameEquals.Name.Identifier.Text;
+                name = member.NameEquals.Name.Identifier.ValueText;
             else
             {
                 name = member.Expression switch
                 {
-                    IdentifierNameSyntax id => id.Identifier.Text,
-                    MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+                    IdentifierNameSyntax id => id.Identifier.ValueText,
+                    MemberAccessExpressionSyntax ma => ma.Name.Identifier.ValueText,
                     _ => null
                 };
             }
@@ -358,7 +358,7 @@ internal partial class ExpressionBuilder
                 if (item is not AssignmentExpressionSyntax { Left: IdentifierNameSyntax identifier } ae)
                     return ToError(item);
 
-                var memberName = identifier.Identifier.Text;
+                var memberName = identifier.Identifier.ValueText;
                 var member = GetAssignMember(type, memberName);
                 if (member == null)
                     return ToError(item, "Member not found.");
@@ -425,7 +425,7 @@ internal partial class ExpressionBuilder
 
                 case IdentifierNameSyntax identifier:
                     {
-                        var member = GetAssignMember(type, identifier.Identifier.Text);
+                        var member = GetAssignMember(type, identifier.Identifier.ValueText);
                         if (member == null)
                             return ToError(item, "Member not found.");
 

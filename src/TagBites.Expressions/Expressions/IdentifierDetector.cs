@@ -15,7 +15,7 @@ internal class IdentifierDetector : ExpressionBuilder
 
     public override Expression VisitIdentifierName(IdentifierNameSyntax node)
     {
-        var name = node.Identifier.Text;
+        var name = node.Identifier.ValueText;
         var result = base.VisitIdentifierName(node);
 
         if (result != null)

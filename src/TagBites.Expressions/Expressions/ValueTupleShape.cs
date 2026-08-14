@@ -36,8 +36,8 @@ internal sealed class ValueTupleShape
     {
         var name = expression switch
         {
-            IdentifierNameSyntax id => id.Identifier.Text,
-            MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+            IdentifierNameSyntax id => id.Identifier.ValueText,
+            MemberAccessExpressionSyntax ma => ma.Name.Identifier.ValueText,
             _ => null
         };
 

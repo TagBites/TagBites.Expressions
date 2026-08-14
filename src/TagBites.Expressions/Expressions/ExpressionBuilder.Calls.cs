@@ -39,7 +39,7 @@ internal partial class ExpressionBuilder
                     methodNameSyntax = ins;
 
                     // Parameter as method
-                    var name = methodNameSyntax.Identifier.Text;
+                    var name = methodNameSyntax.Identifier.ValueText;
                     var parameter = FindParameter(name);
                     if (parameter != null && typeof(Delegate).IsAssignableFrom(parameter.Type))
                     {
@@ -59,7 +59,7 @@ internal partial class ExpressionBuilder
                     // Custom operator or 'this' method
                     else
                     {
-                        methodName = methodNameSyntax.Identifier.Text;
+                        methodName = methodNameSyntax.Identifier.ValueText;
 
                         if (_options.AllowRuntimeCast
                             && methodName is "typeis" or "typeas" or "typecast"
@@ -80,7 +80,7 @@ internal partial class ExpressionBuilder
                         return null;
 
                     methodNameSyntax = ma.Name;
-                    methodName = methodNameSyntax.Identifier.Text;
+                    methodName = methodNameSyntax.Identifier.ValueText;
                     break;
                 }
 
@@ -91,7 +91,7 @@ internal partial class ExpressionBuilder
                         return null;
 
                     methodNameSyntax = mbs.Name;
-                    methodName = methodNameSyntax.Identifier.Text;
+                    methodName = methodNameSyntax.Identifier.ValueText;
                     break;
                 }
 
@@ -99,7 +99,7 @@ internal partial class ExpressionBuilder
                 {
                     instanceExpression = _context.ThisParameter;
                     methodNameSyntax = g;
-                    methodName = methodNameSyntax.Identifier.Text;
+                    methodName = methodNameSyntax.Identifier.ValueText;
                     break;
                 }
 
@@ -267,7 +267,7 @@ internal partial class ExpressionBuilder
 
         for (var i = 0; i < node.Count; i++)
         {
-            var name = node[i].NameColon?.Name.Identifier.Text;
+            var name = node[i].NameColon?.Name.Identifier.ValueText;
             if (name == null)
                 continue;
 
@@ -327,9 +327,9 @@ internal partial class ExpressionBuilder
     {
         return expression switch
         {
-            IdentifierNameSyntax id => id.Identifier.Text,
-            GenericNameSyntax g => g.Identifier.Text,
-            MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+            IdentifierNameSyntax id => id.Identifier.ValueText,
+            GenericNameSyntax g => g.Identifier.ValueText,
+            MemberAccessExpressionSyntax ma => ma.Name.Identifier.ValueText,
             _ => null
         };
     }

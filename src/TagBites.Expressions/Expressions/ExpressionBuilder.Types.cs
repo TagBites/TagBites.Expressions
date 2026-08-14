@@ -101,7 +101,7 @@ internal partial class ExpressionBuilder
                     // Unbound generic (typeof(List<>), typeof(Dictionary<,>)): return the open definition.
                     if (arguments[0] is OmittedTypeArgumentSyntax)
                     {
-                        var definition = ResolveType(type, genericName.Identifier.Text, arguments.Count);
+                        var definition = ResolveType(type, genericName.Identifier.ValueText, arguments.Count);
                         return definition == null || definition.IsGenericTypeDefinition
                             ? definition
                             : ToTypeError(type, null);
@@ -117,7 +117,7 @@ internal partial class ExpressionBuilder
                         elements[i] = elementType;
                     }
 
-                    var genericType = ResolveType(type, genericName.Identifier.Text, elements.Length, elements);
+                    var genericType = ResolveType(type, genericName.Identifier.ValueText, elements.Length, elements);
                     return genericType != null
                         ? TryCloseGenericType(genericType, elements) ?? ToTypeError(type, null)
                         : null;
@@ -129,7 +129,7 @@ internal partial class ExpressionBuilder
 
                     if (arguments[0] is OmittedTypeArgumentSyntax)
                     {
-                        return TryResolveTypeByName(gen.Identifier.Text, arguments.Count) is { IsGenericTypeDefinition: true } open && open.Namespace == name.Left.ToString()
+                        return TryResolveTypeByName(gen.Identifier.ValueText, arguments.Count) is { IsGenericTypeDefinition: true } open && open.Namespace == name.Left.ToString()
                             ? open
                             : ToTypeError(type, null);
                     }
@@ -144,7 +144,7 @@ internal partial class ExpressionBuilder
                         elements[i] = elementType;
                     }
 
-                    if (TryResolveTypeByName(gen.Identifier.Text, arguments.Count, elements) is not { } resolved || resolved.Namespace != name.Left.ToString())
+                    if (TryResolveTypeByName(gen.Identifier.ValueText, arguments.Count, elements) is not { } resolved || resolved.Namespace != name.Left.ToString())
                         return ToTypeError(type, null);
 
                     return TryCloseGenericType(resolved, elements) ?? ToTypeError(type, null);
@@ -157,7 +157,7 @@ internal partial class ExpressionBuilder
                         ret = resolved;
                     else
                     {
-                        if (TryResolveTypeByName(id.Identifier.Text) is { } type1 && type1.Namespace == name.Left.ToString())
+                        if (TryResolveTypeByName(id.Identifier.ValueText) is { } type1 && type1.Namespace == name.Left.ToString())
                             ret = type1;
                         else
                         {
@@ -171,11 +171,11 @@ internal partial class ExpressionBuilder
                         var outerType = name.Left switch
                         {
                             GenericNameSyntax => ResolveType(name.Left),
-                            IdentifierNameSyntax leftId => TryResolveTypeByName(leftId.Identifier.Text),
+                            IdentifierNameSyntax leftId => TryResolveTypeByName(leftId.Identifier.ValueText),
                             _ => null
                         };
 
-                        ret = outerType?.GetNestedType(id.Identifier.Text, BindingFlags.Public);
+                        ret = outerType?.GetNestedType(id.Identifier.ValueText, BindingFlags.Public);
 
                         if (ret is { IsGenericTypeDefinition: true } && outerType is { IsGenericType: true, IsGenericTypeDefinition: false })
                             ret = ret.MakeGenericType(outerType.GetGenericArguments());
@@ -186,7 +186,7 @@ internal partial class ExpressionBuilder
                 }
 
             case IdentifierNameSyntax name:
-                return ResolveType(name, name.Identifier.Text);
+                return ResolveType(name, name.Identifier.ValueText);
 
             default:
                 return ToTypeError(type, null);
@@ -255,18 +255,18 @@ internal partial class ExpressionBuilder
             switch (node)
             {
                 case IdentifierNameSyntax id:
-                    fullName = simpleName = id.Identifier.Text;
+                    fullName = simpleName = id.Identifier.ValueText;
                     return true;
 
                 case MemberAccessExpressionSyntax { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression, Name: IdentifierNameSyntax name } ma
                     when TryGetDottedName(ma.Expression, out var prefix, out _):
-                    simpleName = name.Identifier.Text;
+                    simpleName = name.Identifier.ValueText;
                     fullName = prefix + "." + simpleName;
                     return true;
 
                 case QualifiedNameSyntax { Right: IdentifierNameSyntax name } qualifiedName
                     when TryGetDottedName(qualifiedName.Left, out var prefix, out _):
-                    simpleName = name.Identifier.Text;
+                    simpleName = name.Identifier.ValueText;
                     fullName = prefix + "." + simpleName;
                     return true;
 

@@ -103,7 +103,7 @@ internal partial class ExpressionBuilder
                         // Narrows only when it resolves to a type, not a constant pattern
                         var narrowedType = narrowingType switch
                         {
-                            IdentifierNameSyntax bareName => TryResolveTypeByName(bareName.Identifier.Text),
+                            IdentifierNameSyntax bareName => TryResolveTypeByName(bareName.Identifier.ValueText),
                             MemberAccessExpressionSyntax qualifiedName => TryResolveNamespaceQualifiedType(qualifiedName),
                             TypeSyntax typeName => ResolveType(typeName),
                             _ => null
@@ -187,7 +187,7 @@ internal partial class ExpressionBuilder
             // is var x
             case VarPatternSyntax { Designation: SingleVariableDesignationSyntax v }:
                 {
-                    var name = v.Identifier.Text;
+                    var name = v.Identifier.ValueText;
                     var declareExpression = DeclareVariable(v, expression, name);
                     if (declareExpression == null)
                         return null;
@@ -210,7 +210,7 @@ internal partial class ExpressionBuilder
                     if (typeCheck == null)
                         return null;
 
-                    var name = v.Identifier.Text;
+                    var name = v.Identifier.ValueText;
                     var declareExpression = DeclareVariable(v, Expression.Convert(expression, type), name);
                     if (declareExpression == null)
                         return null;
@@ -315,7 +315,7 @@ internal partial class ExpressionBuilder
                         if (p.Designation is not SingleVariableDesignationSyntax v)
                             return ToError(p.Designation);
 
-                        var name = v.Identifier.Text;
+                        var name = v.Identifier.ValueText;
                         var declareExpression = DeclareVariable(v, Expression.Convert(expression, expression.Type), name);
                         if (declareExpression == null)
                             return null;
@@ -426,7 +426,7 @@ internal partial class ExpressionBuilder
                         if (p.Designation is not SingleVariableDesignationSyntax v)
                             return ToError(p.Designation);
 
-                        var name = v.Identifier.Text;
+                        var name = v.Identifier.ValueText;
                         var declareExpression = DeclareVariable(v, receiver, name);
                         if (declareExpression == null)
                             return null;
@@ -496,7 +496,7 @@ internal partial class ExpressionBuilder
 
             case SingleVariableDesignationSyntax single:
                 {
-                    var declareExpression = DeclareVariable(single, expression, single.Identifier.Text);
+                    var declareExpression = DeclareVariable(single, expression, single.Identifier.ValueText);
                     return declareExpression == null ? null : Expression.Block(declareExpression, Expression.Constant(true));
                 }
 
@@ -608,14 +608,14 @@ internal partial class ExpressionBuilder
         switch (path)
         {
             case IdentifierNameSyntax id:
-                yield return id.Identifier.Text;
+                yield return id.Identifier.ValueText;
                 break;
 
             case MemberAccessExpressionSyntax { Name: IdentifierNameSyntax name } ma:
                 {
                     foreach (var item in GetPropertyPatternPath(ma.Expression))
                         yield return item;
-                    yield return name.Identifier.Text;
+                    yield return name.Identifier.ValueText;
                     break;
                 }
 

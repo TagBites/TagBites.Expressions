@@ -27,7 +27,7 @@ internal partial class ExpressionBuilder
             return null;
         }
 
-        var name = node.Name.Identifier.Text;
+        var name = node.Name.Identifier.ValueText;
         return ResolveCustomMember(instance, name)
                ?? ResolveMember(node, instance, name);
     }
@@ -37,7 +37,7 @@ internal partial class ExpressionBuilder
         if (instance == null)
             return null;
 
-        var name = node.Name.Identifier.Text;
+        var name = node.Name.Identifier.ValueText;
         return ResolveCustomMember(instance, name)
                ?? ResolveMember(node, instance, name);
     }
@@ -145,7 +145,7 @@ internal partial class ExpressionBuilder
 
     public override Expression? VisitIdentifierName(IdentifierNameSyntax node)
     {
-        var name = node.Identifier.Text;
+        var name = node.Identifier.ValueText;
 
         // Variables
         if (_variables != null)

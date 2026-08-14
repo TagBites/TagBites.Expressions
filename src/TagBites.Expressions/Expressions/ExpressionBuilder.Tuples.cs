@@ -28,7 +28,7 @@ internal partial class ExpressionBuilder
             var argument = node.Arguments[i];
 
             // Explicit name
-            var elementName = argument.NameColon?.Name.Identifier.Text;
+            var elementName = argument.NameColon?.Name.Identifier.ValueText;
             if (elementName != null)
             {
                 switch (ValueTupleShape.GetReservedElementPosition(elementName))
@@ -69,7 +69,7 @@ internal partial class ExpressionBuilder
                 if (i != index)
                 {
                     var argument = node.Arguments[i];
-                    var other = argument.NameColon?.Name.Identifier.Text
+                    var other = argument.NameColon?.Name.Identifier.ValueText
                                 ?? ValueTupleShape.GetImplicitElementName(argument.Expression);
 
                     if (other != null && string.Equals(other, name, _nameComparison))
