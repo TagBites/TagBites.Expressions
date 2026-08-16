@@ -2,7 +2,7 @@
 
 [![Nuget](https://img.shields.io/nuget/v/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 ![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4)
-[![License](https://img.shields.io/github/license/TagBites/TagBites.Expressions)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/TagBites/TagBites.Expressions)](https://github.com/TagBites/TagBites.Expressions/blob/master/LICENSE.md)
 [![Downloads](https://img.shields.io/nuget/dt/TagBites.Expressions.svg)](https://www.nuget.org/packages/TagBites.Expressions/)
 
 **TagBites.Expressions is a Roslyn-based C# expression parser and evaluator for .NET.**

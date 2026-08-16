@@ -16,7 +16,7 @@
     <Description>Roslyn-based C# expression parser and evaluator for .NET. Compiles runtime string expressions to strongly typed Func delegates or LINQ expression trees without creating a new assembly.</Description>
     <PackageTags>roslyn; parser; expression; expression-parser; expression-evaluator; expression-trees; lambda-expressions; linq; dynamic-linq; eval; runtime-compilation; formula-parser; rules-engine; delegate</PackageTags>
     <PackageProjectUrl>https://tagbites.com/expressions/</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <!-- References -->
